@@ -1184,6 +1184,17 @@ const CandidateDetail = () => {
                               setScheduleDateTime(event ? formatDateForInput(event.startTime) : '');
                               // Set duration but don't show it in UI - use default based on step type
                               setScheduleDuration(event ? Math.round((new Date(event.endTime) - new Date(event.startTime)) / 60000) : durationMap[step.stepType] || 30);
+                              // Load existing attachment if event has one
+                              if (event?.attachmentPath) {
+                                // Show the filename from the attachment path
+                                const fileName = event.attachmentPath.split('/').pop() || event.attachmentPath;
+                                setScheduleAttachmentPreview(fileName);
+                                // Note: We can't set the actual file object, but we can show the filename
+                                // The user can upload a new file to replace it
+                              } else {
+                                setScheduleAttachment(null);
+                                setScheduleAttachmentPreview(null);
+                              }
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
                               setShowScheduleModal(scheduleAction);

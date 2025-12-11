@@ -799,6 +799,7 @@ const autoCompleteCalendarSteps = async () => {
     const now = new Date();
     
     // Find calendar events that have passed their start time and are still SCHEDULED
+    // IMPORTANT: Check for already sent emails to prevent duplicates
     const pastEvents = await prisma.calendarEvent.findMany({
       where: {
         status: 'SCHEDULED',
