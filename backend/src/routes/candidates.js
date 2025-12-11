@@ -519,11 +519,20 @@ router.post('/:id/send-offer', async (req, res) => {
       }
     });
 
-    // Send offer letter email (now includes upload link)
-    const email = await emailService.sendOfferLetter(req.prisma, candidate, uploadToken);
+    // Use stepService to send offer letter (Step 1) - ensures it uses the same logic and templates
+    // This prevents duplicate emails and ensures all emails use templates from database
+    let emailRecord = null;
+    try {
+      const result = await stepService.completeStep(req.prisma, candidate.id, 1, req.user.id);
+      emailRecord = result.emailRecord;
+      logger.info(`✅ Step 1 (Offer Letter) completed via manual send button for ${candidate.email}`);
+    } catch (stepError) {
+      logger.error(`Error completing step 1: ${stepError.message}`);
+      throw stepError;
+    }
 
     // Update candidate status
-    await req.prisma.candidate.update({
+    const updatedCandidate = await req.prisma.candidate.update({
       where: { id: candidate.id },
       data: { 
         status: 'OFFER_SENT',
@@ -531,23 +540,25 @@ router.post('/:id/send-offer', async (req, res) => {
       }
     });
 
-    // Schedule reminder for follow-up
-    const reminderDate = new Date();
-    reminderDate.setHours(reminderDate.getHours() + parseInt(process.env.OFFER_REMINDER_HOURS || 72));
+    // Generate secure upload token for self-service portal (if not already set)
+    if (!candidate.uploadToken) {
+      const uploadToken = crypto.randomBytes(32).toString('hex');
+      const uploadTokenExpiry = new Date();
+      uploadTokenExpiry.setDate(uploadTokenExpiry.getDate() + 30); // Valid for 30 days
 
-    await req.prisma.reminder.create({
-      data: {
-        candidateId: candidate.id,
-        type: 'OFFER_FOLLOWUP',
-        message: `Follow up on offer letter for ${candidate.firstName} ${candidate.lastName}`,
-        scheduledFor: reminderDate
-      }
-    });
+      await req.prisma.candidate.update({
+        where: { id: candidate.id },
+        data: { 
+          uploadToken,
+          uploadTokenExpiry
+        }
+      });
+    }
 
     await logActivity(req.prisma, candidate.id, req.user.id, 'OFFER_SENT', 
       `Offer letter email sent to ${candidate.email}`);
 
-    res.json({ success: true, data: { candidate, email } });
+    res.json({ success: true, data: { candidate: updatedCandidate, email: emailRecord } });
   } catch (error) {
     logger.error('Error sending offer letter:', error);
     res.status(500).json({ success: false, message: 'Server error' });

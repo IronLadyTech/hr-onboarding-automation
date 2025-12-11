@@ -41,8 +41,8 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
   });
 
   if (!template) {
-    // Use default templates
-    return getDefaultTemplate(type, candidate, customData);
+    // NO HARDCODED FALLBACK - All emails must use templates from database
+    throw new Error(`No email template found for type: ${type}. Please create an email template in the database.`);
   }
 
   let subject = template.subject;

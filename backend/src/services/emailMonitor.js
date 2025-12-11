@@ -264,29 +264,35 @@ const processMessage = async (messageId) => {
               data: { status: 'CANCELLED' }
             });
 
-            // Mark Step 2 (Offer Reminder) task as completed
-            // Find all tasks for this candidate and mark Step 2 as completed
-            const tasks = await prisma.task.findMany({
-              where: {
-                candidateId: candidate.id,
-                status: { not: 'COMPLETED' }
-              }
-            });
+            // Mark Step 2 (Offer Reminder) as completed using stepService
+            try {
+              const stepService = require('./stepService');
+              await stepService.completeStep(prisma, candidate.id, 2, null, 'Signed offer received via email');
+              logger.info(`✅ Marked Step 2 (Offer Reminder) as completed for ${candidate.firstName} ${candidate.lastName}`);
+            } catch (stepError) {
+              logger.warn(`⚠️ Could not mark Step 2 as completed: ${stepError.message}`);
+              // Fallback: Mark old task system if it exists
+              const tasks = await prisma.task.findMany({
+                where: {
+                  candidateId: candidate.id,
+                  status: { not: 'COMPLETED' }
+                }
+              });
 
-            // Find Step 2 task by type or by metadata step number
-            for (const task of tasks) {
-              const isStep2 = task.type === 'OFFER_REMINDER' || 
-                             (task.metadata && typeof task.metadata === 'object' && task.metadata.step === 2);
-              
-              if (isStep2) {
-                await prisma.task.update({
-                  where: { id: task.id },
-                  data: {
-                    status: 'COMPLETED',
-                    completedAt: signedAt
-                  }
-                });
-                logger.info(`✅ Marked Step 2 task as completed: ${task.title}`);
+              for (const task of tasks) {
+                const isStep2 = task.type === 'OFFER_REMINDER' || 
+                               (task.metadata && typeof task.metadata === 'object' && task.metadata.step === 2);
+                
+                if (isStep2) {
+                  await prisma.task.update({
+                    where: { id: task.id },
+                    data: {
+                      status: 'COMPLETED',
+                      completedAt: signedAt
+                    }
+                  });
+                  logger.info(`✅ Marked Step 2 task as completed: ${task.title}`);
+                }
               }
             }
 
