@@ -1,14 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { configApi } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [companyName, setCompanyName] = useState('Company');
   const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Fetch company name from config
+  useEffect(() => {
+    const fetchCompanyName = async () => {
+      try {
+        const response = await configApi.getSettings();
+        if (response.data?.success && response.data?.data?.companyName) {
+          setCompanyName(response.data.data.companyName);
+        }
+      } catch (error) {
+        console.error('Failed to fetch company name:', error);
+      }
+    };
+    fetchCompanyName();
+  }, []);
 
   // Redirect if already logged in (only after auth check is complete)
   useEffect(() => {
@@ -60,7 +77,7 @@ const Login = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
               <span className="text-3xl">👩‍💼</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Iron Lady</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{companyName || 'Company'}</h1>
             <p className="text-gray-500 mt-2">HR Onboarding System</p>
           </div>
 
@@ -75,7 +92,7 @@ const Login = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input"
-                placeholder="you@ironlady.com"
+                placeholder="you@company.com"
                 required
               />
             </div>

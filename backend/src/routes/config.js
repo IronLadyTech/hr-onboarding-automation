@@ -349,11 +349,26 @@ router.delete('/departments/:name', async (req, res) => {
 // Get system settings
 router.get('/settings', async (req, res) => {
   try {
+    // Get company config from database
+    const configs = await req.prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location']
+        }
+      }
+    });
+    const configMap = {};
+    configs.forEach(c => { configMap[c.key] = c.value; });
+    
     const settings = {
-      companyName: process.env.COMPANY_NAME || 'Iron Lady',
-      hrEmail: process.env.HR_EMAIL || 'hr@ironlady.com',
-      ceoName: process.env.CEO_NAME || 'CEO',
-      officeLocation: process.env.OFFICE_LOCATION || 'Office Address',
+      companyName: configMap.company_name || process.env.COMPANY_NAME || 'Company',
+      hrEmail: configMap.hr_email || process.env.HR_EMAIL || 'hr@company.com',
+      hrName: configMap.hr_name || process.env.HR_NAME || 'HR Team',
+      hrPhone: configMap.hr_phone || process.env.HR_PHONE || '',
+      companyAddress: configMap.company_address || process.env.COMPANY_ADDRESS || '',
+      ceoName: configMap.ceo_name || process.env.CEO_NAME || 'CEO',
+      officeLocation: configMap.office_location || process.env.OFFICE_LOCATION || 'Office Address',
+      officeTimings: configMap.office_timings || process.env.OFFICE_TIMINGS || '9:30 AM - 6:30 PM',
       workingHours: {
         start: '09:00',
         end: '18:00'

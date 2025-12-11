@@ -34,6 +34,25 @@ transporter.verify((error, success) => {
   }
 });
 
+// Helper to get company config from database
+const getCompanyConfig = async (prisma) => {
+  try {
+    const configs = await prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['company_name', 'hr_name', 'hr_email', 'hr_phone', 'company_address', 'office_timings']
+        }
+      }
+    });
+    const configMap = {};
+    configs.forEach(c => { configMap[c.key] = c.value; });
+    return configMap;
+  } catch (error) {
+    logger.warn('Failed to fetch company config, using defaults:', error);
+    return {};
+  }
+};
+
 // Helper to get template and replace placeholders
 const getEmailContent = async (prisma, type, candidate, customData = {}) => {
   const template = await prisma.emailTemplate.findFirst({
@@ -44,6 +63,9 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
     // NO HARDCODED FALLBACK - All emails must use templates from database
     throw new Error(`No email template found for type: ${type}. Please create an email template in the database.`);
   }
+
+  // Get company config from database
+  const companyConfig = await getCompanyConfig(prisma);
 
   let subject = template.subject;
   let body = template.body;
@@ -60,8 +82,8 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
     '{{salary}}': candidate.salary || '',
     '{{joiningDate}}': candidate.expectedJoiningDate?.toLocaleDateString() || '',
     '{{reportingManager}}': candidate.reportingManager || '',
-    '{{hrName}}': 'HR Team',
-    '{{companyName}}': 'Iron Lady',
+    '{{hrName}}': companyConfig.hr_name || process.env.HR_NAME || 'HR Team',
+    '{{companyName}}': companyConfig.company_name || process.env.COMPANY_NAME || 'Company',
     ...customData
   };
 
@@ -76,6 +98,9 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
 // UNIVERSAL: Get email content from template or step template
 // This ensures ALL steps use editable email templates
 const getUniversalEmailContent = async (prisma, emailType, candidate, stepTemplate = null, customData = {}) => {
+  // Get company config from database
+  const companyConfig = await getCompanyConfig(prisma);
+  
   // Priority 1: If step template has a linked email template (emailTemplateId), use that specific template
   if (stepTemplate && stepTemplate.emailTemplateId && stepTemplate.emailTemplate) {
     const emailTemplate = stepTemplate.emailTemplate;
@@ -96,8 +121,8 @@ const getUniversalEmailContent = async (prisma, emailType, candidate, stepTempla
       '{{salary}}': candidate.salary || '',
       '{{joiningDate}}': candidate.expectedJoiningDate?.toLocaleDateString() || '',
       '{{reportingManager}}': candidate.reportingManager || '',
-      '{{hrName}}': 'HR Team',
-      '{{companyName}}': 'Iron Lady',
+      '{{hrName}}': companyConfig.hr_name || process.env.HR_NAME || 'HR Team',
+      '{{companyName}}': companyConfig.company_name || process.env.COMPANY_NAME || 'Company',
       ...customData
     };
 

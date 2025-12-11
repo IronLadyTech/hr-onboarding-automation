@@ -1,11 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { configApi } from '../services/api';
 
 const Layout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [companyName, setCompanyName] = useState('Company');
+  
+  useEffect(() => {
+    // Fetch company name from config
+    const fetchCompanyName = async () => {
+      try {
+        const response = await configApi.getSettings();
+        if (response.data?.success && response.data?.data?.companyName) {
+          setCompanyName(response.data.data.companyName);
+        }
+      } catch (error) {
+        console.error('Failed to fetch company name:', error);
+      }
+    };
+    fetchCompanyName();
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -27,7 +44,7 @@ const Layout = () => {
       <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-indigo-900 text-white transition-all duration-300 flex flex-col`}>
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-indigo-800">
-          {sidebarOpen && <span className="font-bold text-xl">Iron Lady</span>}
+          {sidebarOpen && <span className="font-bold text-xl">{companyName}</span>}
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 hover:bg-indigo-800 rounded"

@@ -787,7 +787,7 @@ router.post('/:id/schedule-hr-induction', async (req, res) => {
 
     const eventData = {
       title: `HR Induction - ${candidate.firstName} ${candidate.lastName}`,
-      description: `Welcome to Iron Lady!\n\nThis is your HR induction session where we'll cover:\n- Company policies\n- Benefits overview\n- Team introduction\n- Q&A session`,
+      description: `Welcome!\n\nThis is your HR induction session where we'll cover:\n- Company policies\n- Benefits overview\n- Team introduction\n- Q&A session`,
       startTime,
       endTime,
       attendees: [candidate.email],
@@ -1108,7 +1108,7 @@ router.post('/:id/send-whatsapp-groups', async (req, res) => {
           subject: 'Join Our WhatsApp Groups - {{firstName}}',
           body: `Hi {{firstName}},
 
-Welcome to Iron Lady! 🎉
+Welcome! 🎉
 
 Please join the following WhatsApp groups to stay connected with the team:
 
@@ -1383,13 +1383,13 @@ router.post('/batch/schedule', async (req, res) => {
       },
       'WELCOME_EMAIL': {
         title: 'Welcome Email - Batch Session',
-        description: 'Welcome to Iron Lady! We\'re excited to have you join our team.',
+        description: 'Welcome! We\'re excited to have you join our team.',
         type: 'WELCOME_EMAIL',
         updateField: 'welcomeEmailSentAt'
       },
       'HR_INDUCTION': {
         title: 'HR Induction - Batch Session',
-        description: 'Welcome to Iron Lady!\n\nThis is your HR induction session where we\'ll cover:\n- Company policies\n- Benefits overview\n- Team introduction\n- Q&A session',
+        description: 'Welcome!\n\nThis is your HR induction session where we\'ll cover:\n- Company policies\n- Benefits overview\n- Team introduction\n- Q&A session',
         type: 'HR_INDUCTION',
         updateField: 'hrInductionScheduled'
       },
