@@ -178,43 +178,88 @@ const processMessage = async (messageId) => {
     const fromHeader = headers.find(h => h.name.toLowerCase() === 'from');
     const subjectHeader = headers.find(h => h.name.toLowerCase() === 'subject');
     const dateHeader = headers.find(h => h.name.toLowerCase() === 'date');
+    const inReplyToHeader = headers.find(h => h.name.toLowerCase() === 'in-reply-to');
+    const referencesHeader = headers.find(h => h.name.toLowerCase() === 'references');
+    const messageIdHeader = headers.find(h => h.name.toLowerCase() === 'message-id');
     
     // Extract email address from "Name <email@domain.com>" format
     const fromEmail = extractEmail(fromHeader?.value || '');
     const subject = subjectHeader?.value || '';
     const emailDate = dateHeader ? new Date(dateHeader.value) : new Date(message.data.internalDate ? parseInt(message.data.internalDate) : Date.now());
+    const inReplyTo = inReplyToHeader?.value || '';
+    const references = referencesHeader?.value || '';
 
     if (!fromEmail) return;
 
-    logger.info(`Processing: From=${fromEmail}, Subject=${subject}, Date=${emailDate.toISOString()}`);
+    logger.info(`Processing: From=${fromEmail}, Subject=${subject}, Date=${emailDate.toISOString()}, InReplyTo=${inReplyTo || 'none'}`);
 
-    // Find candidate by email - only check candidates who have been sent an offer
+    // Find candidate by email
     const candidate = await prisma.candidate.findFirst({
       where: { 
-        email: fromEmail.toLowerCase(),
-        offerSentAt: { not: null } // Only candidates who have been sent an offer
+        email: fromEmail.toLowerCase()
       }
     });
 
     if (!candidate) {
-      logger.info(`No matching candidate with sent offer for: ${fromEmail}`);
+      logger.info(`No matching candidate for: ${fromEmail}`);
       return;
     }
 
-    // CRITICAL: Only process emails that came AFTER the offer was sent
-    // Add a small buffer (1 minute) to account for timezone differences
-    const offerSentTime = new Date(candidate.offerSentAt);
-    const bufferTime = new Date(offerSentTime.getTime() - 60000); // 1 minute before
+    // CRITICAL: Only process attachments from replies to Step 1 (OFFER_LETTER) or Step 2 (OFFER_REMINDER) emails
+    // Check if this email is a reply to an offer-related email by checking subject or matching original email
+    let isReplyToOfferEmail = false;
+    let originalEmailType = null;
     
-    if (candidate.offerSentAt && emailDate < bufferTime) {
-      logger.info(`⏭️ Skipping email from ${fromEmail}: Email date (${emailDate.toISOString()}) is before offer sent date (${candidate.offerSentAt.toISOString()})`);
+    const subjectLower = subject.toLowerCase();
+    
+    // Method 1: Check subject for offer letter/reminder keywords
+    if (subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'))) {
+      isReplyToOfferEmail = true;
+      logger.info(`✅ Detected as offer email reply based on subject: "${subject}"`);
+    }
+    
+    // Method 2: Find the original OFFER_LETTER or OFFER_REMINDER email and check if this is a reply to it
+    if (!isReplyToOfferEmail) {
+      // Find the most recent OFFER_LETTER or OFFER_REMINDER email sent to this candidate
+      const offerEmails = await prisma.email.findMany({
+        where: {
+          candidateId: candidate.id,
+          type: { in: ['OFFER_LETTER', 'OFFER_REMINDER'] },
+          status: 'SENT'
+        },
+        orderBy: { sentAt: 'desc' },
+        take: 5 // Check last 5 offer-related emails
+      });
+      
+      for (const offerEmail of offerEmails) {
+        const offerSubjectLower = offerEmail.subject.toLowerCase();
+        // Remove "Re:" prefix for comparison
+        const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').trim();
+        const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').trim();
+        
+        // Check if reply subject matches or contains the original email subject
+        if (cleanReplySubject.includes(cleanOfferSubject) || cleanOfferSubject.includes(cleanReplySubject)) {
+          isReplyToOfferEmail = true;
+          originalEmailType = offerEmail.type;
+          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}"`);
+          break;
+        }
+      }
+    }
+    
+    // If not a reply to Step 1 or Step 2 email, skip processing
+    if (!isReplyToOfferEmail) {
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Not a reply to Step 1 (Offer Letter) or Step 2 (Offer Reminder) email. Subject: "${subject}"`);
       return;
     }
     
-    logger.info(`✅ Email date check passed: EmailDate=${emailDate.toISOString()}, OfferSentAt=${candidate.offerSentAt.toISOString()}`);
-
-    // If candidate hasn't signed yet and email came after offer was sent, treat any attachment as signed offer
-    const shouldProcessSignedOffer = !candidate.offerSignedAt;
+    // Only process if candidate hasn't signed yet
+    if (candidate.offerSignedAt) {
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Candidate has already signed offer letter`);
+      return;
+    }
+    
+    const shouldProcessSignedOffer = true;
     
     logger.info(`📧 Processing email from ${candidate.firstName} ${candidate.lastName}: OfferSentAt=${candidate.offerSentAt?.toISOString()}, EmailDate=${emailDate.toISOString()}, HasSigned=${!!candidate.offerSignedAt}, WillProcess=${shouldProcessSignedOffer}`);
 
