@@ -164,6 +164,7 @@ export const calendarApi = {
   getUpcoming: (days) => api.get('/calendar/upcoming', { params: { days } }),
   create: (data) => {
     // If FormData, don't set Content-Type header (browser will set it with boundary)
+    // This handles both single attachment ('attachment') and multiple attachments ('attachments')
     if (data instanceof FormData) {
       return api.post('/calendar', data, {
         headers: {
