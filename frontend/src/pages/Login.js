@@ -9,22 +9,28 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [companyName, setCompanyName] = useState('Company');
+  const [companyLogo, setCompanyLogo] = useState(null);
   const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Fetch company name from config
+  // Fetch company name and logo from config
   useEffect(() => {
-    const fetchCompanyName = async () => {
+    const fetchCompanyInfo = async () => {
       try {
         const response = await configApi.getSettings();
-        if (response.data?.success && response.data?.data?.companyName) {
-          setCompanyName(response.data.data.companyName);
+        if (response.data?.success) {
+          if (response.data.data?.companyName) {
+            setCompanyName(response.data.data.companyName);
+          }
+          if (response.data.data?.companyLogoUrl) {
+            setCompanyLogo(response.data.data.companyLogoUrl);
+          }
         }
       } catch (error) {
-        console.error('Failed to fetch company name:', error);
+        console.error('Failed to fetch company info:', error);
       }
     };
-    fetchCompanyName();
+    fetchCompanyInfo();
   }, []);
 
   // Redirect if already logged in (only after auth check is complete)
@@ -74,9 +80,19 @@ const Login = () => {
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
-              <span className="text-3xl">👩‍💼</span>
-            </div>
+            {companyLogo ? (
+              <div className="inline-flex items-center justify-center mb-4">
+                <img 
+                  src={companyLogo} 
+                  alt={companyName} 
+                  className="h-16 w-auto object-contain"
+                />
+              </div>
+            ) : (
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary-light, #6366F1)' }}>
+                <span className="text-3xl">👩‍💼</span>
+              </div>
+            )}
             <h1 className="text-2xl font-bold text-gray-900">{companyName || 'Company'}</h1>
             <p className="text-gray-500 mt-2">HR Onboarding System</p>
           </div>
