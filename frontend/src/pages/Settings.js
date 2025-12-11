@@ -1387,6 +1387,209 @@ const Settings = () => {
           {saving ? 'Saving...' : '💾 Save All Changes'}
         </button>
       </div>
+
+      {/* Custom Field Modal */}
+      {showCustomFieldModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">
+              {editingCustomField ? 'Edit Custom Field' : 'Create Custom Field'}
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Field Label *
+                </label>
+                <input
+                  type="text"
+                  value={customFieldForm.label}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, label: e.target.value })}
+                  className="input"
+                  placeholder="e.g., Emergency Contact"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Field Key *
+                </label>
+                <input
+                  type="text"
+                  value={customFieldForm.fieldKey}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, fieldKey: e.target.value.replace(/[^a-zA-Z0-9_]/g, '') })}
+                  className="input"
+                  placeholder="e.g., emergencyContact"
+                  required
+                  disabled={!!editingCustomField}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Only letters, numbers, and underscores allowed. Cannot be changed after creation.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Field Type *
+                </label>
+                <select
+                  value={customFieldForm.fieldType}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, fieldType: e.target.value, options: e.target.value === 'select' ? customFieldForm.options : [] })}
+                  className="input"
+                  required
+                >
+                  <option value="text">Text</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="select">Select (Dropdown)</option>
+                  <option value="textarea">Textarea</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Placeholder
+                </label>
+                <input
+                  type="text"
+                  value={customFieldForm.placeholder}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, placeholder: e.target.value })}
+                  className="input"
+                  placeholder="Enter placeholder text"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="required"
+                  checked={customFieldForm.required}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, required: e.target.checked })}
+                  className="mr-2"
+                />
+                <label htmlFor="required" className="text-sm font-medium text-gray-700">
+                  Required Field
+                </label>
+              </div>
+
+              {customFieldForm.fieldType === 'select' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Options *
+                  </label>
+                  <div className="space-y-2">
+                    {customFieldForm.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={option.label}
+                          onChange={(e) => {
+                            const newOptions = [...customFieldForm.options];
+                            newOptions[index].label = e.target.value;
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="input flex-1"
+                          placeholder="Display Label"
+                        />
+                        <input
+                          type="text"
+                          value={option.value}
+                          onChange={(e) => {
+                            const newOptions = [...customFieldForm.options];
+                            newOptions[index].value = e.target.value;
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="input flex-1"
+                          placeholder="Value"
+                        />
+                        <button
+                          onClick={() => {
+                            const newOptions = customFieldForm.options.filter((_, i) => i !== index);
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newOption.label}
+                        onChange={(e) => setNewOption({ ...newOption, label: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Display Label"
+                      />
+                      <input
+                        type="text"
+                        value={newOption.value}
+                        onChange={(e) => setNewOption({ ...newOption, value: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Value"
+                      />
+                      <button
+                        onClick={handleAddOption}
+                        className="btn btn-secondary text-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Order
+                </label>
+                <input
+                  type="number"
+                  value={customFieldForm.order}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, order: parseInt(e.target.value) || 0 })}
+                  className="input"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Lower numbers appear first in the form
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCustomFieldModal(false);
+                  setEditingCustomField(null);
+                  setCustomFieldForm({
+                    label: '',
+                    fieldKey: '',
+                    fieldType: 'text',
+                    placeholder: '',
+                    required: false,
+                    validation: null,
+                    options: [],
+                    order: 0
+                  });
+                  setNewOption({ label: '', value: '' });
+                }}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCustomField}
+                disabled={customFieldLoading}
+                className="btn btn-primary"
+              >
+                {customFieldLoading ? 'Saving...' : editingCustomField ? 'Update Field' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
