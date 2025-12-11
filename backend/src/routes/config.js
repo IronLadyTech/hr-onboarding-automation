@@ -227,6 +227,125 @@ router.get('/departments', async (req, res) => {
   }
 });
 
+// Create a new department
+router.post('/departments', async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Department name is required' });
+    }
+
+    const departmentName = name.trim();
+
+    // Check if department already exists (by checking if any candidate uses it)
+    const existing = await req.prisma.candidate.findFirst({
+      where: { department: departmentName }
+    });
+
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Department already exists' });
+    }
+
+    // Since departments are stored as strings in candidates, we just return success
+    // The department will be available when a candidate is created with it
+    res.json({ success: true, data: { name: departmentName }, message: 'Department created successfully' });
+  } catch (error) {
+    logger.error('Error creating department:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update department name (rename)
+router.put('/departments/:oldName', async (req, res) => {
+  try {
+    const { oldName } = req.params;
+    const { newName } = req.body;
+
+    if (!newName || !newName.trim()) {
+      return res.status(400).json({ success: false, message: 'New department name is required' });
+    }
+
+    const oldDepartmentName = decodeURIComponent(oldName);
+    const newDepartmentName = newName.trim();
+
+    if (oldDepartmentName === newDepartmentName) {
+      return res.status(400).json({ success: false, message: 'New name must be different from old name' });
+    }
+
+    // Check if new name already exists
+    const existing = await req.prisma.candidate.findFirst({
+      where: { department: newDepartmentName }
+    });
+
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Department with new name already exists' });
+    }
+
+    // Update all candidates with the old department name
+    const updateResult = await req.prisma.candidate.updateMany({
+      where: { department: oldDepartmentName },
+      data: { department: newDepartmentName }
+    });
+
+    // Update all department step templates
+    await req.prisma.departmentStepTemplate.updateMany({
+      where: { department: oldDepartmentName },
+      data: { department: newDepartmentName }
+    });
+
+    res.json({ 
+      success: true, 
+      data: { oldName: oldDepartmentName, newName: newDepartmentName, updatedCandidates: updateResult.count },
+      message: `Department renamed successfully. Updated ${updateResult.count} candidate(s).`
+    });
+  } catch (error) {
+    logger.error('Error updating department:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete department
+router.delete('/departments/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    const departmentName = decodeURIComponent(name);
+
+    // Check if department is in use
+    const candidatesUsingDept = await req.prisma.candidate.count({
+      where: { department: departmentName }
+    });
+
+    if (candidatesUsingDept > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Cannot delete department. It is currently used by ${candidatesUsingDept} candidate(s). Please reassign candidates to another department first.` 
+      });
+    }
+
+    // Check if department has step templates
+    const stepTemplatesCount = await req.prisma.departmentStepTemplate.count({
+      where: { department: departmentName }
+    });
+
+    if (stepTemplatesCount > 0) {
+      // Delete department step templates
+      await req.prisma.departmentStepTemplate.deleteMany({
+        where: { department: departmentName }
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Department deleted successfully',
+      data: { name: departmentName, deletedStepTemplates: stepTemplatesCount }
+    });
+  } catch (error) {
+    logger.error('Error deleting department:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get system settings
 router.get('/settings', async (req, res) => {
   try {

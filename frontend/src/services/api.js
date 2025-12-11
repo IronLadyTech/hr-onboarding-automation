@@ -207,6 +207,7 @@ export const dashboardApi = {
 };
 
 // Config APIs
+// Config APIs
 export const configApi = {
   getWorkflow: () => api.get('/config/workflow'),
   updateWorkflow: (data) => api.put('/config/workflow', data),
@@ -217,6 +218,9 @@ export const configApi = {
   getTrainingPlans: () => api.get('/config/training-plans'),
   createTrainingPlan: (data) => api.post('/config/training-plans', data),
   getDepartments: () => api.get('/config/departments'),
+  createDepartment: (data) => api.post('/config/departments', data),
+  updateDepartment: (oldName, data) => api.put(`/config/departments/${encodeURIComponent(oldName)}`, data),
+  deleteDepartment: (name) => api.delete(`/config/departments/${encodeURIComponent(name)}`),
   getSettings: () => api.get('/config/settings'),
   initWorkflow: () => api.post('/config/workflow/init'),
   initTrainingPlans: () => api.post('/config/training-plans/init'),

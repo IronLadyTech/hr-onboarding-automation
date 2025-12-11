@@ -19,7 +19,18 @@ const Settings = () => {
 
   useEffect(() => {
     fetchData();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const response = await configApi.getDepartments();
+      setDepartments(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch departments:', error);
+      toast.error('Failed to load departments');
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -89,6 +100,61 @@ const Settings = () => {
     }
   };
 
+  const handleCreateDepartment = async () => {
+    if (!newDepartmentName.trim()) {
+      toast.error('Please enter a department name');
+      return;
+    }
+
+    setDepartmentLoading(true);
+    try {
+      await configApi.createDepartment({ name: newDepartmentName.trim() });
+      toast.success('Department created successfully!');
+      setNewDepartmentName('');
+      fetchDepartments();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create department');
+    } finally {
+      setDepartmentLoading(false);
+    }
+  };
+
+  const handleUpdateDepartment = async (oldName) => {
+    if (!editingDepartmentName.trim() || editingDepartmentName === oldName) {
+      return;
+    }
+
+    setDepartmentLoading(true);
+    try {
+      await configApi.updateDepartment(oldName, { newName: editingDepartmentName.trim() });
+      toast.success('Department updated successfully!');
+      setEditingDepartment(null);
+      setEditingDepartmentName('');
+      fetchDepartments();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update department');
+    } finally {
+      setDepartmentLoading(false);
+    }
+  };
+
+  const handleDeleteDepartment = async (name) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    setDepartmentLoading(true);
+    try {
+      await configApi.deleteDepartment(name);
+      toast.success('Department deleted successfully!');
+      fetchDepartments();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete department');
+    } finally {
+      setDepartmentLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -99,12 +165,19 @@ const Settings = () => {
 
   const tabs = [
     { id: 'company', label: 'Company', icon: '🏢' },
+    { id: 'departments', label: 'Departments', icon: '🏛️' },
     { id: 'automation', label: 'Automation (11 Steps)', icon: '⚡' },
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
     { id: 'training', label: 'Training Plans', icon: '📚' },
   ];
 
-  const departments = ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations', 'ALL'];
+  const [departments, setDepartments] = useState([]);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [editingDepartmentName, setEditingDepartmentName] = useState('');
+  const [departmentLoading, setDepartmentLoading] = useState(false);
+  const [editingDepartmentName, setEditingDepartmentName] = useState('');
+  const [departmentLoading, setDepartmentLoading] = useState(false);
 
   return (
     <div className="animate-fadeIn">
@@ -278,6 +351,119 @@ const Settings = () => {
                 rows={3}
                 placeholder="Aadhaar Card,PAN Card,Educational Certificates..."
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Department Management */}
+      {activeTab === 'departments' && (
+        <div className="space-y-6">
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">🏛️ Department Management</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Create, edit, and delete departments. New departments work exactly like existing ones.
+            </p>
+
+            {/* Create New Department */}
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-medium mb-3">Create New Department</h3>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={newDepartmentName}
+                  onChange={(e) => setNewDepartmentName(e.target.value)}
+                  placeholder="Enter department name (e.g., Product, Design)"
+                  className="input flex-1"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCreateDepartment();
+                    }
+                  }}
+                />
+                <button
+                  onClick={handleCreateDepartment}
+                  disabled={!newDepartmentName.trim() || departmentLoading}
+                  className="btn btn-primary"
+                >
+                  {departmentLoading ? 'Creating...' : '+ Create'}
+                </button>
+              </div>
+            </div>
+
+            {/* Departments List */}
+            <div>
+              <h3 className="font-medium mb-3">Existing Departments</h3>
+              {departments.length === 0 ? (
+                <p className="text-gray-500 text-sm">No departments found. Create one above.</p>
+              ) : (
+                <div className="space-y-2">
+                  {departments.map((dept) => (
+                    <div
+                      key={dept}
+                      className="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-gray-50"
+                    >
+                      {editingDepartment === dept ? (
+                        <div className="flex items-center gap-3 flex-1">
+                          <input
+                            type="text"
+                            value={editingDepartmentName}
+                            onChange={(e) => setEditingDepartmentName(e.target.value)}
+                            className="input flex-1"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateDepartment(dept);
+                              } else if (e.key === 'Escape') {
+                                setEditingDepartment(null);
+                                setEditingDepartmentName('');
+                              }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleUpdateDepartment(dept)}
+                            disabled={!editingDepartmentName.trim() || editingDepartmentName === dept || departmentLoading}
+                            className="btn btn-primary text-sm"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingDepartment(null);
+                              setEditingDepartmentName('');
+                            }}
+                            className="btn btn-secondary text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-medium">{dept}</span>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => {
+                                setEditingDepartment(dept);
+                                setEditingDepartmentName(dept);
+                              }}
+                              className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDepartment(dept)}
+                              disabled={departmentLoading}
+                              className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
