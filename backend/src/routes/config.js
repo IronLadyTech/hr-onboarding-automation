@@ -1,0 +1,598 @@
+const express = require('express');
+const router = express.Router();
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const logger = require('../utils/logger');
+
+// Apply authentication to all routes
+router.use(authenticateToken);
+
+// Get all workflow configurations
+router.get('/workflow', async (req, res) => {
+  try {
+    const configs = await req.prisma.workflowConfig.findMany({
+      orderBy: { key: 'asc' }
+    });
+
+    // Return as key-value object
+    const configMap = configs.reduce((acc, config) => {
+      acc[config.key] = config.value;
+      return acc;
+    }, {});
+
+    res.json({ success: true, data: configMap });
+  } catch (error) {
+    logger.error('Error fetching workflow config:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update workflow configuration
+router.put('/workflow', requireAdmin, async (req, res) => {
+  try {
+    const configs = req.body;
+
+    const updates = await Promise.all(
+      Object.entries(configs).map(([key, value]) =>
+        req.prisma.workflowConfig.upsert({
+          where: { key },
+          update: { value },
+          create: { key, value }
+        })
+      )
+    );
+
+    res.json({ success: true, data: updates });
+  } catch (error) {
+    logger.error('Error updating workflow config:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all WhatsApp groups
+router.get('/whatsapp-groups', async (req, res) => {
+  try {
+    const groups = await req.prisma.whatsAppGroup.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' }
+    });
+
+    res.json({ success: true, data: groups });
+  } catch (error) {
+    logger.error('Error fetching WhatsApp groups:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create WhatsApp group
+router.post('/whatsapp-groups', requireAdmin, async (req, res) => {
+  try {
+    const { name, department, description, url } = req.body;
+
+    const group = await req.prisma.whatsAppGroup.create({
+      data: {
+        name,
+        department,
+        description,
+        url,
+        isActive: true
+      }
+    });
+
+    res.status(201).json({ success: true, data: group });
+  } catch (error) {
+    logger.error('Error creating WhatsApp group:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update WhatsApp group
+router.put('/whatsapp-groups/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, department, description, url, isActive } = req.body;
+
+    const group = await req.prisma.whatsAppGroup.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { name }),
+        ...(department !== undefined && { department }),
+        ...(description !== undefined && { description }),
+        ...(url !== undefined && { url }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+
+    res.json({ success: true, data: group });
+  } catch (error) {
+    logger.error('Error updating WhatsApp group:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete WhatsApp group
+router.delete('/whatsapp-groups/:id', requireAdmin, async (req, res) => {
+  try {
+    await req.prisma.whatsAppGroup.delete({
+      where: { id: req.params.id }
+    });
+
+    res.json({ success: true, message: 'WhatsApp group deleted' });
+  } catch (error) {
+    logger.error('Error deleting WhatsApp group:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all training plans
+router.get('/training-plans', async (req, res) => {
+  try {
+    const { department } = req.query;
+    
+    const where = { isActive: true };
+    if (department) where.department = department;
+
+    const plans = await req.prisma.trainingPlan.findMany({
+      where,
+      orderBy: { name: 'asc' }
+    });
+
+    res.json({ success: true, data: plans });
+  } catch (error) {
+    logger.error('Error fetching training plans:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create training plan
+router.post('/training-plans', requireAdmin, async (req, res) => {
+  try {
+    const { name, department, duration, modules, description } = req.body;
+
+    const plan = await req.prisma.trainingPlan.create({
+      data: {
+        name,
+        department,
+        duration,
+        modules: modules || [],
+        description,
+        isActive: true
+      }
+    });
+
+    res.status(201).json({ success: true, data: plan });
+  } catch (error) {
+    logger.error('Error creating training plan:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update training plan
+router.put('/training-plans/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, department, duration, modules, description, isActive } = req.body;
+
+    const plan = await req.prisma.trainingPlan.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name && { name }),
+        ...(department && { department }),
+        ...(duration && { duration }),
+        ...(modules && { modules }),
+        ...(description && { description }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+
+    res.json({ success: true, data: plan });
+  } catch (error) {
+    logger.error('Error updating training plan:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete training plan
+router.delete('/training-plans/:id', requireAdmin, async (req, res) => {
+  try {
+    await req.prisma.trainingPlan.delete({
+      where: { id: req.params.id }
+    });
+
+    res.json({ success: true, message: 'Training plan deleted' });
+  } catch (error) {
+    logger.error('Error deleting training plan:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all departments
+router.get('/departments', async (req, res) => {
+  try {
+    // Get unique departments from candidates
+    const departments = await req.prisma.candidate.findMany({
+      select: { department: true },
+      distinct: ['department']
+    });
+
+    const departmentList = departments
+      .map(d => d.department)
+      .filter(d => d && d.trim() !== '');
+
+    // Add default departments if not present
+    const defaults = ['Engineering', 'Sales', 'Marketing', 'Operations', 'HR', 'Finance'];
+    const allDepartments = [...new Set([...departmentList, ...defaults])].sort();
+
+    res.json({ success: true, data: allDepartments });
+  } catch (error) {
+    logger.error('Error fetching departments:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get system settings
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = {
+      companyName: process.env.COMPANY_NAME || 'Iron Lady',
+      hrEmail: process.env.HR_EMAIL || 'hr@ironlady.com',
+      ceoName: process.env.CEO_NAME || 'CEO',
+      officeLocation: process.env.OFFICE_LOCATION || 'Office Address',
+      workingHours: {
+        start: '09:00',
+        end: '18:00'
+      },
+      timezone: process.env.TIMEZONE || 'Asia/Kolkata',
+      automationEnabled: true,
+      emailTrackingEnabled: true
+    };
+
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('Error fetching settings:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Initialize default workflow configurations
+router.post('/workflow/init', requireAdmin, async (req, res) => {
+  try {
+    const defaultConfigs = [
+      { key: 'offer_reminder_days', value: '3' },
+      { key: 'welcome_email_days_before', value: '1' },
+      { key: 'hr_induction_time', value: '09:30' },
+      { key: 'onboarding_form_reminder_hours', value: '24' },
+      { key: 'checkin_call_days_after', value: '7' },
+      { key: 'training_duration_days', value: '7' },
+      { key: 'auto_send_welcome_email', value: 'true' },
+      { key: 'auto_create_calendar_events', value: 'true' },
+      { key: 'auto_send_form_reminders', value: 'true' },
+      { key: 'email_tracking_enabled', value: 'true' }
+    ];
+
+    const created = [];
+    for (const config of defaultConfigs) {
+      const existing = await req.prisma.workflowConfig.findUnique({
+        where: { key: config.key }
+      });
+
+      if (!existing) {
+        const newConfig = await req.prisma.workflowConfig.create({
+          data: config
+        });
+        created.push(newConfig);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Initialized ${created.length} workflow configurations`,
+      data: created
+    });
+  } catch (error) {
+    logger.error('Error initializing workflow config:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Initialize default training plans
+router.post('/training-plans/init', requireAdmin, async (req, res) => {
+  try {
+    const defaultPlans = [
+      {
+        name: 'General Onboarding',
+        department: 'ALL',
+        duration: 7,
+        description: 'Standard one-week onboarding for all new employees',
+        modules: [
+          { day: 1, title: 'Company Overview', description: 'Introduction to company history, mission, and values' },
+          { day: 2, title: 'Policies & Procedures', description: 'HR policies, code of conduct, compliance training' },
+          { day: 3, title: 'Tools & Systems', description: 'Setting up email, communication tools, and internal systems' },
+          { day: 4, title: 'Team Introduction', description: 'Meet the team, understand team structure and processes' },
+          { day: 5, title: 'Role-Specific Training', description: 'Deep dive into role responsibilities' },
+          { day: 6, title: 'Shadowing', description: 'Shadow experienced team members' },
+          { day: 7, title: 'Review & Feedback', description: 'Week 1 review and feedback session' }
+        ]
+      },
+      {
+        name: 'Sales Onboarding',
+        department: 'Sales',
+        duration: 14,
+        description: 'Two-week intensive sales training program',
+        modules: [
+          { day: 1, title: 'Company & Product Overview', description: 'Understanding our products and services' },
+          { day: 2, title: 'Sales Process', description: 'End-to-end sales process and CRM training' },
+          { day: 3, title: 'Product Deep Dive', description: 'Detailed product knowledge sessions' },
+          { day: 4, title: 'Competitor Analysis', description: 'Understanding competitive landscape' },
+          { day: 5, title: 'Sales Tools', description: 'CRM, proposal tools, and sales enablement' },
+          { day: 6, title: 'Role Play - Discovery', description: 'Practice discovery calls' },
+          { day: 7, title: 'Role Play - Demo', description: 'Practice product demonstrations' },
+          { day: 8, title: 'Objection Handling', description: 'Common objections and responses' },
+          { day: 9, title: 'Closing Techniques', description: 'Negotiation and closing strategies' },
+          { day: 10, title: 'Shadowing Calls', description: 'Shadow senior sales reps on live calls' },
+          { day: 11, title: 'First Solo Calls', description: 'Make first independent calls with supervision' },
+          { day: 12, title: 'Pipeline Management', description: 'Managing and forecasting pipeline' },
+          { day: 13, title: 'Advanced Scenarios', description: 'Complex deal scenarios and solutions' },
+          { day: 14, title: 'Certification', description: 'Final assessment and certification' }
+        ]
+      }
+    ];
+
+    const created = [];
+    for (const plan of defaultPlans) {
+      const existing = await req.prisma.trainingPlan.findFirst({
+        where: { name: plan.name }
+      });
+
+      if (!existing) {
+        const newPlan = await req.prisma.trainingPlan.create({
+          data: {
+            ...plan,
+            isActive: true
+          }
+        });
+        created.push(newPlan);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Created ${created.length} default training plans`,
+      data: created
+    });
+  } catch (error) {
+    logger.error('Error initializing training plans:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ============ DEPARTMENT STEP TEMPLATES ============
+
+// Get all step templates for a department
+router.get('/department-steps/:department', async (req, res) => {
+  try {
+    const { department } = req.params;
+    
+    const steps = await req.prisma.departmentStepTemplate.findMany({
+      where: { 
+        department,
+        isActive: true
+      },
+      include: {
+        emailTemplate: true // Include email template details
+      },
+      orderBy: { stepNumber: 'asc' }
+    });
+
+    res.json({ success: true, data: steps });
+  } catch (error) {
+    logger.error('Error fetching department steps:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create or update step template
+router.post('/department-steps', async (req, res) => {
+  try {
+    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId } = req.body;
+
+    if (!department || !stepNumber || !title || !type) {
+      return res.status(400).json({ success: false, message: 'Department, stepNumber, title, and type are required' });
+    }
+
+    // Validate: Email template is required
+    if (!emailTemplateId) {
+      return res.status(400).json({ success: false, message: 'Email template is required for every step' });
+    }
+
+    // Check if step already exists
+    const existing = await req.prisma.departmentStepTemplate.findUnique({
+      where: {
+        department_stepNumber: {
+          department,
+          stepNumber: parseInt(stepNumber)
+        }
+      }
+    });
+
+    let step;
+    if (existing) {
+      // Update existing step
+      step = await req.prisma.departmentStepTemplate.update({
+        where: { id: existing.id },
+        data: {
+          title,
+          description,
+          type,
+          icon,
+          isAuto: isAuto || false,
+          dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          priority: priority || 'MEDIUM',
+          emailTemplateId: emailTemplateId || null
+        },
+        include: {
+          emailTemplate: true
+        }
+      });
+    } else {
+      // Create new step - need to shift other steps if inserting in middle
+      const stepsAfter = await req.prisma.departmentStepTemplate.findMany({
+        where: {
+          department,
+          stepNumber: { gte: parseInt(stepNumber) }
+        }
+      });
+
+      // Shift existing steps
+      for (const stepAfter of stepsAfter) {
+        await req.prisma.departmentStepTemplate.update({
+          where: { id: stepAfter.id },
+          data: { stepNumber: stepAfter.stepNumber + 1 }
+        });
+      }
+
+      step = await req.prisma.departmentStepTemplate.create({
+        data: {
+          department,
+          stepNumber: parseInt(stepNumber),
+          title,
+          description,
+          type,
+          icon,
+          isAuto: isAuto || false,
+          dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          priority: priority || 'MEDIUM',
+          emailTemplateId: emailTemplateId || null
+        },
+        include: {
+          emailTemplate: true
+        }
+      });
+    }
+
+    res.json({ success: true, data: step });
+  } catch (error) {
+    logger.error('Error creating/updating department step:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update step template
+router.put('/department-steps/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, type, icon, isAuto, dueDateOffset, priority, stepNumber, emailTemplateId } = req.body;
+
+    // Validate: Email template is required
+    if (emailTemplateId !== undefined && !emailTemplateId) {
+      return res.status(400).json({ success: false, message: 'Email template is required for every step' });
+    }
+
+    const step = await req.prisma.departmentStepTemplate.update({
+      where: { id },
+      data: {
+        ...(title && { title }),
+        ...(description !== undefined && { description }),
+        ...(type && { type }),
+        ...(icon !== undefined && { icon }),
+        ...(isAuto !== undefined && { isAuto }),
+        ...(dueDateOffset !== undefined && { dueDateOffset: parseInt(dueDateOffset) }),
+        ...(priority && { priority }),
+        ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
+        ...(emailTemplateId !== undefined && { emailTemplateId: emailTemplateId || null })
+      },
+      include: {
+        emailTemplate: true
+      }
+    });
+
+    res.json({ success: true, data: step });
+  } catch (error) {
+    logger.error('Error updating department step:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete step template
+router.delete('/department-steps/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const step = await req.prisma.departmentStepTemplate.findUnique({
+      where: { id }
+    });
+
+    if (!step) {
+      return res.status(404).json({ success: false, message: 'Step not found' });
+    }
+
+    await req.prisma.departmentStepTemplate.delete({
+      where: { id }
+    });
+
+    // Reorder remaining steps
+    const stepsAfter = await req.prisma.departmentStepTemplate.findMany({
+      where: {
+        department: step.department,
+        stepNumber: { gt: step.stepNumber }
+      }
+    });
+
+    for (const stepAfter of stepsAfter) {
+      await req.prisma.departmentStepTemplate.update({
+        where: { id: stepAfter.id },
+        data: { stepNumber: stepAfter.stepNumber - 1 }
+      });
+    }
+
+    res.json({ success: true, message: 'Step deleted and steps reordered' });
+  } catch (error) {
+    logger.error('Error deleting department step:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Initialize default steps for a department
+router.post('/department-steps/init-defaults/:department', async (req, res) => {
+  try {
+    const { department } = req.params;
+
+    // Check if steps already exist
+    const existing = await req.prisma.departmentStepTemplate.findFirst({
+      where: { department }
+    });
+
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Steps already exist for this department. Delete existing steps first.' });
+    }
+
+    const defaultSteps = [
+      { stepNumber: 1, title: 'Offer Letter Email', description: 'Upload and send offer letter with tracking', type: 'OFFER_LETTER', icon: '📄', isAuto: false, dueDateOffset: 0, priority: 'HIGH' },
+      { stepNumber: 2, title: 'Offer Reminder (Auto)', description: 'Auto-sends if not signed in 3 days', type: 'OFFER_REMINDER', icon: '⏰', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM' },
+      { stepNumber: 3, title: 'Day -1 Welcome Email (Auto)', description: 'Sent automatically one day before joining', type: 'WELCOME_EMAIL', icon: '👋', isAuto: true, dueDateOffset: -1, priority: 'MEDIUM' },
+      { stepNumber: 4, title: 'HR Induction (9:30 AM) (Auto)', description: 'Calendar invite on joining day', type: 'HR_INDUCTION', icon: '🏢', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
+      { stepNumber: 5, title: 'WhatsApp Group Addition (Auto)', description: 'Send WhatsApp group URLs via email', type: 'WHATSAPP_ADDITION', icon: '💬', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
+      { stepNumber: 6, title: 'Onboarding Form Email (Auto)', description: 'Sent within 1 hour of joining', type: 'ONBOARDING_FORM', icon: '📝', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
+      { stepNumber: 7, title: 'Form Reminder (Auto)', description: 'Auto-sends if not completed in 24h', type: 'FORM_REMINDER', icon: '🔔', isAuto: true, dueDateOffset: 1, priority: 'MEDIUM' },
+      { stepNumber: 8, title: 'CEO Induction', description: 'HR confirms time with CEO, then system sends invite', type: 'CEO_INDUCTION', icon: '👔', isAuto: false, dueDateOffset: 2, priority: 'MEDIUM' },
+      { stepNumber: 9, title: `${department} Induction`, description: `HR confirms time with ${department} team, then system sends invite`, type: department === 'Sales' ? 'SALES_INDUCTION' : 'DEPARTMENT_INDUCTION', icon: '💼', isAuto: false, dueDateOffset: 3, priority: 'MEDIUM' },
+      { stepNumber: 10, title: 'Training Plan Email (Auto)', description: 'Auto-sends on Day 3 with structured training', type: 'TRAINING_PLAN', icon: '📚', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM' },
+      { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled 7 days after joining', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM' }
+    ];
+
+    const created = await Promise.all(
+      defaultSteps.map(step =>
+        req.prisma.departmentStepTemplate.create({
+          data: {
+            department,
+            ...step
+          }
+        })
+      )
+    );
+
+    res.json({ success: true, message: `Initialized ${created.length} default steps for ${department}`, data: created });
+  } catch (error) {
+    logger.error('Error initializing default steps:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+module.exports = router;

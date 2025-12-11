@@ -1,0 +1,1522 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { candidateApi, calendarApi, configApi } from '../services/api';
+import toast from 'react-hot-toast';
+
+const statusColors = {
+  OFFER_PENDING: 'bg-gray-100 text-gray-800',
+  OFFER_SENT: 'bg-yellow-100 text-yellow-800',
+  OFFER_VIEWED: 'bg-yellow-100 text-yellow-800',
+  OFFER_SIGNED: 'bg-blue-100 text-blue-800',
+  JOINING_PENDING: 'bg-blue-100 text-blue-800',
+  READY_TO_JOIN: 'bg-indigo-100 text-indigo-800',
+  JOINED: 'bg-green-100 text-green-800',
+  ONBOARDING: 'bg-purple-100 text-purple-800',
+  COMPLETED: 'bg-green-100 text-green-800',
+  WITHDRAWN: 'bg-red-100 text-red-800',
+  REJECTED: 'bg-red-100 text-red-800'
+};
+
+const CandidateDetail = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [candidate, setCandidate] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState('');
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(null);
+  const [scheduleDateTime, setScheduleDateTime] = useState('');
+  const [scheduleDuration, setScheduleDuration] = useState(60);
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [scheduleAttachment, setScheduleAttachment] = useState(null);
+  const [scheduleAttachmentPreview, setScheduleAttachmentPreview] = useState(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [pendingStep, setPendingStep] = useState(null);
+  const [departmentSteps, setDepartmentSteps] = useState([]);
+  const [schedulingStepType, setSchedulingStepType] = useState(null);
+  const [schedulingStepNumber, setSchedulingStepNumber] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    fetchCandidate();
+  }, [id]);
+
+  useEffect(() => {
+    if (candidate?.department) {
+      fetchDepartmentSteps();
+    }
+  }, [candidate?.department]);
+
+  const fetchCandidate = async () => {
+    try {
+      const response = await candidateApi.getById(id);
+      setCandidate(response.data.data);
+    } catch (error) {
+      toast.error('Failed to load candidate');
+      navigate('/candidates');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDepartmentSteps = async () => {
+    if (!candidate?.department) return;
+    try {
+      const response = await configApi.getDepartmentSteps(candidate.department);
+      const steps = response.data.data || [];
+      // Sort by stepNumber
+      steps.sort((a, b) => a.stepNumber - b.stepNumber);
+      setDepartmentSteps(steps);
+    } catch (error) {
+      // If no steps found, use empty array (will fall back to default behavior)
+      setDepartmentSteps([]);
+    }
+  };
+
+  const getFullName = () => {
+    if (!candidate) return '';
+    return `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim();
+  };
+
+  const getInitials = () => {
+    if (!candidate) return '';
+    const first = candidate.firstName ? candidate.firstName.charAt(0) : '';
+    const last = candidate.lastName ? candidate.lastName.charAt(0) : '';
+    return (first + last).toUpperCase() || '?';
+  };
+
+  const handleSendClick = (stepNumber) => {
+    setPendingStep(stepNumber);
+    setPendingAction('send');
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!pendingStep) return;
+    
+    setShowConfirmDialog(false);
+    setActionLoading(`completeStep${pendingStep}`);
+    
+    try {
+      // Complete step (backend will send email if needed and mark as completed)
+      await candidateApi.completeStep(id, pendingStep);
+      toast.success(`Step ${pendingStep} completed! Email sent to candidate.`);
+      fetchCandidate();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to complete step');
+    } finally {
+      setActionLoading('');
+      setPendingStep(null);
+      setPendingAction(null);
+    }
+  };
+
+  const handleDeleteCandidate = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteCandidate = async () => {
+    setDeleting(true);
+    try {
+      await candidateApi.delete(id);
+      toast.success('Candidate deleted successfully');
+      navigate('/candidates');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete candidate');
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  const handleAction = async (action, data = {}) => {
+    setActionLoading(action);
+    try {
+      switch (action) {
+        case 'sendOffer':
+          await candidateApi.sendOffer(id);
+          toast.success('Step 1: Offer letter sent!');
+          break;
+        case 'sendOfferReminder':
+          await candidateApi.sendOfferReminder(id);
+          toast.success('Step 2: Offer reminder sent!');
+          break;
+        case 'sendWelcome':
+          await candidateApi.sendWelcomeEmail(id);
+          toast.success('Step 3: Welcome email sent!');
+          break;
+        case 'sendForm':
+          await candidateApi.sendOnboardingForm(id);
+          toast.success('Step 6: Onboarding form sent!');
+          break;
+        case 'markFormComplete':
+          await candidateApi.markFormCompleted(id);
+          toast.success('Step 7: Form marked as completed!');
+          break;
+        case 'scheduleHRInduction':
+        case 'scheduleCEOInduction':
+        case 'scheduleSalesInduction':
+        case 'scheduleCheckin':
+          // Convert to generic calendar event creation to support attachments universally
+          // Extract values from FormData or regular object
+          let hrEventId, hrDateTime, hrDuration;
+          if (data instanceof FormData) {
+            hrEventId = data.get('eventId');
+            hrDateTime = data.get('dateTime');
+            hrDuration = parseInt(data.get('duration') || '60');
+          } else {
+            hrEventId = data.eventId;
+            hrDateTime = data.dateTime || data.startTime;
+            hrDuration = data.duration || 60;
+          }
+          
+          if (hrEventId) {
+            await candidateApi.rescheduleEvent(hrEventId, data);
+            toast.success('Event rescheduled!');
+          } else {
+            if (!hrDateTime) {
+              toast.error('Date and time are required');
+              return;
+            }
+            
+            // Use generic calendar API which supports attachments
+            const eventTypeMap = {
+              'scheduleHRInduction': 'HR_INDUCTION',
+              'scheduleCEOInduction': 'CEO_INDUCTION',
+              'scheduleSalesInduction': 'SALES_INDUCTION',
+              'scheduleCheckin': 'CHECKIN_CALL'
+            };
+            const eventType = eventTypeMap[action] || 'CUSTOM';
+            
+            // Get title and description from step template
+            const stepTemplate = departmentSteps.find(s => s.type === eventType);
+            const replacePlaceholders = (text) => {
+              if (!text) return '';
+              return text
+                .replace(/{{firstName}}/g, candidate.firstName || '')
+                .replace(/{{lastName}}/g, candidate.lastName || '')
+                .replace(/{{position}}/g, candidate.position || '')
+                .replace(/{{department}}/g, candidate.department || '');
+            };
+            
+            let title = `${eventType.replace(/_/g, ' ')} - ${candidate.firstName} ${candidate.lastName}`;
+            let description = `Calendar event scheduled for ${candidate.firstName} ${candidate.lastName}`;
+            
+            if (stepTemplate) {
+              title = replacePlaceholders(stepTemplate.title);
+              description = replacePlaceholders(stepTemplate.description || description);
+            }
+            
+            const startTime = new Date(hrDateTime);
+            const endTime = new Date(startTime);
+            endTime.setMinutes(endTime.getMinutes() + hrDuration);
+            
+            // Extract data from FormData if needed
+            let requestData;
+            if (data instanceof FormData) {
+              // Create new FormData with all required fields
+              requestData = new FormData();
+              // Copy existing FormData entries (including attachment)
+              for (let [key, value] of data.entries()) {
+                requestData.append(key, value);
+              }
+              // Add/update required fields
+              requestData.set('candidateId', id);
+              requestData.set('type', eventType);
+              requestData.set('title', title);
+              requestData.set('description', description);
+              requestData.set('startTime', startTime.toISOString());
+              requestData.set('endTime', endTime.toISOString());
+              requestData.set('attendees', JSON.stringify([candidate.email]));
+            } else {
+              requestData = { 
+                ...data, 
+                candidateId: id, 
+                type: eventType,
+                title: title,
+                description: description,
+                startTime: startTime.toISOString(),
+                endTime: endTime.toISOString(),
+                attendees: [candidate.email]
+              };
+            }
+            
+            await calendarApi.create(requestData);
+            toast.success('Event scheduled!');
+          }
+          break;
+        case 'sendTrainingPlan':
+          await candidateApi.sendTrainingPlan(id);
+          toast.success('Step 10: Training plan sent!');
+          break;
+        case 'scheduleOfferLetter':
+        case 'scheduleOfferReminder':
+        case 'scheduleWelcomeEmail':
+        case 'scheduleWhatsAppTask':
+        case 'scheduleOnboardingForm':
+        case 'scheduleFormReminder':
+        case 'scheduleTrainingPlan':
+        case 'scheduleGeneric':
+          // Generic calendar event creation for other steps
+          // Extract values from FormData or regular object
+          let dateTime, duration, eventId, eventTypeFromData;
+          if (data instanceof FormData) {
+            dateTime = data.get('dateTime');
+            duration = parseInt(data.get('duration') || '30');
+            eventId = data.get('eventId');
+            eventTypeFromData = data.get('eventType');
+          } else {
+            dateTime = data.dateTime;
+            duration = data.duration || 30;
+            eventId = data.eventId;
+            eventTypeFromData = data.eventType;
+          }
+          
+          if (eventId) {
+            await candidateApi.rescheduleEvent(eventId, data);
+            toast.success('Event rescheduled!');
+          } else {
+            if (!dateTime) {
+              toast.error('Date and time are required');
+              return;
+            }
+            
+            const startTime = new Date(dateTime);
+            const endTime = new Date(startTime);
+            endTime.setMinutes(endTime.getMinutes() + duration);
+            
+            // Map schedule action names to event types
+            const eventTypeMap = {
+              'scheduleOfferLetter': 'OFFER_LETTER',
+              'scheduleOfferReminder': 'OFFER_REMINDER',
+              'scheduleWelcomeEmail': 'WELCOME_EMAIL',
+              'scheduleWhatsAppTask': 'WHATSAPP_TASK',
+              'scheduleOnboardingForm': 'ONBOARDING_FORM',
+              'scheduleFormReminder': 'FORM_REMINDER',
+              'scheduleTrainingPlan': 'TRAINING_PLAN',
+              'scheduleHRInduction': 'HR_INDUCTION',
+              'scheduleCEOInduction': 'CEO_INDUCTION',
+              'scheduleSalesInduction': 'SALES_INDUCTION',
+              'scheduleCheckin': 'CHECKIN_CALL'
+            };
+            
+            // Get event type from data.eventType first (most reliable), then from action name
+            let eventType = eventTypeFromData || eventTypeMap[showScheduleModal];
+            
+            // If eventType not found, try to get it from the step template based on the action
+            if (!eventType) {
+              // Try to find step by matching the schedule action to step type
+              const actionToTypeMap = {
+                'scheduleHRInduction': 'HR_INDUCTION',
+                'scheduleCEOInduction': 'CEO_INDUCTION',
+                'scheduleSalesInduction': 'SALES_INDUCTION',
+                'scheduleCheckin': 'CHECKIN_CALL'
+              };
+              const mappedType = actionToTypeMap[showScheduleModal];
+              if (mappedType) {
+                const stepTemplate = departmentSteps.find(s => s.type === mappedType);
+                if (stepTemplate) {
+                  eventType = stepTemplate.type;
+                } else {
+                  eventType = mappedType;
+                }
+              }
+            }
+            
+            // If still no eventType, use CUSTOM as fallback
+            if (!eventType) {
+              eventType = 'CUSTOM';
+            }
+            
+            // Find step number from data first (most reliable)
+            let stepNumber = null;
+            if (data instanceof FormData) {
+              stepNumber = data.get('stepNumber');
+            } else {
+              stepNumber = data.stepNumber;
+            }
+            
+            // Find the step template to get title and description
+            // If stepNumber is available, use it to find the exact step (handles multiple steps with same type)
+            let stepTemplate = null;
+            if (stepNumber) {
+              stepTemplate = departmentSteps.find(s => s.stepNumber === parseInt(stepNumber));
+            }
+            // Fallback: find by type if stepNumber not available
+            if (!stepTemplate) {
+              stepTemplate = departmentSteps.find(s => s.type === eventType);
+            }
+            
+            let title = `${eventType.replace(/_/g, ' ')} - ${candidate.firstName} ${candidate.lastName}`;
+            let description = `Calendar event scheduled for ${candidate.firstName} ${candidate.lastName}`;
+            
+            if (stepTemplate) {
+              title = replacePlaceholders(stepTemplate.title);
+              description = replacePlaceholders(stepTemplate.description || description);
+              // If stepNumber wasn't in data, get it from step template
+              if (!stepNumber) {
+                stepNumber = stepTemplate.stepNumber;
+              }
+            }
+            
+            // Check if data is FormData (has attachment) or regular object
+            let requestData;
+            if (data instanceof FormData) {
+              // If FormData, create a new one with all required fields
+              requestData = new FormData();
+              // Copy existing FormData entries (including attachment)
+              for (let [key, value] of data.entries()) {
+                requestData.append(key, value);
+              }
+              // Add/update required fields
+              requestData.set('candidateId', id);
+              requestData.set('type', eventType);
+              requestData.set('title', title);
+              requestData.set('description', description);
+              requestData.set('startTime', startTime.toISOString());
+              requestData.set('endTime', endTime.toISOString());
+              requestData.set('attendees', JSON.stringify([candidate.email]));
+              if (stepNumber) requestData.set('stepNumber', stepNumber.toString());
+            } else {
+              // Regular object - check if we need to create FormData for attachment
+              if (data.attachment) {
+                requestData = new FormData();
+                Object.keys(data).forEach(key => {
+                  if (key === 'attendees') {
+                    requestData.append(key, JSON.stringify(data[key]));
+                  } else if (key !== 'dateTime' && key !== 'duration' && key !== 'eventType') {
+                    // Don't copy dateTime, duration, eventType as we'll set them below
+                    requestData.append(key, data[key]);
+                  }
+                });
+                requestData.append('candidateId', id);
+                requestData.append('type', eventType);
+                requestData.append('title', title);
+                requestData.append('description', description);
+                requestData.append('startTime', startTime.toISOString());
+                requestData.append('endTime', endTime.toISOString());
+                requestData.append('attendees', JSON.stringify([candidate.email]));
+                if (stepNumber) requestData.append('stepNumber', stepNumber.toString());
+              } else {
+                requestData = {
+                  candidateId: id,
+                  type: eventType,
+                  title: title,
+                  description: description,
+                  startTime: startTime.toISOString(),
+                  endTime: endTime.toISOString(),
+                  attendees: [candidate.email],
+                  ...(stepNumber && { stepNumber: parseInt(stepNumber) })
+                };
+              }
+            }
+            
+            await calendarApi.create(requestData);
+            toast.success('Calendar event scheduled!');
+          }
+          break;
+        case 'sendWhatsAppGroups':
+          await candidateApi.sendWhatsAppGroups(id);
+          toast.success('Step 5: WhatsApp group URLs sent via email!');
+          break;
+        case 'completeWhatsApp':
+          await candidateApi.completeWhatsApp(id);
+          toast.success('Step 5: WhatsApp groups marked as added!');
+          break;
+        default:
+          break;
+      }
+      fetchCandidate();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Action failed');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleFileUpload = async (type) => {
+    if (!selectedFile) {
+      toast.error('Please select a file');
+      return;
+    }
+    const formData = new FormData();
+    formData.append(type === 'offer' ? 'offerLetter' : 'signedOffer', selectedFile);
+    setActionLoading(type);
+    try {
+      if (type === 'offer') {
+        await candidateApi.uploadOffer(id, formData);
+        toast.success('Offer letter uploaded!');
+      } else {
+        await candidateApi.uploadSignedOffer(id, formData);
+        toast.success('Signed offer uploaded! (Step 2 auto-reminder active)');
+      }
+      setShowUploadModal(false);
+      setSelectedFile(null);
+      fetchCandidate();
+    } catch (error) {
+      toast.error('Upload failed');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleScheduleSubmit = () => {
+    if (!scheduleDateTime) {
+      toast.error('Please select date and time');
+      return;
+    }
+    
+    // Use the stored step type if available, otherwise try to find it
+    let eventType = schedulingStepType;
+    if (!eventType && showScheduleModal === 'scheduleGeneric') {
+      // Find the step that matches the current schedule action
+      const currentStep = workflowSteps.find(s => {
+        const action = getScheduleActionName(s.stepType || 'MANUAL');
+        return action === showScheduleModal;
+      });
+      if (currentStep && currentStep.stepType) {
+        eventType = currentStep.stepType;
+      }
+    }
+    
+    // Find the step number for this event
+    let stepNumber = schedulingStepNumber;
+    if (!stepNumber) {
+      // Try to find step number from workflow steps
+      const currentStep = workflowSteps.find(s => {
+        const action = getScheduleActionName(s.stepType || 'MANUAL');
+        return action === showScheduleModal;
+      });
+      if (currentStep) {
+        stepNumber = currentStep.step;
+      }
+    }
+    
+    // Create FormData if attachment exists
+    const formData = new FormData();
+    formData.append('dateTime', scheduleDateTime);
+    formData.append('duration', scheduleDuration.toString());
+    if (editingEventId) formData.append('eventId', editingEventId);
+    if (eventType) formData.append('eventType', eventType);
+    if (stepNumber) formData.append('stepNumber', stepNumber.toString());
+    if (scheduleAttachment) {
+      formData.append('attachment', scheduleAttachment);
+    }
+
+    handleAction(showScheduleModal, formData);
+    setShowScheduleModal(null);
+    setScheduleDateTime('');
+    setScheduleDuration(60);
+    setEditingEventId(null);
+    setSchedulingStepType(null);
+    setSchedulingStepNumber(null);
+    setScheduleAttachment(null);
+    setScheduleAttachmentPreview(null);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="spinner" style={{ width: 40, height: 40 }}></div>
+      </div>
+    );
+  }
+
+  if (!candidate) return null;
+
+  // Helper to get scheduled event for a step by event type AND step number
+  // This ensures each step has its own unique event, even if they share the same type
+  const getScheduledEventByType = (eventType, stepNumber = null) => {
+    if (!candidate?.calendarEvents) return null;
+    // If stepNumber is provided, match by both type and stepNumber
+    if (stepNumber !== null) {
+      return candidate.calendarEvents.find(e => 
+        e.type === eventType && 
+        e.stepNumber === stepNumber && 
+        e.status !== 'CANCELLED'
+      );
+    }
+    // Fallback: match by type only (for backward compatibility)
+    return candidate.calendarEvents.find(e => e.type === eventType && e.status !== 'CANCELLED');
+  };
+
+  // Helper to get scheduled event for a step (uses stepNumber for unique identification)
+  const getScheduledEvent = (stepNumber) => {
+    if (!candidate?.calendarEvents || !departmentSteps.length) return null;
+    const step = departmentSteps.find(s => s.stepNumber === stepNumber);
+    if (!step) return null;
+    // Use stepNumber to uniquely identify the event
+    return getScheduledEventByType(step.type, stepNumber);
+  };
+
+  // Helper to check if previous step is completed
+  const isPreviousStepCompleted = (stepNumber) => {
+    if (stepNumber === 1) return true; // First step is always available
+    
+    // Find previous step
+    const currentStepIndex = departmentSteps.findIndex(s => s.stepNumber === stepNumber);
+    if (currentStepIndex <= 0) return true;
+    
+    const previousStep = departmentSteps[currentStepIndex - 1];
+    if (!previousStep) return true;
+    
+    // Check if previous step is completed based on its type
+    return isStepCompleted(previousStep);
+  };
+
+  // Helper to check if a step is completed based on its type and step number
+  const isStepCompleted = (stepTemplate) => {
+    // Use stepNumber to uniquely identify the event for this specific step
+    const event = getScheduledEventByType(stepTemplate.type, stepTemplate.stepNumber);
+    if (event && event.status === 'COMPLETED') return true;
+    
+    // Check candidate fields based on step type
+    switch(stepTemplate.type) {
+      case 'OFFER_LETTER': return !!candidate.offerSentAt;
+      case 'OFFER_REMINDER': return !!candidate.offerReminderSent || !!candidate.offerSignedAt;
+      case 'WELCOME_EMAIL': return !!candidate.welcomeEmailSentAt;
+      case 'HR_INDUCTION': return event?.status === 'COMPLETED';
+      case 'WHATSAPP_ADDITION': return !!candidate.whatsappGroupsAdded;
+      case 'ONBOARDING_FORM': return !!candidate.onboardingFormSentAt;
+      case 'FORM_REMINDER': return !!candidate.onboardingFormCompletedAt;
+      case 'CEO_INDUCTION': return event?.status === 'COMPLETED';
+      case 'SALES_INDUCTION': return event?.status === 'COMPLETED';
+      case 'DEPARTMENT_INDUCTION': return event?.status === 'COMPLETED';
+      case 'TRAINING_PLAN': return !!candidate.trainingPlanSent;
+      case 'CHECKIN_CALL': return event?.status === 'COMPLETED';
+      default: return event?.status === 'COMPLETED';
+    }
+  };
+
+  // Helper to get action handler for each step type
+  const getStepActionHandler = (stepType) => {
+    const actionMap = {
+      'OFFER_LETTER': 'sendOffer',
+      'OFFER_REMINDER': 'sendOfferReminder',
+      'WELCOME_EMAIL': 'sendWelcome',
+      'HR_INDUCTION': 'scheduleHRInduction',
+      'WHATSAPP_ADDITION': 'sendWhatsAppGroups',
+      'ONBOARDING_FORM': 'sendForm',
+      'FORM_REMINDER': 'markFormComplete',
+      'CEO_INDUCTION': 'scheduleCEOInduction',
+      'SALES_INDUCTION': 'scheduleSalesInduction',
+      'DEPARTMENT_INDUCTION': 'scheduleGeneric', // Use generic handler to preserve correct type
+      'TRAINING_PLAN': 'sendTrainingPlan',
+      'CHECKIN_CALL': 'scheduleCheckin'
+    };
+    return actionMap[stepType] || 'scheduleGeneric';
+  };
+
+  // Helper to get schedule action name for a step type
+  const getScheduleActionName = (stepType) => {
+    const actionMap = {
+      'OFFER_LETTER': 'scheduleOfferLetter',
+      'OFFER_REMINDER': 'scheduleOfferReminder',
+      'WELCOME_EMAIL': 'scheduleWelcomeEmail',
+      'HR_INDUCTION': 'scheduleHRInduction',
+      'WHATSAPP_ADDITION': 'scheduleWhatsAppTask',
+      'ONBOARDING_FORM': 'scheduleOnboardingForm',
+      'FORM_REMINDER': 'scheduleFormReminder',
+      'CEO_INDUCTION': 'scheduleCEOInduction',
+      'SALES_INDUCTION': 'scheduleSalesInduction',
+      'DEPARTMENT_INDUCTION': 'scheduleGeneric', // Use generic handler to preserve correct type
+      'TRAINING_PLAN': 'scheduleTrainingPlan',
+      'CHECKIN_CALL': 'scheduleCheckin'
+    };
+    return actionMap[stepType] || 'scheduleGeneric';
+  };
+
+  // Helper to format date/time for display
+  const formatScheduleDate = (dateTime) => {
+    if (!dateTime) return null;
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-IN', { 
+      dateStyle: 'medium', 
+      timeStyle: 'short' 
+    });
+  };
+
+  // Helper to convert date to local datetime-local format (YYYY-MM-DDTHH:mm)
+  const formatDateForInput = (dateTime) => {
+    if (!dateTime) return '';
+    const date = new Date(dateTime);
+    // Get local date/time components
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  // Helper to replace placeholders in text
+  const replacePlaceholders = (text) => {
+    if (!text || !candidate) return text;
+    return text
+      .replace(/{{firstName}}/g, candidate.firstName || '')
+      .replace(/{{lastName}}/g, candidate.lastName || '')
+      .replace(/{{position}}/g, candidate.position || '')
+      .replace(/{{department}}/g, candidate.department || '');
+  };
+
+  // Helper to get step status based on type
+  const getStepStatus = (stepTemplate) => {
+    // Use stepNumber to uniquely identify the event for this specific step
+    const event = getScheduledEventByType(stepTemplate.type, stepTemplate.stepNumber);
+    
+    // If completed
+    if (event && event.status === 'COMPLETED') return 'completed';
+    if (isStepCompleted(stepTemplate)) return 'completed';
+    
+    // If scheduled
+    if (event) return 'scheduled';
+    
+    // Check candidate fields for completion
+    switch(stepTemplate.type) {
+      case 'OFFER_LETTER':
+        return candidate.offerSentAt ? 'completed' : 'waiting';
+      case 'OFFER_REMINDER':
+        return (candidate.offerReminderSent || candidate.offerSignedAt) ? 'completed' : 'waiting';
+      case 'WELCOME_EMAIL':
+        return candidate.welcomeEmailSentAt ? 'completed' : 'waiting';
+      case 'WHATSAPP_ADDITION':
+        return candidate.whatsappGroupsAdded ? 'completed' : candidate.whatsappTaskCreated ? 'pending' : 'waiting';
+      case 'ONBOARDING_FORM':
+        return candidate.onboardingFormSentAt ? 'completed' : 'waiting';
+      case 'FORM_REMINDER':
+        return candidate.onboardingFormCompletedAt ? 'completed' : candidate.onboardingFormSentAt ? 'waiting' : 'pending';
+      case 'TRAINING_PLAN':
+        return candidate.trainingPlanSent ? 'completed' : 'waiting';
+      default:
+        return 'waiting';
+    }
+  };
+
+  // Helper to get step description
+  const getStepDescription = (stepTemplate) => {
+    // Use stepNumber to uniquely identify the event for this specific step
+    const event = getScheduledEventByType(stepTemplate.type, stepTemplate.stepNumber);
+    
+    if (event) {
+      return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+    }
+    
+    // Use template description or generate based on type
+    let desc = stepTemplate.description || '';
+    
+    // Add type-specific details
+    switch(stepTemplate.type) {
+      case 'OFFER_LETTER':
+        if (event) {
+          desc = `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        } else if (candidate.offerSentAt) {
+          desc = `Sent on ${new Date(candidate.offerSentAt).toLocaleDateString('en-IN')}`;
+        } else {
+          desc = desc || 'Upload and send offer letter with tracking';
+        }
+        break;
+      case 'OFFER_REMINDER':
+        if (candidate.offerSignedAt) {
+          desc = `✅ Signed offer auto-detected on ${new Date(candidate.offerSignedAt).toLocaleDateString('en-IN')}`;
+        } else if (candidate.offerReminderSent) {
+          desc = 'Reminder sent';
+        } else {
+          desc = desc || 'Auto-sends if not signed in 3 days (or auto-detects email reply)';
+        }
+        break;
+      case 'WELCOME_EMAIL':
+        if (candidate.welcomeEmailSentAt) {
+          desc = `Sent on ${new Date(candidate.welcomeEmailSentAt).toLocaleDateString('en-IN')}`;
+        } else {
+          desc = desc || 'Sent automatically one day before joining';
+        }
+        break;
+      case 'WHATSAPP_ADDITION':
+        if (candidate.whatsappGroupsAdded) {
+          desc = 'WhatsApp groups sent via email';
+        } else if (candidate.whatsappTaskCreated) {
+          desc = 'Email sent with WhatsApp group URLs';
+        } else {
+          desc = desc || 'Send WhatsApp group URLs via email';
+        }
+        break;
+      case 'ONBOARDING_FORM':
+        if (candidate.onboardingFormSentAt) {
+          desc = `Sent on ${new Date(candidate.onboardingFormSentAt).toLocaleDateString('en-IN')}`;
+        } else {
+          desc = desc || 'Sent within 1 hour of joining';
+        }
+        break;
+      case 'FORM_REMINDER':
+        if (candidate.onboardingFormCompletedAt) {
+          desc = `Completed on ${new Date(candidate.onboardingFormCompletedAt).toLocaleDateString()}`;
+        } else {
+          desc = desc || 'Auto-sends if not completed in 24h';
+        }
+        break;
+      case 'TRAINING_PLAN':
+        if (candidate.trainingPlanSent) {
+          desc = `Sent on ${new Date().toLocaleDateString('en-IN')}`;
+        } else {
+          desc = desc || 'Auto-sends on Day 3 with structured training';
+        }
+        break;
+    }
+    
+    return replacePlaceholders(desc);
+  };
+
+  // Build workflow steps dynamically from department steps
+  const buildWorkflowSteps = () => {
+    // If no department steps, use default hardcoded steps (backward compatibility)
+    if (!departmentSteps || departmentSteps.length === 0) {
+      return [
+    {
+      step: 1,
+      icon: '📄',
+      title: 'Offer Letter Email',
+      description: (() => {
+        const event = getScheduledEvent(1);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.offerSentAt 
+          ? `Sent on ${new Date(candidate.offerSentAt).toLocaleDateString('en-IN')}`
+          : 'Upload and send offer letter with tracking';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(1);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.offerSentAt ? 'completed' : 'waiting';
+      })(),
+      date: candidate.offerSentAt,
+      scheduledEvent: getScheduledEvent(1),
+      actions: null, // No special actions - follows same pattern as other steps
+      auto: false,
+      stepType: 'OFFER_LETTER'
+    },
+    {
+      step: 2,
+      icon: '⏰',
+      title: 'Offer Reminder (Auto)',
+      description: (() => {
+        const event = getScheduledEvent(2);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.offerSignedAt 
+          ? `✅ Signed offer auto-detected on ${new Date(candidate.offerSignedAt).toLocaleDateString('en-IN')}`
+          : candidate.offerReminderSent 
+            ? 'Reminder sent' 
+            : 'Auto-sends if not signed in 3 days (or auto-detects email reply)';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(2);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.offerReminderSent ? 'completed' : 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(2),
+      auto: true
+    },
+    {
+      step: 3,
+      icon: '👋',
+      title: 'Day -1 Welcome Email',
+      description: (() => {
+        const event = getScheduledEvent(3);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.welcomeEmailSentAt 
+          ? `Sent on ${new Date(candidate.welcomeEmailSentAt).toLocaleDateString('en-IN')}`
+          : 'Sent automatically one day before joining';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(3);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.welcomeEmailSentAt ? 'completed' : 'waiting';
+      })(),
+      date: candidate.welcomeEmailSentAt,
+      scheduledEvent: getScheduledEvent(3),
+      auto: true
+    },
+    {
+      step: 4,
+      icon: '🏢',
+      title: 'HR Induction (9:30 AM)',
+      description: (() => {
+        const event = getScheduledEvent(4);
+        return event 
+          ? `Scheduled: ${formatScheduleDate(event.startTime)}`
+          : 'Calendar invite on joining day';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(4);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(4),
+      auto: true
+    },
+    {
+      step: 5,
+      icon: '💬',
+      title: 'WhatsApp Group Addition',
+      description: (() => {
+        const event = getScheduledEvent(5);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.whatsappGroupsAdded 
+          ? 'WhatsApp groups sent via email'
+          : candidate.whatsappTaskCreated 
+            ? 'Email sent with WhatsApp group URLs'
+            : 'Send WhatsApp group URLs via email';
+      })(),
+      status: candidate.whatsappGroupsAdded ? 'completed' : candidate.whatsappTaskCreated ? 'pending' : 'waiting',
+      scheduledEvent: getScheduledEvent(5),
+      auto: true
+    },
+    {
+      step: 6,
+      icon: '📝',
+      title: 'Onboarding Form Email',
+      description: (() => {
+        const event = getScheduledEvent(6);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.onboardingFormSentAt 
+          ? `Sent on ${new Date(candidate.onboardingFormSentAt).toLocaleDateString('en-IN')}`
+          : 'Sent within 1 hour of joining';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(6);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.onboardingFormSentAt ? 'completed' : 'waiting';
+      })(),
+      date: candidate.onboardingFormSentAt,
+      scheduledEvent: getScheduledEvent(6),
+      auto: true
+    },
+    {
+      step: 7,
+      icon: '🔔',
+      title: 'Form Reminder (Auto)',
+      description: candidate.onboardingFormCompletedAt 
+        ? `Completed on ${new Date(candidate.onboardingFormCompletedAt).toLocaleDateString()}`
+        : 'Auto-sends if not completed in 24h',
+      status: (() => {
+        const event = getScheduledEvent(7);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.onboardingFormCompletedAt ? 'completed' : candidate.onboardingFormSentAt ? 'waiting' : 'pending';
+      })(),
+      scheduledEvent: getScheduledEvent(7),
+      auto: true
+    },
+    {
+      step: 8,
+      icon: '👔',
+      title: 'CEO Induction',
+      description: (() => {
+        const event = getScheduledEvent(8);
+        return event 
+          ? `Scheduled: ${formatScheduleDate(event.startTime)}`
+          : 'HR confirms time with CEO, then system sends invite';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(8);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(8),
+      auto: false
+    },
+    {
+      step: 9,
+      icon: '💼',
+      title: 'Sales Induction (Brunda)',
+      description: (() => {
+        const event = getScheduledEvent(9);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return 'HR confirms time with Sales team, then system sends invite';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(9);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(9),
+      auto: false
+    },
+    {
+      step: 10,
+      icon: '📚',
+      title: 'Training Plan Email',
+      description: (() => {
+        const event = getScheduledEvent(10);
+        if (event) return `Scheduled: ${formatScheduleDate(event.startTime)}`;
+        return candidate.trainingPlanSent 
+          ? `Sent on ${new Date().toLocaleDateString('en-IN')}`
+          : 'Auto-sends on Day 3 with structured training';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(10);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return candidate.trainingPlanSent ? 'completed' : 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(10),
+      auto: true
+    },
+    {
+      step: 11,
+      icon: '📞',
+      title: 'HR Check-in Call (Day 7)',
+      description: (() => {
+        const event = getScheduledEvent(11);
+        return event 
+          ? `Scheduled: ${formatScheduleDate(event.startTime)}`
+          : 'Auto-scheduled 7 days after joining';
+      })(),
+      status: (() => {
+        const event = getScheduledEvent(11);
+        if (event && event.status === 'COMPLETED') return 'completed';
+        if (event) return 'scheduled';
+        return 'waiting';
+      })(),
+      scheduledEvent: getScheduledEvent(11),
+      auto: true
+    }
+      ];
+    }
+
+    // Build steps from department templates
+    return departmentSteps.map((stepTemplate) => {
+      // Use stepNumber to uniquely identify the event for this specific step
+      const event = getScheduledEventByType(stepTemplate.type, stepTemplate.stepNumber);
+      const status = getStepStatus(stepTemplate);
+      const description = getStepDescription(stepTemplate);
+      const title = replacePlaceholders(stepTemplate.title);
+      
+      // All steps now follow the same pattern - no special actions
+      return {
+        step: stepTemplate.stepNumber,
+        icon: stepTemplate.icon || '📋',
+        title: title,
+        description: description,
+        status: status,
+        date: event?.startTime || (stepTemplate.type === 'OFFER_LETTER' ? candidate.offerSentAt : null),
+        scheduledEvent: event,
+        auto: stepTemplate.isAuto || false,
+        actions: null, // No special actions - all steps use calendar + send pattern
+        stepType: stepTemplate.type
+      };
+    });
+  };
+
+  const workflowSteps = buildWorkflowSteps();
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'completed': return <span className="badge badge-success">✓ Done</span>;
+      case 'ready': return <span className="badge badge-info">Ready</span>;
+      case 'sent': return <span className="badge badge-warning">Sent</span>;
+      case 'pending': return <span className="badge badge-warning">Pending</span>;
+      case 'waiting': return <span className="badge badge-gray">Waiting</span>;
+      case 'skipped': return <span className="badge badge-gray">Skipped</span>;
+      default: return null;
+    }
+  };
+
+  return (
+    <div className="animate-fadeIn">
+      {/* Header */}
+      <div className="mb-6">
+        <button onClick={() => navigate('/candidates')} className="text-gray-500 hover:text-gray-700 text-sm mb-2">
+          ← Back to Candidates
+        </button>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 text-2xl font-bold">
+              {getInitials()}
+            </div>
+            <div className="ml-4">
+              <h1 className="text-2xl font-bold text-gray-900">{getFullName()}</h1>
+              <p className="text-gray-500">{candidate.position} • {candidate.department}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`px-4 py-2 rounded-full text-sm font-medium ${statusColors[candidate.status] || 'bg-gray-100 text-gray-800'}`}>
+              {(candidate.status || 'NEW').replace(/_/g, ' ')}
+            </span>
+            <button
+              onClick={handleDeleteCandidate}
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+              title="Delete candidate"
+            >
+              🗑️ Delete
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Candidate Info */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">Candidate Information</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-sm text-gray-500">Email</p><p className="font-medium">{candidate.email}</p></div>
+              <div><p className="text-sm text-gray-500">Phone</p><p className="font-medium">{candidate.phone || '-'}</p></div>
+              <div><p className="text-sm text-gray-500">Position</p><p className="font-medium">{candidate.position}</p></div>
+              <div><p className="text-sm text-gray-500">Department</p><p className="font-medium">{candidate.department}</p></div>
+              <div><p className="text-sm text-gray-500">Expected Joining</p><p className="font-medium">{candidate.expectedJoiningDate ? new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN') : '-'}</p></div>
+              <div><p className="text-sm text-gray-500">Reporting Manager</p><p className="font-medium">{candidate.reportingManager || '-'}</p></div>
+              <div><p className="text-sm text-gray-500">Salary</p><p className="font-medium">{candidate.salary ? `₹${candidate.salary}` : '-'}</p></div>
+              <div><p className="text-sm text-gray-500">Created</p><p className="font-medium">{new Date(candidate.createdAt).toLocaleDateString('en-IN')}</p></div>
+            </div>
+            
+            {/* Documents Section */}
+            <div className="mt-6 pt-4 border-t">
+              <h3 className="text-md font-semibold mb-3">📎 Documents</h3>
+              <div className="space-y-2">
+                {/* Offer Letter */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center">
+                    <span className="text-xl mr-2">📄</span>
+                    <div>
+                      <p className="font-medium text-sm">Offer Letter</p>
+                      <p className="text-xs text-gray-500">
+                        {candidate.offerLetterPath ? 'Uploaded' : 'Not uploaded'}
+                      </p>
+                    </div>
+                  </div>
+                  {candidate.offerLetterPath && (
+                    <a 
+                      href={`/uploads/${candidate.offerLetterPath.replace(/\\/g, '/')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                    >
+                      View →
+                    </a>
+                  )}
+                </div>
+                
+                {/* Signed Offer Letter */}
+                <div className={`flex items-center justify-between p-3 rounded-lg ${candidate.signedOfferPath ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}>
+                  <div className="flex items-center">
+                    <span className="text-xl mr-2">{candidate.signedOfferPath ? '✅' : '📝'}</span>
+                    <div>
+                      <p className="font-medium text-sm">Signed Offer Letter</p>
+                      <p className="text-xs text-gray-500">
+                        {candidate.signedOfferPath 
+                          ? `Auto-captured on ${candidate.offerSignedAt ? new Date(candidate.offerSignedAt).toLocaleString('en-IN') : 'N/A'}`
+                          : 'Waiting for candidate response'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  {candidate.signedOfferPath ? (
+                    <a 
+                      href={`/uploads/${candidate.signedOfferPath.replace(/\\/g, '/')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-600 hover:text-green-800 text-sm font-medium"
+                    >
+                      View Document →
+                    </a>
+                  ) : (
+                    <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">Pending</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dynamic Workflow Steps */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">📋 {workflowSteps.length}-Step Onboarding Workflow</h2>
+            <div className="space-y-3">
+              {workflowSteps.map((step) => (
+                <div key={step.step} className={`p-4 border rounded-lg ${step.status === 'completed' ? 'bg-green-50 border-green-200' : step.status === 'skipped' ? 'bg-gray-50 border-gray-200' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center flex-1">
+                      <span className="text-2xl mr-3">{step.icon}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          <p className="font-medium">Step {step.step}: {step.title}</p>
+                          {step.auto && <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">AUTO</span>}
+                        </div>
+                        <p className="text-sm text-gray-500">{step.description}</p>
+                        {step.date && <p className="text-xs text-gray-400 mt-1">Done: {new Date(step.date).toLocaleString('en-IN')}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 ml-4">
+                      {step.actions}
+                      {/* If step is completed, show completed badge only - no calendar */}
+                      {step.status === 'completed' ? (
+                        <span className="badge badge-success">✓ Completed</span>
+                      ) : step.scheduledEvent && step.scheduledEvent.status !== 'COMPLETED' ? (
+                        /* If scheduled, show "Scheduled" button for editing + "Send" button */
+                        <>
+                          <button
+                            onClick={() => {
+                              const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                              const durationMap = { 
+                                'OFFER_LETTER': 30, 
+                                'OFFER_REMINDER': 15, 
+                                'WELCOME_EMAIL': 30, 
+                                'HR_INDUCTION': 60, 
+                                'WHATSAPP_ADDITION': 15, 
+                                'ONBOARDING_FORM': 30, 
+                                'FORM_REMINDER': 15, 
+                                'CEO_INDUCTION': 60, 
+                                'SALES_INDUCTION': 90, 
+                                'DEPARTMENT_INDUCTION': 90,
+                                'TRAINING_PLAN': 30, 
+                                'CHECKIN_CALL': 30 
+                              };
+                              const event = step.scheduledEvent;
+                              setEditingEventId(event?.id || null);
+                              setScheduleDateTime(event ? formatDateForInput(event.startTime) : '');
+                              // Set duration but don't show it in UI - use default based on step type
+                              setScheduleDuration(event ? Math.round((new Date(event.endTime) - new Date(event.startTime)) / 60000) : durationMap[step.stepType] || 30);
+                              setSchedulingStepType(step.stepType); // Store step type for generic handler
+                              setSchedulingStepNumber(step.step); // Store step number for unique identification
+                              setShowScheduleModal(scheduleAction);
+                            }}
+                            className="btn btn-secondary text-sm"
+                            title="Click to edit/reschedule"
+                          >
+                            Scheduled
+                          </button>
+                          {/* Send button next to Scheduled - available for all steps including Step 1 */}
+                          {!step.actions && (
+                            <button
+                              onClick={() => {
+                                // Special check for Step 1 (Offer Letter) - must have offer letter uploaded or scheduled with attachment
+                                const hasOfferLetter = candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath);
+                                if (step.stepType === 'OFFER_LETTER' && !hasOfferLetter) {
+                                  toast.error('Please upload an offer letter first. You can attach it when scheduling or upload it separately.');
+                                  setShowUploadModal('offer');
+                                  return;
+                                }
+                                handleSendClick(step.step);
+                              }}
+                              className={`btn text-sm ${(step.stepType !== 'OFFER_LETTER' || candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath)) ? 'btn-primary' : 'btn-secondary opacity-50 cursor-not-allowed'}`}
+                              disabled={actionLoading === `completeStep${step.step}` || (step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath))}
+                              title={
+                                step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath)
+                                  ? 'Upload offer letter first or schedule with attachment' 
+                                  : 'Mark as completed'
+                              }
+                            >
+                              {actionLoading === `completeStep${step.step}` ? 'Completing...' : 'Send'}
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        /* If not completed and not scheduled, show calendar icon + Send button */
+                        <>
+                          {/* Calendar icon for scheduling */}
+                          <button
+                            onClick={() => {
+                              const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                              const durationMap = { 
+                                'OFFER_LETTER': 30, 
+                                'OFFER_REMINDER': 15, 
+                                'WELCOME_EMAIL': 30, 
+                                'HR_INDUCTION': 60, 
+                                'WHATSAPP_ADDITION': 15, 
+                                'ONBOARDING_FORM': 30, 
+                                'FORM_REMINDER': 15, 
+                                'CEO_INDUCTION': 60, 
+                                'SALES_INDUCTION': 90, 
+                                'DEPARTMENT_INDUCTION': 90,
+                                'TRAINING_PLAN': 30, 
+                                'CHECKIN_CALL': 30 
+                              };
+                              setEditingEventId(null);
+                              setScheduleDateTime('');
+                              setScheduleDuration(durationMap[step.stepType] || 30);
+                              setScheduleAttachment(null);
+                              setScheduleAttachmentPreview(null);
+                              setSchedulingStepType(step.stepType); // Store step type for generic handler
+                              setSchedulingStepNumber(step.step); // Store step number for unique identification
+                              setShowScheduleModal(scheduleAction);
+                            }}
+                            className="text-indigo-600 hover:text-indigo-800 text-xl p-1 hover:bg-indigo-50 rounded"
+                            title="Schedule calendar event"
+                          >
+                            📅
+                          </button>
+                          {/* Show "Send" button for all steps (disabled if previous step not completed) */}
+                          {!step.actions && (
+                            <button
+                              onClick={() => {
+                                // Special check for Step 1 (Offer Letter) - must have offer letter uploaded or scheduled with attachment
+                                const hasOfferLetter = candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath);
+                                if (step.stepType === 'OFFER_LETTER' && !hasOfferLetter) {
+                                  toast.error('Please upload an offer letter first. You can attach it when scheduling or upload it separately.');
+                                  setShowUploadModal('offer');
+                                  return;
+                                }
+                                
+                                if (!isPreviousStepCompleted(step.step)) {
+                                  toast.error('Please complete the previous step first');
+                                  return;
+                                }
+                                handleSendClick(step.step);
+                              }}
+                              className={`btn text-sm ${isPreviousStepCompleted(step.step) && (step.stepType !== 'OFFER_LETTER' || candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath)) ? 'btn-primary' : 'btn-secondary opacity-50 cursor-not-allowed'}`}
+                              disabled={actionLoading === `completeStep${step.step}` || !isPreviousStepCompleted(step.step) || (step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath))}
+                              title={
+                                step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath)
+                                  ? 'Upload offer letter first or schedule with attachment' 
+                                  : !isPreviousStepCompleted(step.step) 
+                                    ? 'Complete previous step first' 
+                                    : 'Mark as completed'
+                              }
+                            >
+                              {actionLoading === `completeStep${step.step}` ? 'Completing...' : 'Send'}
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Activity Timeline */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">Activity Timeline</h2>
+            {(!candidate.activityLogs || candidate.activityLogs.length === 0) ? (
+              <p className="text-gray-500 text-sm">No activity yet</p>
+            ) : (
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {candidate.activityLogs.slice(0, 15).map((item, index) => (
+                  <div key={item.id || index} className="flex items-start">
+                    <div className="w-2 h-2 bg-indigo-500 rounded-full mt-2 mr-3"></div>
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-900">{item.description}</p>
+                      <p className="text-xs text-gray-500 mt-1">{new Date(item.createdAt).toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Upload Modal */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">
+              Upload {showUploadModal === 'offer' ? 'Offer Letter' : 'Signed Offer'}
+            </h3>
+            <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setSelectedFile(e.target.files[0])} className="w-full mb-4" />
+            <div className="flex justify-end space-x-3">
+              <button onClick={() => { setShowUploadModal(false); setSelectedFile(null); }} className="btn btn-secondary">Cancel</button>
+              <button onClick={() => handleFileUpload(showUploadModal)} disabled={!selectedFile || actionLoading} className="btn btn-primary">
+                {actionLoading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              {(() => {
+                // Get step title dynamically
+                const currentStep = workflowSteps.find(s => {
+                  const action = getScheduleActionName(s.stepType || 'MANUAL');
+                  return action === showScheduleModal;
+                });
+                const stepTitle = currentStep ? currentStep.title : 'Event';
+                return editingEventId ? `Edit ${stepTitle}` : `Schedule ${stepTitle}`;
+              })()}
+            </h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time *</label>
+              <input 
+                type="datetime-local" 
+                value={scheduleDateTime}
+                onChange={(e) => setScheduleDateTime(e.target.value)}
+                className="input w-full"
+                required
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Attachment (Optional)
+              </label>
+              <input
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setScheduleAttachment(file);
+                    setScheduleAttachmentPreview(file.name);
+                  } else {
+                    setScheduleAttachment(null);
+                    setScheduleAttachmentPreview(null);
+                  }
+                }}
+                className="input w-full"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              />
+              {scheduleAttachmentPreview && (
+                <div className="mt-2 flex items-center justify-between p-2 bg-gray-50 rounded">
+                  <span className="text-sm text-gray-600 truncate flex-1">{scheduleAttachmentPreview}</span>
+                  <button
+                    onClick={() => {
+                      setScheduleAttachment(null);
+                      setScheduleAttachmentPreview(null);
+                      // Reset file input
+                      const fileInput = document.querySelector('input[type="file"]');
+                      if (fileInput) fileInput.value = '';
+                    }}
+                    className="text-red-500 hover:text-red-700 ml-2"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB)
+              </p>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button 
+                onClick={() => { 
+                  setShowScheduleModal(null); 
+                  setScheduleDateTime(''); 
+                  setScheduleDuration(60);
+                  setEditingEventId(null);
+                  setScheduleAttachment(null);
+                  setScheduleAttachmentPreview(null);
+                }} 
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleScheduleSubmit} 
+                disabled={!scheduleDateTime || actionLoading} 
+                className="btn btn-primary"
+              >
+                {actionLoading ? 'Saving...' : editingEventId ? 'Update' : 'Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog */}
+      {showConfirmDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-4">Confirm Action</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to mark Step {pendingStep} as completed? This action will update the candidate's workflow status.
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setPendingStep(null);
+                  setPendingAction(null);
+                }}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmAction}
+                className="btn btn-primary"
+                disabled={actionLoading}
+              >
+                {actionLoading ? 'Processing...' : 'Yes, Complete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Candidate Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="ml-3 text-lg font-medium text-gray-900">Delete Candidate?</h3>
+            </div>
+            <div className="mb-6">
+              <p className="text-sm text-gray-500">
+                Are you sure you want to permanently delete <span className="font-medium text-gray-900">{candidate?.firstName} {candidate?.lastName}</span>?
+              </p>
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-xs font-medium text-red-800 mb-2">⚠️ This action will permanently delete:</p>
+                <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                  <li>Candidate profile and all information</li>
+                  <li>All associated emails and email history</li>
+                  <li>All calendar events and schedules</li>
+                  <li>All tasks and reminders</li>
+                  <li>All uploaded files (offer letters, signed offers, attachments)</li>
+                  <li>All activity logs</li>
+                </ul>
+                <p className="text-xs font-medium text-red-800 mt-2">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                }}
+                className="btn btn-secondary"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteCandidate}
+                className="btn bg-red-600 hover:bg-red-700 text-white"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <span className="flex items-center">
+                    <div className="spinner mr-2" style={{ width: 16, height: 16 }}></div>
+                    Deleting...
+                  </span>
+                ) : (
+                  'Delete Permanently'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CandidateDetail;

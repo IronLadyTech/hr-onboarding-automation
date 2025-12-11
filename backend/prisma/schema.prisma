@@ -1,0 +1,452 @@
+// This is your Prisma schema file for HR Onboarding Automation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum CandidateStatus {
+  OFFER_PENDING
+  OFFER_SENT
+  OFFER_VIEWED
+  OFFER_SIGNED
+  JOINING_PENDING
+  JOINED
+  ONBOARDING
+  COMPLETED
+  WITHDRAWN
+  REJECTED
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+}
+
+enum EmailType {
+  OFFER_LETTER
+  OFFER_REMINDER
+  WELCOME_DAY_MINUS_1
+  HR_INDUCTION_INVITE
+  WHATSAPP_TASK
+  ONBOARDING_FORM
+  FORM_REMINDER
+  CEO_INDUCTION_INVITE
+  SALES_INDUCTION_INVITE
+  TRAINING_PLAN
+  CHECKIN_INVITE
+  CUSTOM
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  COMPLETED
+  CANCELLED
+}
+
+enum ReminderType {
+  OFFER_FOLLOWUP
+  FORM_FOLLOWUP
+  WHATSAPP_TASK
+  CHECKIN_SCHEDULE
+  CEO_INDUCTION
+  SALES_INDUCTION
+  CUSTOM
+}
+
+enum EventType {
+  OFFER_LETTER
+  OFFER_REMINDER
+  WELCOME_EMAIL
+  HR_INDUCTION
+  WHATSAPP_TASK
+  WHATSAPP_ADDITION
+  ONBOARDING_FORM
+  FORM_REMINDER
+  CEO_INDUCTION
+  SALES_INDUCTION
+  DEPARTMENT_INDUCTION
+  TRAINING_PLAN
+  CHECKIN_CALL
+  TRAINING
+  CUSTOM
+  MANUAL
+}
+
+enum EventStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+// ============ MODELS ============
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("HR")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidates   Candidate[]
+  activityLogs ActivityLog[]
+}
+
+model Candidate {
+  id String @id @default(uuid())
+
+  // Basic Info
+  firstName String
+  lastName  String
+  email     String  @unique
+  phone     String?
+
+  // Job Details
+  position         String
+  department       String
+  salary           String?
+  reportingManager String?
+
+  // Dates
+  offerDate           DateTime?
+  expectedJoiningDate DateTime?
+  actualJoiningDate   DateTime?
+  offerExpiryDate     DateTime?
+
+  // Status Tracking
+  status CandidateStatus @default(OFFER_PENDING)
+
+  // Offer Letter
+  offerLetterPath   String?
+  signedOfferPath   String?
+  offerSentAt       DateTime?
+  offerViewedAt     DateTime?
+  offerSignedAt     DateTime?
+  offerReminderSent Boolean   @default(false)
+
+  // Self-Service Upload Token
+  uploadToken       String?   @unique
+  uploadTokenExpiry DateTime?
+
+  // Welcome Email
+  welcomeEmailSentAt DateTime?
+
+  // Onboarding Form
+  onboardingFormSentAt      DateTime?
+  onboardingFormCompletedAt DateTime?
+
+  // Inductions
+  hrInductionScheduled    Boolean @default(false)
+  ceoInductionScheduled   Boolean @default(false)
+  salesInductionScheduled Boolean @default(false)
+  trainingPlanSent        Boolean @default(false)
+  checkinScheduled        Boolean @default(false)
+
+  // WhatsApp
+  whatsappGroupsAdded Boolean @default(false)
+  whatsappTaskCreated Boolean @default(false)
+
+  // Metadata
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  createdBy      User?           @relation(fields: [createdById], references: [id])
+  emails         Email[]
+  calendarEvents CalendarEvent[]
+  reminders      Reminder[]
+  tasks          Task[]
+  activityLogs   ActivityLog[]
+  checkIns       CheckIn[]
+
+  @@index([status])
+  @@index([expectedJoiningDate])
+  @@index([email])
+}
+
+model Email {
+  id          String @id @default(uuid())
+  candidateId String
+
+  type    EmailType
+  subject String
+  body    String    @db.Text
+
+  status EmailStatus @default(PENDING)
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+
+  trackingId     String  @unique @default(uuid())
+  attachmentPath String?
+
+  errorMessage String?
+  retryCount   Int     @default(0)
+
+  scheduledFor DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([type])
+  @@index([status])
+  @@index([trackingId])
+}
+
+model CalendarEvent {
+  id          String @id @default(uuid())
+  candidateId String
+
+  type        EventType
+  title       String
+  description String?   @db.Text
+
+  startTime DateTime
+  endTime   DateTime
+
+  meetingLink String?
+  location    String?
+
+  attendees String[]
+
+  googleEventId String?
+
+  attachmentPath String? // Universal attachment support for all steps
+  
+  stepNumber Int? // Step number this event belongs to (for uniquely identifying steps with same type)
+
+  status EventStatus @default(SCHEDULED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([type])
+  @@index([startTime])
+  @@index([stepNumber])
+  @@index([candidateId, type, stepNumber]) // Composite index for unique step identification
+}
+
+model Reminder {
+  id          String @id @default(uuid())
+  candidateId String
+
+  type    ReminderType
+  message String
+
+  scheduledFor DateTime
+
+  status ReminderStatus @default(PENDING)
+
+  sentAt      DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([scheduledFor])
+  @@index([status])
+}
+
+model Task {
+  id          String @id @default(uuid())
+  candidateId String
+
+  title       String
+  description String?
+
+  type String
+
+  dueDate DateTime?
+
+  status TaskStatus @default(PENDING)
+
+  completedAt DateTime?
+  completedBy String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([status])
+  @@index([type])
+}
+
+model CheckIn {
+  id          String @id @default(uuid())
+  candidateId String
+
+  scheduledDate DateTime
+  completedDate DateTime?
+
+  feedback    String? @db.Text
+  concerns    String? @db.Text
+  actionItems String? @db.Text
+  rating      Int?
+
+  isCompleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([scheduledDate])
+}
+
+model EmailTemplate {
+  id String @id @default(uuid())
+
+  name String    @unique
+  type EmailType
+
+  subject String
+  body    String @db.Text
+
+  placeholders String[]
+  
+  // Custom email type name (only used when type is CUSTOM)
+  customEmailType String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  departmentStepTemplates DepartmentStepTemplate[]
+
+  @@index([type])
+  @@index([name])
+}
+
+model WorkflowConfig {
+  id String @id @default(uuid())
+
+  key         String  @unique
+  value       String
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WhatsAppGroup {
+  id String @id @default(uuid())
+
+  name        String
+  department  String?
+  description String?
+  url         String? // WhatsApp group invite URL
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TrainingPlan {
+  id String @id @default(uuid())
+
+  name       String
+  department String?
+
+  dayWiseContent Json
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([department])
+}
+
+model ActivityLog {
+  id String @id @default(uuid())
+
+  candidateId String?
+  userId      String?
+
+  action      String
+  description String
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  candidate Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id])
+
+  @@index([candidateId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model DepartmentStepTemplate {
+  id String @id @default(uuid())
+
+  department    String
+  stepNumber    Int // Order/position of the step
+  title         String
+  description   String? @db.Text
+  type          String // Task type (OFFER_LETTER, HR_INDUCTION, etc.)
+  icon          String? // Icon emoji
+  isAuto        Boolean @default(false) // Auto-scheduled or manual
+  dueDateOffset Int? // Days offset from joining date (null = immediate)
+  priority      String  @default("MEDIUM") // HIGH, MEDIUM, LOW
+  isActive      Boolean @default(true)
+  
+  // Email Template Selection - REQUIRED: Every step must use an existing email template
+  emailTemplateId String? // Link to EmailTemplate (required for all steps)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailTemplate EmailTemplate? @relation(fields: [emailTemplateId], references: [id], onDelete: SetNull)
+
+  @@unique([department, stepNumber])
+  @@index([department])
+  @@index([stepNumber])
+  @@index([emailTemplateId])
+}
