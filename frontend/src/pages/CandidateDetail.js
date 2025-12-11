@@ -1110,6 +1110,21 @@ const CandidateDetail = () => {
               <div><p className="text-sm text-gray-500">Created</p><p className="font-medium">{new Date(candidate.createdAt).toLocaleDateString('en-IN')}</p></div>
             </div>
             
+            {/* Custom Fields */}
+            {candidate.customFields && Object.keys(candidate.customFields).length > 0 && (
+              <div className="mt-6 pt-4 border-t">
+                <h3 className="text-md font-semibold mb-3">Additional Information</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  {Object.entries(candidate.customFields).map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-gray-500 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                      <p className="font-medium">{value || '-'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             {/* Documents Section */}
             <div className="mt-6 pt-4 border-t">
               <h3 className="text-md font-semibold mb-3">📎 Documents</h3>

@@ -242,6 +242,101 @@ const Settings = () => {
     }
   };
 
+  // Custom Fields handlers
+  const handleCreateCustomField = async () => {
+    if (!customFieldForm.label.trim() || !customFieldForm.fieldKey.trim()) {
+      toast.error('Label and Field Key are required');
+      return;
+    }
+
+    setCustomFieldLoading(true);
+    try {
+      const data = {
+        ...customFieldForm,
+        options: customFieldForm.fieldType === 'select' && customFieldForm.options.length > 0 
+          ? customFieldForm.options 
+          : null,
+        order: customFields.length
+      };
+      
+      if (editingCustomField) {
+        await configApi.updateCustomField(editingCustomField.id, data);
+        toast.success('Custom field updated successfully!');
+      } else {
+        await configApi.createCustomField(data);
+        toast.success('Custom field created successfully!');
+      }
+      
+      setShowCustomFieldModal(false);
+      setEditingCustomField(null);
+      setCustomFieldForm({
+        label: '',
+        fieldKey: '',
+        fieldType: 'text',
+        placeholder: '',
+        required: false,
+        validation: null,
+        options: [],
+        order: 0
+      });
+      setNewOption({ label: '', value: '' });
+      fetchCustomFields();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save custom field');
+    } finally {
+      setCustomFieldLoading(false);
+    }
+  };
+
+  const handleEditCustomField = (field) => {
+    setEditingCustomField(field);
+    setCustomFieldForm({
+      label: field.label,
+      fieldKey: field.fieldKey,
+      fieldType: field.fieldType,
+      placeholder: field.placeholder || '',
+      required: field.required || false,
+      validation: field.validation,
+      options: field.options || [],
+      order: field.order || 0
+    });
+    setShowCustomFieldModal(true);
+  };
+
+  const handleDeleteCustomField = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this custom field?')) return;
+    
+    try {
+      await configApi.deleteCustomField(id);
+      toast.success('Custom field deleted successfully!');
+      fetchCustomFields();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete custom field');
+    }
+  };
+
+  const handleToggleCustomFieldActive = async (field) => {
+    try {
+      await configApi.updateCustomField(field.id, { isActive: !field.isActive });
+      toast.success(`Field ${!field.isActive ? 'activated' : 'deactivated'} successfully!`);
+      fetchCustomFields();
+    } catch (error) {
+      toast.error('Failed to update field status');
+    }
+  };
+
+  const handleAddOption = () => {
+    if (!newOption.label.trim() || !newOption.value.trim()) {
+      toast.error('Option label and value are required');
+      return;
+    }
+    setCustomFieldForm({
+      ...customFieldForm,
+      options: [...customFieldForm.options, { ...newOption }]
+    });
+    setNewOption({ label: '', value: '' });
+  };
+
   const handleDeleteDepartment = async (name) => {
     if (!window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
       return;
@@ -450,6 +545,103 @@ const Settings = () => {
                 placeholder="Aadhaar Card,PAN Card,Educational Certificates..."
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Form Fields */}
+      {activeTab === 'custom-fields' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">📝 Custom Form Fields</h2>
+              <button
+                onClick={() => {
+                  setEditingCustomField(null);
+                  setCustomFieldForm({
+                    label: '',
+                    fieldKey: '',
+                    fieldType: 'text',
+                    placeholder: '',
+                    required: false,
+                    validation: null,
+                    options: [],
+                    order: customFields.length
+                  });
+                  setNewOption({ label: '', value: '' });
+                  setShowCustomFieldModal(true);
+                }}
+                className="btn btn-primary text-sm"
+              >
+                + Add Custom Field
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Create custom fields that will appear in the candidate creation form. These fields will be stored with each candidate record.
+            </p>
+            
+            {customFields.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No custom fields created yet.</p>
+                <p className="text-sm mt-2">Click "Add Custom Field" to create your first field.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customFields.map((field) => (
+                  <div
+                    key={field.id}
+                    className={`flex items-center justify-between p-4 border rounded-lg ${
+                      field.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        <span className="font-medium">{field.label}</span>
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                          {field.fieldType}
+                        </span>
+                        {!field.isActive && (
+                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                            Inactive
+                          </span>
+                        )}
+                        {field.required && (
+                          <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">
+                            Required
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Key: <code className="bg-gray-100 px-1 rounded">{field.fieldKey}</code>
+                        {field.placeholder && ` • Placeholder: ${field.placeholder}`}
+                        {field.order !== undefined && ` • Order: ${field.order}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleToggleCustomFieldActive(field)}
+                        className="text-sm text-blue-600 hover:text-blue-700"
+                        title={field.isActive ? 'Deactivate' : 'Activate'}
+                      >
+                        {field.isActive ? '👁️' : '👁️‍🗨️'}
+                      </button>
+                      <button
+                        onClick={() => handleEditCustomField(field)}
+                        className="text-sm text-indigo-600 hover:text-indigo-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCustomField(field.id)}
+                        className="text-sm text-red-600 hover:text-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
