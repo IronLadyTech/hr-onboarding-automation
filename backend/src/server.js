@@ -43,8 +43,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Static files for uploads - serve from both /uploads and /api/uploads for compatibility
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-app.use('/api/uploads', express.static(path.join(__dirname, '../uploads')));
+// IMPORTANT: Place these BEFORE the catch-all route to ensure they're processed first
+const uploadsPath = path.join(__dirname, '../uploads');
+app.use('/uploads', express.static(uploadsPath));
+app.use('/api/uploads', express.static(uploadsPath));
 
 // Request logging
 app.use((req, res, next) => {
