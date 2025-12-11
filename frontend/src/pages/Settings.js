@@ -24,6 +24,13 @@ const Settings = () => {
   const [editingDepartmentName, setEditingDepartmentName] = useState('');
   const [departmentLoading, setDepartmentLoading] = useState(false);
   
+  // UI Customization state
+  const [settings, setSettings] = useState({});
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [savingColors, setSavingColors] = useState(false);
+  
   // Custom Fields state
   const [customFields, setCustomFields] = useState([]);
   const [showCustomFieldModal, setShowCustomFieldModal] = useState(false);
