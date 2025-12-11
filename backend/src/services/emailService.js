@@ -641,22 +641,30 @@ const sendUniversalEmail = async (prisma, candidate, emailType, stepTemplate = n
       logger.warn(`⚠️ Email type ${emailType} not in enum, using CUSTOM instead`);
     }
     
+    // Handle multiple attachments: attachmentPath can be a string (single) or array (multiple)
+    const attachmentPaths = Array.isArray(attachmentPath) ? attachmentPath : (attachmentPath ? [attachmentPath] : []);
+    const singleAttachmentPath = attachmentPaths.length > 0 ? attachmentPaths[0] : null; // For backward compatibility
+    
     const emailRecord = await prisma.email.create({
       data: {
         candidateId: candidate.id,
         type: finalEmailType,
         subject: content.subject,
         body: content.body,
-        attachmentPath: attachmentPath
+        attachmentPath: singleAttachmentPath, // Single attachment (backward compatibility)
+        attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null // Multiple attachments
       }
     });
     
     logger.info(`✅ Email record created: id=${emailRecord.id}, type=${finalEmailType}`);
 
+    // Process all attachments (support both single and multiple)
     const attachments = [];
-    if (attachmentPath) {
+    for (const attPath of attachmentPaths) {
+      if (!attPath) continue;
+      
       // Convert relative path to absolute path
-      let filePath = attachmentPath;
+      let filePath = attPath;
       if (!path.isAbsolute(filePath)) {
         const uploadsDir = path.join(__dirname, '../../uploads');
         filePath = path.join(uploadsDir, filePath);
@@ -673,6 +681,10 @@ const sendUniversalEmail = async (prisma, candidate, emailType, stepTemplate = n
       } else {
         logger.warn(`⚠️ Attachment file not found: ${filePath}`);
       }
+    }
+    
+    if (attachments.length > 0) {
+      logger.info(`📎 Total ${attachments.length} attachment(s) will be sent with email`);
     }
 
     logger.info(`📤 Attempting to send email via sendEmail function...`);

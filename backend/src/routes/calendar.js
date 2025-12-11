@@ -22,6 +22,7 @@ const calendarAttachmentStorage = multer.diskStorage({
   }
 });
 
+// Single file upload (backward compatibility)
 const uploadCalendarAttachment = multer({
   storage: calendarAttachmentStorage,
   limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760 }, // 10MB default
@@ -35,6 +36,21 @@ const uploadCalendarAttachment = multer({
     }
   }
 });
+
+// Multiple files upload (new feature)
+const uploadCalendarAttachments = multer({
+  storage: calendarAttachmentStorage,
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760 }, // 10MB per file
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, Word documents, and images are allowed'));
+    }
+  }
+}).array('attachments', 10); // Allow up to 10 attachments
 
 // Helper to convert absolute file path to relative path for storage
 const getRelativeFilePath = (filePath) => {
@@ -176,8 +192,22 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create calendar event (with optional attachment support for all steps)
-router.post('/', uploadCalendarAttachment.single('attachment'), async (req, res) => {
+// Create calendar event (with optional single or multiple attachment support for all steps)
+router.post('/', (req, res, next) => {
+  // Check if multiple attachments are being uploaded
+  if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+    // Use multiple file upload handler
+    uploadCalendarAttachments(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      next();
+    });
+  } else {
+    // Use single file upload handler (backward compatibility)
+    uploadCalendarAttachment.single('attachment')(req, res, next);
+  }
+}, async (req, res) => {
   try {
     let { 
       candidateId, 
@@ -201,10 +231,19 @@ router.post('/', uploadCalendarAttachment.single('attachment'), async (req, res)
       }
     }
 
-    // Handle attachment if uploaded
-    let attachmentPath = null;
-    if (req.file) {
+    // Handle attachments (support both single and multiple)
+    let attachmentPath = null; // Single attachment (backward compatibility)
+    let attachmentPaths = []; // Multiple attachments (new feature)
+    
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      // Multiple files uploaded
+      attachmentPaths = req.files.map(file => getRelativeFilePath(file.path));
+      attachmentPath = attachmentPaths[0]; // First file for backward compatibility
+      logger.info(`📎 ${attachmentPaths.length} attachment(s) uploaded for calendar event`);
+    } else if (req.file) {
+      // Single file uploaded (backward compatibility)
       attachmentPath = getRelativeFilePath(req.file.path);
+      attachmentPaths = [attachmentPath];
       logger.info(`📎 Attachment uploaded for calendar event: ${attachmentPath}`);
     }
 
@@ -240,7 +279,7 @@ router.post('/', uploadCalendarAttachment.single('attachment'), async (req, res)
       logger.info(`✅ Saved offer letter attachment to candidate profile: ${attachmentPath}`);
     }
 
-    // Create event in database (with universal attachment support and stepNumber for unique identification)
+    // Create event in database (with universal single and multiple attachment support and stepNumber for unique identification)
     const event = await req.prisma.calendarEvent.create({
       data: {
         candidateId,
@@ -253,7 +292,8 @@ router.post('/', uploadCalendarAttachment.single('attachment'), async (req, res)
         location,
         meetingLink,
         googleEventId,
-        attachmentPath: attachmentPath, // Universal attachment support for all steps
+        attachmentPath: attachmentPath, // Single attachment (backward compatibility)
+        attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // Multiple attachments (new feature)
         stepNumber: stepNumber ? parseInt(stepNumber) : null, // Step number for unique step identification
         status: 'SCHEDULED'
       }

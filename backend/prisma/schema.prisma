@@ -206,7 +206,8 @@ model Email {
   clickedAt   DateTime?
 
   trackingId     String  @unique @default(uuid())
-  attachmentPath String?
+  attachmentPath String? // Single attachment (backward compatibility)
+  attachmentPaths Json? // Multiple attachments as JSON array ["path1", "path2"]
 
   errorMessage String?
   retryCount   Int     @default(0)
@@ -242,7 +243,8 @@ model CalendarEvent {
 
   googleEventId String?
 
-  attachmentPath String? // Universal attachment support for all steps
+  attachmentPath String? // Single attachment (backward compatibility)
+  attachmentPaths Json? // Multiple attachments as JSON array ["path1", "path2"]
   
   stepNumber Int? // Step number this event belongs to (for uniquely identifying steps with same type)
 

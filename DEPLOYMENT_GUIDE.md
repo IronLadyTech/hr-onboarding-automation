@@ -68,6 +68,13 @@ Before starting, ensure you have:
 
 Once connected via SSH, run these commands:
 
+
+
+
+ssh -i "$HOME\Downloads\lightsail.pem" bitnami@43.204.155.68
+
+
+
 ```bash
 # Update system packages
 sudo apt update && sudo apt upgrade -y
@@ -107,7 +114,7 @@ git clone YOUR_REPOSITORY_URL .
 # git clone https://YOUR_USERNAME:YOUR_TOKEN@github.com/YOUR_USERNAME/YOUR_REPO.git .
 
 # Navigate to backend folder
-cd backend
+cd hr-onboarding-automation/backend
 ```
 
 ### Option B: Using SCP (File Transfer)
@@ -264,7 +271,7 @@ pm2 logs hr-onboarding-backend
 
 ## Step 11: Create Static IP (Optional but Recommended)
 
-1. In Lightsail console, click **"Networking"** tab
+1. In Lightsail console, click **"Networking"** tab  43.204.155.68
 2. Click **"Create static IP"**
 3. Attach it to your instance
 4. Note down the static IP address
@@ -282,7 +289,7 @@ pm2 restart hr-onboarding-backend
 
 ---
 
-## Step 12: Set Up Domain and SSL (Optional)
+## Step 12: Set Up Domain and SSL (Recommended)
 
 ### 12.1 Point Domain to Static IP
 1. Go to your domain registrar

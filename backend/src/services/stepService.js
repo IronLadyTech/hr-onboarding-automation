@@ -180,16 +180,48 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
     if (stepConfig.sendEmail && stepConfig.emailType) {
       try {
         // UNIVERSAL ATTACHMENT HANDLING: Check if there's a calendar event with attachment
+        // CRITICAL FIX: Search by stepNumber first (most reliable), then by type as fallback
+        // This ensures attachments work for ALL steps including newly created custom steps
         let stepAttachmentPath = null;
         
-        // Determine event type to search for calendar event
-        let eventTypeToSearch = null;
-        if (stepTemplate && stepTemplate.type) {
-          eventTypeToSearch = stepTemplate.type === 'MANUAL' ? 'CUSTOM' : stepTemplate.type;
+        // Priority 1: Search by stepNumber (most reliable - works for all step types)
+        // This is the primary search method that works for existing, edited, and newly created steps
+        let calendarEvent = await prisma.calendarEvent.findFirst({
+          where: {
+            candidateId: candidate.id,
+            stepNumber: stepNumber, // Match by stepNumber - ensures unique step identification
+            status: { in: ['SCHEDULED', 'COMPLETED'] },
+            OR: [
+              { attachmentPath: { not: null } }, // Single attachment
+              { attachmentPaths: { not: null } } // Multiple attachments
+            ]
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+        
+        // Priority 2: If not found by stepNumber, try searching by type (fallback for old events without stepNumber)
+        if (!calendarEvent && stepTemplate && stepTemplate.type) {
+          let eventTypeToSearch = stepTemplate.type === 'MANUAL' ? 'CUSTOM' : stepTemplate.type;
           if (eventTypeToSearch === 'WHATSAPP_ADDITION') {
             eventTypeToSearch = 'WHATSAPP_TASK';
           }
-        } else {
+          
+          calendarEvent = await prisma.calendarEvent.findFirst({
+            where: {
+              candidateId: candidate.id,
+              type: eventTypeToSearch,
+              status: { in: ['SCHEDULED', 'COMPLETED'] },
+              OR: [
+                { attachmentPath: { not: null } }, // Single attachment
+                { attachmentPaths: { not: null } } // Multiple attachments
+              ]
+            },
+            orderBy: { createdAt: 'desc' }
+          });
+        }
+        
+        // Priority 3: If still not found, try hardcoded mapping (backward compatibility)
+        if (!calendarEvent) {
           const eventTypeMap = {
             1: 'OFFER_LETTER',
             2: 'OFFER_REMINDER',
@@ -203,24 +235,41 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
             10: 'TRAINING_PLAN',
             11: 'CHECKIN_CALL'
           };
-          eventTypeToSearch = eventTypeMap[stepNumber];
+          const eventTypeToSearch = eventTypeMap[stepNumber];
+          
+          if (eventTypeToSearch) {
+            calendarEvent = await prisma.calendarEvent.findFirst({
+              where: {
+                candidateId: candidate.id,
+                type: eventTypeToSearch,
+                status: { in: ['SCHEDULED', 'COMPLETED'] },
+                OR: [
+                  { attachmentPath: { not: null } }, // Single attachment
+                  { attachmentPaths: { not: null } } // Multiple attachments
+                ]
+              },
+              orderBy: { createdAt: 'desc' }
+            });
+          }
         }
         
-        // Search for calendar event with attachment - use stepNumber for unique identification
-        if (eventTypeToSearch) {
-          const calendarEvent = await prisma.calendarEvent.findFirst({
-            where: {
-              candidateId: candidate.id,
-              type: eventTypeToSearch,
-              stepNumber: stepNumber, // Match by stepNumber to ensure unique step identification
-              status: { in: ['SCHEDULED', 'COMPLETED'] }
-            },
-            orderBy: { createdAt: 'desc' }
-          });
-          if (calendarEvent && calendarEvent.attachmentPath) {
+        // Extract attachment path(s) if found
+        // Support both single attachment (backward compatibility) and multiple attachments
+        if (calendarEvent) {
+          // Priority: Use attachmentPaths (array) if available, otherwise use attachmentPath (single)
+          if (calendarEvent.attachmentPaths && Array.isArray(calendarEvent.attachmentPaths) && calendarEvent.attachmentPaths.length > 0) {
+            // Multiple attachments - pass as array
+            stepAttachmentPath = calendarEvent.attachmentPaths;
+            logger.info(`✅ Found ${calendarEvent.attachmentPaths.length} attachment(s) for step ${stepNumber} (${calendarEvent.type})`);
+          } else if (calendarEvent.attachmentPath) {
+            // Single attachment - pass as string (will be converted to array in sendUniversalEmail)
             stepAttachmentPath = calendarEvent.attachmentPath;
-            logger.info(`Found attachment for step ${stepNumber}: ${stepAttachmentPath}`);
+            logger.info(`✅ Found attachment for step ${stepNumber} (${calendarEvent.type}): ${calendarEvent.attachmentPath}`);
           }
+        }
+        
+        if (!stepAttachmentPath) {
+          logger.debug(`ℹ️ No attachment found for step ${stepNumber} - email will be sent without attachment`);
         }
 
         // UNIVERSAL: ALL steps MUST use existing email templates from database
@@ -249,13 +298,14 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
         }
 
         // UNIVERSAL: Use sendUniversalEmail for ALL steps
+        // stepAttachmentPath can be a string (single) or array (multiple)
         logger.info(`📧 Completing step ${stepNumber} for ${candidate.email} - sending email type: ${emailTemplateType}`);
         await emailService.sendUniversalEmail(
           prisma, 
           candidate, 
           emailTemplateType, 
           stepTemplate,
-          stepAttachmentPath,
+          stepAttachmentPath, // Can be string or array
           customData
         );
         logger.info(`✅ Email sent successfully for step ${stepNumber}`);
