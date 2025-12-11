@@ -347,5 +347,6 @@ module.exports = {
   createCheckInCall,
   rescheduleEvent,
   cancelEvent,
-  createGoogleEvent
+  createGoogleEvent,
+  createEvent: createGoogleEvent // Alias for compatibility
 };
