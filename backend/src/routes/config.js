@@ -1,7 +1,47 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const logger = require('../utils/logger');
+
+// Configure multer for logo uploads
+const logoStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const dir = path.join(__dirname, `../../uploads/company-logo`);
+    // Create directory if it doesn't exist
+    await fs.mkdir(dir, { recursive: true }).catch(() => {});
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    // Use a fixed filename so we can replace the old logo
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `company-logo${ext}`);
+  }
+});
+
+const uploadLogo = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2097152 }, // 2MB max
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.png', '.jpg', '.jpeg', '.svg', '.gif'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PNG, JPG, JPEG, SVG, and GIF images are allowed'));
+    }
+  }
+});
+
+// Helper to convert absolute file path to relative path for storage
+const getRelativeFilePath = (filePath) => {
+  if (!filePath) return null;
+  const uploadsDir = path.join(__dirname, '../../uploads');
+  const relativePath = path.relative(uploadsDir, filePath);
+  return relativePath.replace(/\\/g, '/'); // Normalize path separators
+};
 
 // Apply authentication to all routes
 router.use(authenticateToken);
@@ -353,12 +393,19 @@ router.get('/settings', async (req, res) => {
     const configs = await req.prisma.workflowConfig.findMany({
       where: {
         key: {
-          in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location']
+          in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location', 'company_logo_path', 'ui_primary_color', 'ui_secondary_color', 'ui_accent_color']
         }
       }
     });
     const configMap = {};
     configs.forEach(c => { configMap[c.key] = c.value; });
+    
+    // Build logo URL if logo path exists
+    let logoUrl = null;
+    if (configMap.company_logo_path) {
+      const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:5000';
+      logoUrl = `${baseUrl}/api/uploads/${configMap.company_logo_path}`;
+    }
     
     const settings = {
       companyName: configMap.company_name || process.env.COMPANY_NAME || 'Company',
@@ -369,6 +416,11 @@ router.get('/settings', async (req, res) => {
       ceoName: configMap.ceo_name || process.env.CEO_NAME || 'CEO',
       officeLocation: configMap.office_location || process.env.OFFICE_LOCATION || 'Office Address',
       officeTimings: configMap.office_timings || process.env.OFFICE_TIMINGS || '9:30 AM - 6:30 PM',
+      companyLogoPath: configMap.company_logo_path || null,
+      companyLogoUrl: logoUrl,
+      uiPrimaryColor: configMap.ui_primary_color || '#4F46E5',
+      uiSecondaryColor: configMap.ui_secondary_color || '#7C3AED',
+      uiAccentColor: configMap.ui_accent_color || null,
       workingHours: {
         start: '09:00',
         end: '18:00'
@@ -381,6 +433,128 @@ router.get('/settings', async (req, res) => {
     res.json({ success: true, data: settings });
   } catch (error) {
     logger.error('Error fetching settings:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Upload company logo
+router.post('/logo', requireAdmin, uploadLogo.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
+    }
+
+    const logoPath = getRelativeFilePath(req.file.path);
+    
+    // Store logo path in database
+    await req.prisma.workflowConfig.upsert({
+      where: { key: 'company_logo_path' },
+      update: { value: logoPath },
+      create: { key: 'company_logo_path', value: logoPath }
+    });
+
+    // Build logo URL
+    const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:5000';
+    const logoUrl = `${baseUrl}/api/uploads/${logoPath}`;
+
+    logger.info(`✅ Company logo uploaded: ${logoPath}`);
+
+    res.json({ 
+      success: true, 
+      data: { 
+        logoPath, 
+        logoUrl 
+      } 
+    });
+  } catch (error) {
+    logger.error('Error uploading logo:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete company logo
+router.delete('/logo', requireAdmin, async (req, res) => {
+  try {
+    // Get current logo path
+    const config = await req.prisma.workflowConfig.findUnique({
+      where: { key: 'company_logo_path' }
+    });
+
+    if (config && config.value) {
+      // Delete file from filesystem
+      const filePath = path.join(__dirname, '../../uploads', config.value);
+      try {
+        await fs.unlink(filePath);
+      } catch (fileError) {
+        logger.warn('Logo file not found, continuing with database deletion:', fileError);
+      }
+
+      // Remove from database
+      await req.prisma.workflowConfig.delete({
+        where: { key: 'company_logo_path' }
+      });
+
+      logger.info('✅ Company logo deleted');
+    }
+
+    res.json({ success: true, message: 'Logo deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting logo:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update UI colors
+router.put('/ui-colors', requireAdmin, async (req, res) => {
+  try {
+    const { primaryColor, secondaryColor, accentColor } = req.body;
+
+    const updates = [];
+    
+    if (primaryColor) {
+      updates.push(
+        req.prisma.workflowConfig.upsert({
+          where: { key: 'ui_primary_color' },
+          update: { value: primaryColor },
+          create: { key: 'ui_primary_color', value: primaryColor }
+        })
+      );
+    }
+
+    if (secondaryColor) {
+      updates.push(
+        req.prisma.workflowConfig.upsert({
+          where: { key: 'ui_secondary_color' },
+          update: { value: secondaryColor },
+          create: { key: 'ui_secondary_color', value: secondaryColor }
+        })
+      );
+    }
+
+    if (accentColor !== undefined) {
+      if (accentColor) {
+        updates.push(
+          req.prisma.workflowConfig.upsert({
+            where: { key: 'ui_accent_color' },
+            update: { value: accentColor },
+            create: { key: 'ui_accent_color', value: accentColor }
+          })
+        );
+      } else {
+        // Delete if set to null/empty
+        await req.prisma.workflowConfig.deleteMany({
+          where: { key: 'ui_accent_color' }
+        });
+      }
+    }
+
+    await Promise.all(updates);
+
+    logger.info('✅ UI colors updated');
+
+    res.json({ success: true, message: 'UI colors updated successfully' });
+  } catch (error) {
+    logger.error('Error updating UI colors:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

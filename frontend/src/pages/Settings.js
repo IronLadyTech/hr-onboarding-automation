@@ -27,7 +27,75 @@ const Settings = () => {
   useEffect(() => {
     fetchData();
     fetchDepartments();
+    fetchSettings();
   }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await configApi.getSettings();
+      if (response.data?.success) {
+        setSettings(response.data.data || {});
+        if (response.data.data?.companyLogoUrl) {
+          setLogoPreview(response.data.data.companyLogoUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return;
+    
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('logo', logoFile);
+      
+      const response = await configApi.uploadLogo(formData);
+      if (response.data?.success) {
+        toast.success('Logo uploaded successfully!');
+        setLogoFile(null);
+        await fetchSettings();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleDeleteLogo = async () => {
+    if (!window.confirm('Are you sure you want to delete the logo?')) return;
+    
+    try {
+      const response = await configApi.deleteLogo();
+      if (response.data?.success) {
+        toast.success('Logo deleted successfully!');
+        setLogoPreview(null);
+        setLogoFile(null);
+        await fetchSettings();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete logo');
+    }
+  };
+
+  const handleSaveColors = async () => {
+    setSavingColors(true);
+    try {
+      await configApi.updateUIColors({
+        primaryColor: settings.uiPrimaryColor,
+        secondaryColor: settings.uiSecondaryColor,
+        accentColor: settings.uiAccentColor || null
+      });
+      toast.success('Colors saved successfully! Please refresh the page to see changes.');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save colors');
+    } finally {
+      setSavingColors(false);
+    }
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -172,6 +240,7 @@ const Settings = () => {
 
   const tabs = [
     { id: 'company', label: 'Company', icon: '🏢' },
+    { id: 'ui', label: 'UI Customization', icon: '🎨' },
     { id: 'departments', label: 'Departments', icon: '🏛️' },
     { id: 'automation', label: 'Automation (11 Steps)', icon: '⚡' },
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },

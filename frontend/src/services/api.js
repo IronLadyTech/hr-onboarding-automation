@@ -222,6 +222,11 @@ export const configApi = {
   updateDepartment: (oldName, data) => api.put(`/config/departments/${encodeURIComponent(oldName)}`, data),
   deleteDepartment: (name) => api.delete(`/config/departments/${encodeURIComponent(name)}`),
   getSettings: () => api.get('/config/settings'),
+  uploadLogo: (formData) => api.post('/config/logo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  deleteLogo: () => api.delete('/config/logo'),
+  updateUIColors: (data) => api.put('/config/ui-colors', data),
   initWorkflow: () => api.post('/config/workflow/init'),
   initTrainingPlans: () => api.post('/config/training-plans/init'),
   
