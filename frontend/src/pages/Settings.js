@@ -16,6 +16,13 @@ const Settings = () => {
   const [editingPlan, setEditingPlan] = useState(null);
   const [newGroup, setNewGroup] = useState({ name: '', department: '', description: '' });
   const [showAddGroup, setShowAddGroup] = useState(false);
+  
+  // Department management state
+  const [departments, setDepartments] = useState([]);
+  const [newDepartmentName, setNewDepartmentName] = useState('');
+  const [editingDepartment, setEditingDepartment] = useState(null);
+  const [editingDepartmentName, setEditingDepartmentName] = useState('');
+  const [departmentLoading, setDepartmentLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -170,12 +177,6 @@ const Settings = () => {
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
     { id: 'training', label: 'Training Plans', icon: '📚' },
   ];
-
-  const [departments, setDepartments] = useState([]);
-  const [newDepartmentName, setNewDepartmentName] = useState('');
-  const [editingDepartment, setEditingDepartment] = useState(null);
-  const [editingDepartmentName, setEditingDepartmentName] = useState('');
-  const [departmentLoading, setDepartmentLoading] = useState(false);
 
   return (
     <div className="animate-fadeIn">
