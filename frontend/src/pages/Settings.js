@@ -176,8 +176,6 @@ const Settings = () => {
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [editingDepartmentName, setEditingDepartmentName] = useState('');
   const [departmentLoading, setDepartmentLoading] = useState(false);
-  const [editingDepartmentName, setEditingDepartmentName] = useState('');
-  const [departmentLoading, setDepartmentLoading] = useState(false);
 
   return (
     <div className="animate-fadeIn">
