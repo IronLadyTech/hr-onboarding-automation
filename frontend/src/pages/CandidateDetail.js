@@ -1121,10 +1121,24 @@ const CandidateDetail = () => {
                   </div>
                   {candidate.signedOfferPath ? (
                     <a 
-                      href={`/uploads/${candidate.signedOfferPath.replace(/\\/g, '/')}`}
+                      href={`${(() => {
+                        // Get API URL same way as api.js does
+                        let apiUrl = process.env.REACT_APP_API_URL || '/api';
+                        if (apiUrl.startsWith('http')) {
+                          apiUrl = apiUrl.replace(/\/$/, '');
+                          if (!apiUrl.endsWith('/api')) {
+                            apiUrl = `${apiUrl}/api`;
+                          }
+                        }
+                        return apiUrl;
+                      })()}/uploads/${candidate.signedOfferPath.replace(/\\/g, '/')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-green-600 hover:text-green-800 text-sm font-medium"
+                      onClick={(e) => {
+                        // Prevent React Router from intercepting the link
+                        e.stopPropagation();
+                      }}
                     >
                       View Document →
                     </a>
