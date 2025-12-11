@@ -63,6 +63,12 @@ const Settings = () => {
       }
     } catch (error) {
       console.error('Failed to fetch custom fields:', error);
+      // If it's a 500 error, the table probably doesn't exist yet
+      // Set empty array to prevent UI errors
+      if (error.response?.status === 500) {
+        console.warn('Custom fields table may not exist yet. Please deploy database schema.');
+        setCustomFields([]);
+      }
     }
   };
 
