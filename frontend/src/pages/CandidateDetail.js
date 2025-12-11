@@ -30,7 +30,8 @@ const CandidateDetail = () => {
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [editingEventId, setEditingEventId] = useState(null);
   const [scheduleAttachment, setScheduleAttachment] = useState(null);
-  const [scheduleAttachments, setScheduleAttachments] = useState([]); // Multiple attachments
+  const [scheduleAttachments, setScheduleAttachments] = useState([]); // Multiple attachments (new files)
+  const [existingAttachmentPaths, setExistingAttachmentPaths] = useState([]); // Existing attachment paths from event
   const [scheduleAttachmentPreview, setScheduleAttachmentPreview] = useState(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
@@ -87,6 +88,19 @@ const CandidateDetail = () => {
     const first = candidate.firstName ? candidate.firstName.charAt(0) : '';
     const last = candidate.lastName ? candidate.lastName.charAt(0) : '';
     return (first + last).toUpperCase() || '?';
+  };
+
+  // Helper function to update attachment preview (existing + new files)
+  const updateAttachmentPreview = (existingFileNames, newFiles) => {
+    const allFileNames = [...existingFileNames, ...newFiles.map(f => f.name)];
+    if (allFileNames.length > 0) {
+      const previewText = allFileNames.length > 3 
+        ? `${allFileNames.slice(0, 3).join(', ')}... (${allFileNames.length} files)`
+        : allFileNames.join(', ');
+      setScheduleAttachmentPreview(previewText);
+    } else {
+      setScheduleAttachmentPreview(null);
+    }
   };
 
   const handleSendClick = (stepNumber) => {
@@ -504,14 +518,21 @@ const CandidateDetail = () => {
     if (stepNumber) formData.append('stepNumber', stepNumber.toString());
     
     // Support both single attachment (backward compatibility) and multiple attachments
+    // Include both existing attachment paths and new files
     if (scheduleAttachments && scheduleAttachments.length > 0) {
-      // Multiple attachments
+      // Multiple new attachments
       scheduleAttachments.forEach((file) => {
         formData.append('attachments', file);
       });
     } else if (scheduleAttachment) {
-      // Single attachment (backward compatibility)
+      // Single new attachment (backward compatibility)
       formData.append('attachment', scheduleAttachment);
+    }
+    
+    // If editing and there are existing attachments, we need to handle them
+    // The backend will merge existing and new attachments
+    if (editingEventId && existingAttachmentPaths.length > 0) {
+      formData.append('existingAttachmentPaths', JSON.stringify(existingAttachmentPaths));
     }
 
     handleAction(showScheduleModal, formData);
@@ -523,6 +544,7 @@ const CandidateDetail = () => {
     setSchedulingStepNumber(null);
     setScheduleAttachment(null);
     setScheduleAttachments([]);
+    setExistingAttachmentPaths([]);
     setScheduleAttachmentPreview(null);
   };
 
@@ -1224,20 +1246,19 @@ const CandidateDetail = () => {
                               setScheduleDuration(event ? Math.round((new Date(event.endTime) - new Date(event.startTime)) / 60000) : durationMap[step.stepType] || 30);
                               // Load existing attachment(s) if event has any
                               if (event?.attachmentPaths && Array.isArray(event.attachmentPaths) && event.attachmentPaths.length > 0) {
-                                // Multiple attachments
-                                const fileNames = event.attachmentPaths.map(path => path.split('/').pop() || path).join(', ');
-                                setScheduleAttachmentPreview(fileNames.length > 50 ? `${fileNames.substring(0, 50)}... (${event.attachmentPaths.length} files)` : fileNames);
-                                // Note: We can't set the actual file objects, but we can show the filenames
-                                // The user can upload new files to replace them
+                                // Multiple attachments - store paths for display
+                                setExistingAttachmentPaths(event.attachmentPaths);
+                                const fileNames = event.attachmentPaths.map(path => path.split('/').pop() || path);
+                                updateAttachmentPreview(fileNames, []);
                               } else if (event?.attachmentPath) {
                                 // Single attachment (backward compatibility)
+                                setExistingAttachmentPaths([event.attachmentPath]);
                                 const fileName = event.attachmentPath.split('/').pop() || event.attachmentPath;
-                                setScheduleAttachmentPreview(fileName);
-                                // Note: We can't set the actual file object, but we can show the filename
-                                // The user can upload a new file to replace it
+                                updateAttachmentPreview([fileName], []);
                               } else {
                                 setScheduleAttachment(null);
                                 setScheduleAttachments([]);
+                                setExistingAttachmentPaths([]);
                                 setScheduleAttachmentPreview(null);
                               }
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
@@ -1425,69 +1446,76 @@ const CandidateDetail = () => {
                 type="file"
                 multiple
                 onChange={(e) => {
-                  const files = Array.from(e.target.files || []);
-                  if (files.length > 0) {
-                    // Support multiple files
-                    setScheduleAttachments(files);
+                  const newFiles = Array.from(e.target.files || []);
+                  if (newFiles.length > 0) {
+                    // Append new files to existing ones (don't replace)
+                    const updatedFiles = [...scheduleAttachments, ...newFiles];
+                    setScheduleAttachments(updatedFiles);
                     // For backward compatibility, also set single file (first one)
-                    setScheduleAttachment(files[0]);
-                    // Show preview of all files
-                    const fileNames = files.map(f => f.name).join(', ');
-                    setScheduleAttachmentPreview(fileNames.length > 50 ? `${fileNames.substring(0, 50)}... (${files.length} files)` : fileNames);
-                  } else {
-                    setScheduleAttachment(null);
-                    setScheduleAttachments([]);
-                    setScheduleAttachmentPreview(null);
+                    setScheduleAttachment(updatedFiles[0]);
+                    // Show preview of existing + new files
+                    const existingFileNames = existingAttachmentPaths.map(path => path.split('/').pop() || path);
+                    updateAttachmentPreview(existingFileNames, updatedFiles);
                   }
+                  // Reset file input to allow selecting same file again
+                  e.target.value = '';
                 }}
                 className="input w-full"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
               />
-              {scheduleAttachmentPreview && (
+              {(existingAttachmentPaths.length > 0 || scheduleAttachments.length > 0) && (
                 <div className="mt-2 space-y-1">
-                  {scheduleAttachments.length > 0 ? (
-                    // Show list of multiple files
-                    scheduleAttachments.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                        <span className="text-sm text-gray-600 truncate flex-1">{file.name}</span>
+                  {/* Show existing attachments (from event) */}
+                  {existingAttachmentPaths.map((path, index) => {
+                    const fileName = path.split('/').pop() || path;
+                    return (
+                      <div key={`existing-${index}`} className="flex items-center justify-between p-2 bg-blue-50 border border-blue-200 rounded">
+                        <div className="flex items-center flex-1">
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded mr-2">Existing</span>
+                          <span className="text-sm text-gray-700 truncate flex-1">{fileName}</span>
+                        </div>
                         <button
                           onClick={() => {
-                            const newFiles = scheduleAttachments.filter((_, i) => i !== index);
-                            setScheduleAttachments(newFiles);
-                            if (newFiles.length > 0) {
-                              setScheduleAttachment(newFiles[0]);
-                              const fileNames = newFiles.map(f => f.name).join(', ');
-                              setScheduleAttachmentPreview(fileNames.length > 50 ? `${fileNames.substring(0, 50)}... (${newFiles.length} files)` : fileNames);
-                            } else {
-                              setScheduleAttachment(null);
-                              setScheduleAttachmentPreview(null);
-                            }
+                            const updated = existingAttachmentPaths.filter((_, i) => i !== index);
+                            setExistingAttachmentPaths(updated);
+                            const existingFileNames = updated.map(p => p.split('/').pop() || p);
+                            updateAttachmentPreview(existingFileNames, scheduleAttachments);
                           }}
                           className="text-red-500 hover:text-red-700 ml-2"
+                          title="Remove existing attachment"
                         >
                           ✕
                         </button>
                       </div>
-                    ))
-                  ) : (
-                    // Single file preview (backward compatibility)
-                    <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                      <span className="text-sm text-gray-600 truncate flex-1">{scheduleAttachmentPreview}</span>
+                    );
+                  })}
+                  
+                  {/* Show new attachments (just uploaded) */}
+                  {scheduleAttachments.map((file, index) => (
+                    <div key={`new-${index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center flex-1">
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded mr-2">New</span>
+                        <span className="text-sm text-gray-600 truncate flex-1">{file.name}</span>
+                      </div>
                       <button
                         onClick={() => {
-                          setScheduleAttachment(null);
-                          setScheduleAttachments([]);
-                          setScheduleAttachmentPreview(null);
-                          // Reset file input
-                          const fileInput = document.querySelector('input[type="file"]');
-                          if (fileInput) fileInput.value = '';
+                          const newFiles = scheduleAttachments.filter((_, i) => i !== index);
+                          setScheduleAttachments(newFiles);
+                          if (newFiles.length > 0) {
+                            setScheduleAttachment(newFiles[0]);
+                          } else if (existingAttachmentPaths.length === 0) {
+                            setScheduleAttachment(null);
+                          }
+                          const existingFileNames = existingAttachmentPaths.map(p => p.split('/').pop() || p);
+                          updateAttachmentPreview(existingFileNames, newFiles);
                         }}
                         className="text-red-500 hover:text-red-700 ml-2"
+                        title="Remove new attachment"
                       >
                         ✕
                       </button>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
               <p className="text-xs text-gray-500 mt-1">

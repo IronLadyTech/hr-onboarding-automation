@@ -219,7 +219,9 @@ router.post('/', (req, res, next) => {
       attendees,
       location,
       meetingLink,
-      stepNumber
+      stepNumber,
+      eventId,
+      existingAttachmentPaths
     } = req.body;
 
     // Handle attendees if it's a JSON string (from FormData)
@@ -231,20 +233,61 @@ router.post('/', (req, res, next) => {
       }
     }
 
-    // Handle attachments (support both single and multiple)
+    // Handle attachments (support both single and multiple, and preserve existing when editing)
     let attachmentPath = null; // Single attachment (backward compatibility)
     let attachmentPaths = []; // Multiple attachments (new feature)
     
+    // If editing an event, fetch and preserve existing attachments
+    if (eventId) {
+      try {
+        const existingEvent = await req.prisma.calendarEvent.findUnique({
+          where: { id: eventId }
+        });
+        
+        if (existingEvent) {
+          // Preserve existing attachments
+          if (existingEvent.attachmentPaths && Array.isArray(existingEvent.attachmentPaths)) {
+            attachmentPaths = [...existingEvent.attachmentPaths];
+            attachmentPath = attachmentPaths[0] || null;
+          } else if (existingEvent.attachmentPath) {
+            attachmentPaths = [existingEvent.attachmentPath];
+            attachmentPath = existingEvent.attachmentPath;
+          }
+          
+          // Also check if existingAttachmentPaths was sent (in case user removed some)
+          if (existingAttachmentPaths) {
+            try {
+              const keptPaths = typeof existingAttachmentPaths === 'string' 
+                ? JSON.parse(existingAttachmentPaths) 
+                : existingAttachmentPaths;
+              if (Array.isArray(keptPaths)) {
+                // User may have removed some existing attachments, use only the kept ones
+                attachmentPaths = keptPaths;
+                attachmentPath = keptPaths[0] || null;
+              }
+            } catch (e) {
+              logger.warn('Failed to parse existing attachment paths:', e);
+            }
+          }
+        }
+      } catch (e) {
+        logger.warn('Failed to fetch existing event for attachment preservation:', e);
+      }
+    }
+    
+    // Add new attachments to existing ones
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      // Multiple files uploaded
-      attachmentPaths = req.files.map(file => getRelativeFilePath(file.path));
+      // Multiple new files uploaded - append to existing
+      const newPaths = req.files.map(file => getRelativeFilePath(file.path));
+      attachmentPaths = [...attachmentPaths, ...newPaths];
       attachmentPath = attachmentPaths[0]; // First file for backward compatibility
-      logger.info(`📎 ${attachmentPaths.length} attachment(s) uploaded for calendar event`);
+      logger.info(`📎 ${req.files.length} new attachment(s) added. Total: ${attachmentPaths.length} attachment(s)`);
     } else if (req.file) {
-      // Single file uploaded (backward compatibility)
-      attachmentPath = getRelativeFilePath(req.file.path);
-      attachmentPaths = [attachmentPath];
-      logger.info(`📎 Attachment uploaded for calendar event: ${attachmentPath}`);
+      // Single new file uploaded - append to existing
+      const newPath = getRelativeFilePath(req.file.path);
+      attachmentPaths = [...attachmentPaths, newPath];
+      attachmentPath = attachmentPaths[0];
+      logger.info(`📎 New attachment added. Total: ${attachmentPaths.length} attachment(s)`);
     }
 
     // Create event in Google Calendar
@@ -279,25 +322,48 @@ router.post('/', (req, res, next) => {
       logger.info(`✅ Saved offer letter attachment to candidate profile: ${attachmentPath}`);
     }
 
-    // Create event in database (with universal single and multiple attachment support and stepNumber for unique identification)
-    const event = await req.prisma.calendarEvent.create({
-      data: {
-        candidateId,
-        type,
-        title,
-        description,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        attendees: attendees || [],
-        location,
-        meetingLink,
-        googleEventId,
-        attachmentPath: attachmentPath, // Single attachment (backward compatibility)
-        attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // Multiple attachments (new feature)
-        stepNumber: stepNumber ? parseInt(stepNumber) : null, // Step number for unique step identification
-        status: 'SCHEDULED'
-      }
-    });
+    // Create or update event in database (with universal single and multiple attachment support and stepNumber for unique identification)
+    let event;
+    if (eventId) {
+      // Update existing event (when editing/rescheduling)
+      event = await req.prisma.calendarEvent.update({
+        where: { id: eventId },
+        data: {
+          title,
+          description,
+          startTime: new Date(startTime),
+          endTime: new Date(endTime),
+          attendees: attendees || [],
+          location,
+          meetingLink,
+          attachmentPath: attachmentPath, // Single attachment (backward compatibility)
+          attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // Multiple attachments (new feature)
+          status: 'SCHEDULED'
+        }
+      });
+      logger.info(`📅 Calendar event updated: ${event.id} with ${attachmentPaths.length} attachment(s)`);
+    } else {
+      // Create new event
+      event = await req.prisma.calendarEvent.create({
+        data: {
+          candidateId,
+          type,
+          title,
+          description,
+          startTime: new Date(startTime),
+          endTime: new Date(endTime),
+          attendees: attendees || [],
+          location,
+          meetingLink,
+          googleEventId,
+          attachmentPath: attachmentPath, // Single attachment (backward compatibility)
+          attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // Multiple attachments (new feature)
+          stepNumber: stepNumber ? parseInt(stepNumber) : null, // Step number for unique step identification
+          status: 'SCHEDULED'
+        }
+      });
+      logger.info(`📅 Calendar event created: ${event.id} with ${attachmentPaths.length} attachment(s)`);
+    }
 
     // Email will be sent automatically when the calendar event auto-completes at the scheduled time
     // (handled by autoCompleteCalendarSteps in scheduler.js)
