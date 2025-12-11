@@ -907,6 +907,22 @@ const autoCompleteCalendarSteps = async () => {
         // ✅ USE THE SAME LOGIC AS MANUAL "SEND" BUTTON
         // This ensures scheduled emails work exactly like manual sends
         try {
+          // CRITICAL: Mark event as COMPLETED immediately to prevent duplicate processing
+          // Do this BEFORE calling completeStep to prevent race conditions when scheduler runs multiple times
+          const updateResult = await prisma.calendarEvent.updateMany({
+            where: { 
+              id: event.id,
+              status: 'SCHEDULED' // Only update if still SCHEDULED (prevents race condition)
+            },
+            data: { status: 'COMPLETED' }
+          });
+          
+          // If updateResult.count is 0, another process already marked it as completed
+          if (updateResult.count === 0) {
+            logger.info(`⏭️ Skipping event ${event.id} - already processed by another instance`);
+            continue;
+          }
+          
           logger.info(`🔄 Auto-completing step ${actualStepNumber} for ${candidate.email} (event: ${event.type}) - using same logic as manual Send button`);
           
           // Call the universal stepService - same function used by manual "Send" button
@@ -916,12 +932,6 @@ const autoCompleteCalendarSteps = async () => {
             actualStepNumber,
             null // No userId for automated actions
           );
-          
-          // Mark calendar event as COMPLETED (stepService already handles candidate updates)
-          await prisma.calendarEvent.update({
-            where: { id: event.id },
-            data: { status: 'COMPLETED' }
-          });
           
           logger.info(`✅ Successfully auto-completed step ${actualStepNumber} for ${candidate.email} - ${event.type}`);
           
