@@ -230,6 +230,16 @@ router.post('/', uploadCalendarAttachment.single('attachment'), async (req, res)
       where: { id: candidateId }
     });
 
+    // If this is Step 1 (OFFER_LETTER) with attachment, also save it to candidate.offerLetterPath
+    // This ensures the offer letter shows in the candidate profile section
+    if (type === 'OFFER_LETTER' && attachmentPath) {
+      await req.prisma.candidate.update({
+        where: { id: candidateId },
+        data: { offerLetterPath: attachmentPath }
+      });
+      logger.info(`✅ Saved offer letter attachment to candidate profile: ${attachmentPath}`);
+    }
+
     // Create event in database (with universal attachment support and stepNumber for unique identification)
     const event = await req.prisma.calendarEvent.create({
       data: {

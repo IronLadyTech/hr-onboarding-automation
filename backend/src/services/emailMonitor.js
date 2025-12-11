@@ -231,18 +231,40 @@ const processMessage = async (messageId) => {
         take: 5 // Check last 5 offer-related emails
       });
       
+      logger.info(`Found ${offerEmails.length} offer-related email(s) for candidate ${candidate.email}`);
+      
       for (const offerEmail of offerEmails) {
         const offerSubjectLower = offerEmail.subject.toLowerCase();
         // Remove "Re:" prefix for comparison
         const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').trim();
         const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').trim();
         
+        logger.info(`Comparing: Reply="${cleanReplySubject}" vs Original="${cleanOfferSubject}"`);
+        
         // Check if reply subject matches or contains the original email subject
-        if (cleanReplySubject.includes(cleanOfferSubject) || cleanOfferSubject.includes(cleanReplySubject)) {
+        // Also check if original subject is contained in reply (common in email threads)
+        if (cleanReplySubject.includes(cleanOfferSubject) || 
+            cleanOfferSubject.includes(cleanReplySubject) ||
+            subjectLower.includes('re:') && (cleanReplySubject.length > 0 && cleanOfferSubject.length > 0)) {
           isReplyToOfferEmail = true;
           originalEmailType = offerEmail.type;
-          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}"`);
+          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
           break;
+        }
+      }
+      
+      // Method 3: If still not matched, check if email has "Re:" and candidate has been sent an offer
+      // This is a fallback for cases where subject doesn't match exactly
+      if (!isReplyToOfferEmail && subjectLower.includes('re:') && candidate.offerSentAt) {
+        // Check if this email came after the offer was sent (within reasonable time)
+        const offerSentTime = new Date(candidate.offerSentAt);
+        const timeDiff = emailDate.getTime() - offerSentTime.getTime();
+        const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+        
+        // If email came within 30 days of offer being sent and has attachment, likely a reply
+        if (daysDiff >= 0 && daysDiff <= 30) {
+          isReplyToOfferEmail = true;
+          logger.info(`✅ Detected as potential offer reply - has "Re:" prefix, came ${daysDiff.toFixed(1)} days after offer sent`);
         }
       }
     }
