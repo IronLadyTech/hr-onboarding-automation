@@ -1,8 +1,17 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// API Base URL - use relative path when served from same origin
-const API_URL = '/api';
+// API Base URL - use environment variable or fallback to relative path
+// If it's a full URL (starts with http), ensure it ends with /api
+let API_URL = process.env.REACT_APP_API_URL || '/api';
+if (API_URL.startsWith('http')) {
+  // Remove trailing slash if present
+  API_URL = API_URL.replace(/\/$/, '');
+  // Append /api if not already present
+  if (!API_URL.endsWith('/api')) {
+    API_URL = `${API_URL}/api`;
+  }
+}
 
 const api = axios.create({
   baseURL: API_URL,
