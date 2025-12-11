@@ -1095,10 +1095,24 @@ const CandidateDetail = () => {
                   </div>
                   {candidate.offerLetterPath && (
                     <a 
-                      href={`/uploads/${candidate.offerLetterPath.replace(/\\/g, '/')}`}
+                      href={`${(() => {
+                        // Get API URL same way as api.js does
+                        let apiUrl = process.env.REACT_APP_API_URL || '/api';
+                        if (apiUrl.startsWith('http')) {
+                          apiUrl = apiUrl.replace(/\/$/, '');
+                          if (!apiUrl.endsWith('/api')) {
+                            apiUrl = `${apiUrl}/api`;
+                          }
+                        }
+                        return apiUrl;
+                      })()}/uploads/${candidate.offerLetterPath.replace(/\\/g, '/')}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-indigo-600 hover:text-indigo-800 text-sm font-medium"
+                      onClick={(e) => {
+                        // Prevent React Router from intercepting the link
+                        e.stopPropagation();
+                      }}
                     >
                       View →
                     </a>
