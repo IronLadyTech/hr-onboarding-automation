@@ -181,7 +181,13 @@ const frontendPath = path.join(__dirname, '../../frontend/build');
 app.use(express.static(frontendPath));
 
 // Handle React routing - serve index.html for all non-API routes
+// IMPORTANT: The static file middleware (app.use) above handles /api/uploads before this catch-all
 app.get('*', (req, res) => {
+  // Skip uploads routes - they're handled by static middleware above
+  if (req.path.startsWith('/api/uploads/') || req.path.startsWith('/uploads/')) {
+    return; // Let static middleware handle it
+  }
+  
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(frontendPath, 'index.html'));
   } else {
