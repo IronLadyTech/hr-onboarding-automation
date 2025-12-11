@@ -7,6 +7,8 @@ const NewCandidate = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
+  const [customFields, setCustomFields] = useState([]);
+  const [customFieldValues, setCustomFieldValues] = useState({});
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -23,7 +25,26 @@ const NewCandidate = () => {
 
   useEffect(() => {
     fetchDepartments();
+    fetchCustomFields();
   }, []);
+
+  const fetchCustomFields = async () => {
+    try {
+      const response = await configApi.getCustomFields();
+      if (response.data?.success) {
+        const fields = response.data.data || [];
+        setCustomFields(fields);
+        // Initialize custom field values
+        const initialValues = {};
+        fields.forEach(field => {
+          initialValues[field.fieldKey] = '';
+        });
+        setCustomFieldValues(initialValues);
+      }
+    } catch (error) {
+      console.error('Failed to fetch custom fields:', error);
+    }
+  };
 
   const fetchDepartments = async () => {
     try {
@@ -41,12 +62,104 @@ const NewCandidate = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleCustomFieldChange = (fieldKey, value) => {
+    setCustomFieldValues(prev => ({ ...prev, [fieldKey]: value }));
+  };
+
+  const renderCustomField = (field) => {
+    const value = customFieldValues[field.fieldKey] || '';
+    
+    switch (field.fieldType) {
+      case 'text':
+      case 'email':
+      case 'phone':
+      case 'number':
+        return (
+          <input
+            type={field.fieldType === 'number' ? 'number' : field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            className="input"
+            placeholder={field.placeholder || ''}
+            required={field.required}
+          />
+        );
+      
+      case 'date':
+        return (
+          <input
+            type="date"
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            className="input"
+            required={field.required}
+          />
+        );
+      
+      case 'select':
+        const options = field.options || [];
+        return (
+          <select
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            className="input"
+            required={field.required}
+          >
+            <option value="">{field.placeholder || 'Select an option'}</option>
+            {options.map((option, idx) => (
+              <option key={idx} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
+      
+      case 'textarea':
+        return (
+          <textarea
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            className="input"
+            rows={3}
+            placeholder={field.placeholder || ''}
+            required={field.required}
+          />
+        );
+      
+      default:
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            className="input"
+            placeholder={field.placeholder || ''}
+            required={field.required}
+          />
+        );
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await candidateApi.create(formData);
+      // Merge custom fields into formData
+      const customFieldsData = {};
+      customFields.forEach(field => {
+        const value = customFieldValues[field.fieldKey];
+        if (value !== undefined && value !== null && value !== '') {
+          customFieldsData[field.fieldKey] = value;
+        }
+      });
+
+      const submitData = {
+        ...formData,
+        customFields: Object.keys(customFieldsData).length > 0 ? customFieldsData : null
+      };
+
+      const response = await candidateApi.create(submitData);
       toast.success('Candidate created successfully!');
       navigate(`/candidates/${response.data.data.id}`);
     } catch (error) {
@@ -228,6 +341,29 @@ const NewCandidate = () => {
               placeholder="Any additional notes..."
             />
           </div>
+
+          {/* Custom Fields */}
+          {customFields.length > 0 && (
+            <>
+              <div className="md:col-span-2">
+                <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-4 border-t pt-4">
+                  Additional Information
+                </h3>
+              </div>
+              {customFields
+                .filter(field => field.isActive)
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((field) => (
+                  <div key={field.id} className={field.fieldType === 'textarea' ? 'md:col-span-2' : ''}>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-1">*</span>}
+                    </label>
+                    {renderCustomField(field)}
+                  </div>
+                ))}
+            </>
+          )}
         </div>
 
         {/* Actions */}

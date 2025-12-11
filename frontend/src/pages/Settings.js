@@ -23,12 +23,41 @@ const Settings = () => {
   const [editingDepartment, setEditingDepartment] = useState(null);
   const [editingDepartmentName, setEditingDepartmentName] = useState('');
   const [departmentLoading, setDepartmentLoading] = useState(false);
+  
+  // Custom Fields state
+  const [customFields, setCustomFields] = useState([]);
+  const [showCustomFieldModal, setShowCustomFieldModal] = useState(false);
+  const [editingCustomField, setEditingCustomField] = useState(null);
+  const [customFieldForm, setCustomFieldForm] = useState({
+    label: '',
+    fieldKey: '',
+    fieldType: 'text',
+    placeholder: '',
+    required: false,
+    validation: null,
+    options: [],
+    order: 0
+  });
+  const [customFieldLoading, setCustomFieldLoading] = useState(false);
+  const [newOption, setNewOption] = useState({ label: '', value: '' });
 
   useEffect(() => {
     fetchData();
     fetchDepartments();
     fetchSettings();
+    fetchCustomFields();
   }, []);
+
+  const fetchCustomFields = async () => {
+    try {
+      const response = await configApi.getAllCustomFields();
+      if (response.data?.success) {
+        setCustomFields(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch custom fields:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -241,6 +270,7 @@ const Settings = () => {
   const tabs = [
     { id: 'company', label: 'Company', icon: '🏢' },
     { id: 'ui', label: 'UI Customization', icon: '🎨' },
+    { id: 'custom-fields', label: 'Custom Form Fields', icon: '📝' },
     { id: 'departments', label: 'Departments', icon: '🏛️' },
     { id: 'automation', label: 'Automation (11 Steps)', icon: '⚡' },
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
