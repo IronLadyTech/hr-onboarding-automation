@@ -916,8 +916,16 @@ router.get('/custom-fields', async (req, res) => {
   } catch (error) {
     logger.error('Error fetching custom fields:', error);
     // If table doesn't exist yet, return empty array instead of error
-    if (error.message && error.message.includes('does not exist')) {
-      logger.warn('CustomField table does not exist yet. Returning empty array.');
+    const errorMessage = error.message || '';
+    const errorCode = error.code || '';
+    if (
+      errorMessage.includes('does not exist') ||
+      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('relation') ||
+      errorCode === 'P2021' || // Table does not exist in Prisma
+      errorCode === '42P01'    // PostgreSQL: relation does not exist
+    ) {
+      logger.warn('CustomField table does not exist yet. Returning empty array. Please run: npx prisma db push');
       return res.json({ success: true, data: [] });
     }
     res.status(500).json({ success: false, message: error.message });
@@ -934,8 +942,16 @@ router.get('/custom-fields/all', requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error('Error fetching all custom fields:', error);
     // If table doesn't exist yet, return empty array instead of error
-    if (error.message && error.message.includes('does not exist')) {
-      logger.warn('CustomField table does not exist yet. Returning empty array.');
+    const errorMessage = error.message || '';
+    const errorCode = error.code || '';
+    if (
+      errorMessage.includes('does not exist') ||
+      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('relation') ||
+      errorCode === 'P2021' || // Table does not exist in Prisma
+      errorCode === '42P01'    // PostgreSQL: relation does not exist
+    ) {
+      logger.warn('CustomField table does not exist yet. Returning empty array. Please run: npx prisma db push');
       return res.json({ success: true, data: [] });
     }
     res.status(500).json({ success: false, message: error.message });
