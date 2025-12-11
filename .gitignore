@@ -30,8 +30,10 @@ dist/
 prisma/migrations/
 
 # Uploads (keep structure, ignore files)
-uploads/**/*
-!uploads/.gitkeep
+backend/uploads/**/*
+!backend/uploads/.gitkeep
+frontend/uploads/**/*
+!frontend/uploads/.gitkeep
 
 # Logs
 logs/
