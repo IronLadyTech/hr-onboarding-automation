@@ -521,15 +521,22 @@ router.post('/:id/send-offer', async (req, res) => {
 
     // Use stepService to send offer letter (Step 1) - ensures it uses the same logic and templates
     // This prevents duplicate emails and ensures all emails use templates from database
-    let emailRecord = null;
     try {
-      const result = await stepService.completeStep(req.prisma, candidate.id, 1, req.user.id);
-      emailRecord = result.emailRecord;
+      await stepService.completeStep(req.prisma, candidate.id, 1, req.user.id);
       logger.info(`✅ Step 1 (Offer Letter) completed via manual send button for ${candidate.email}`);
     } catch (stepError) {
       logger.error(`Error completing step 1: ${stepError.message}`);
       throw stepError;
     }
+
+    // Get the email record that was just sent
+    const emailRecord = await req.prisma.email.findFirst({
+      where: {
+        candidateId: candidate.id,
+        type: 'OFFER_LETTER'
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
     // Update candidate status
     const updatedCandidate = await req.prisma.candidate.update({
