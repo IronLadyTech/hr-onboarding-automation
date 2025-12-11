@@ -595,4 +595,98 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
   }
 });
 
+// Auto-assign email templates to steps based on step type
+router.post('/department-steps/auto-assign-templates/:department', async (req, res) => {
+  try {
+    const { department } = req.params;
+
+    // Get all steps for this department without email templates
+    const steps = await req.prisma.departmentStepTemplate.findMany({
+      where: {
+        department,
+        isActive: true,
+        emailTemplateId: null
+      },
+      include: {
+        emailTemplate: true
+      }
+    });
+
+    if (steps.length === 0) {
+      return res.json({ success: true, message: 'All steps already have email templates assigned', data: [] });
+    }
+
+    // Mapping of step types to email template types
+    const typeMapping = {
+      'OFFER_LETTER': 'OFFER_LETTER',
+      'OFFER_REMINDER': 'OFFER_REMINDER',
+      'WELCOME_EMAIL': 'WELCOME_EMAIL',
+      'HR_INDUCTION': 'HR_INDUCTION_INVITE',
+      'WHATSAPP_ADDITION': 'WHATSAPP_ADDITION',
+      'ONBOARDING_FORM': 'ONBOARDING_FORM',
+      'FORM_REMINDER': 'FORM_REMINDER',
+      'CEO_INDUCTION': 'CEO_INDUCTION_INVITE',
+      'SALES_INDUCTION': 'SALES_INDUCTION_INVITE',
+      'DEPARTMENT_INDUCTION': 'DEPARTMENT_INDUCTION_INVITE',
+      'TRAINING_PLAN': 'TRAINING_PLAN',
+      'CHECKIN_CALL': 'CHECKIN_CALL_INVITE'
+    };
+
+    const results = [];
+    
+    for (const step of steps) {
+      const emailTemplateType = typeMapping[step.type];
+      
+      if (!emailTemplateType) {
+        logger.warn(`No email template mapping found for step type: ${step.type}`);
+        results.push({ stepId: step.id, stepNumber: step.stepNumber, status: 'skipped', reason: 'No template mapping' });
+        continue;
+      }
+
+      // Find matching email template
+      const emailTemplate = await req.prisma.emailTemplate.findFirst({
+        where: {
+          type: emailTemplateType,
+          isActive: true
+        }
+      });
+
+      if (!emailTemplate) {
+        logger.warn(`No email template found for type: ${emailTemplateType} (step ${step.stepNumber})`);
+        results.push({ stepId: step.id, stepNumber: step.stepNumber, status: 'skipped', reason: `No template found for type: ${emailTemplateType}` });
+        continue;
+      }
+
+      // Assign template to step
+      await req.prisma.departmentStepTemplate.update({
+        where: { id: step.id },
+        data: { emailTemplateId: emailTemplate.id }
+      });
+
+      results.push({ 
+        stepId: step.id, 
+        stepNumber: step.stepNumber, 
+        title: step.title,
+        status: 'assigned', 
+        templateId: emailTemplate.id,
+        templateName: emailTemplate.name
+      });
+
+      logger.info(`✅ Assigned email template "${emailTemplate.name}" to step ${step.stepNumber} (${step.title})`);
+    }
+
+    const assigned = results.filter(r => r.status === 'assigned').length;
+    const skipped = results.filter(r => r.status === 'skipped').length;
+
+    res.json({ 
+      success: true, 
+      message: `Assigned ${assigned} email template(s), skipped ${skipped} step(s)`,
+      data: results
+    });
+  } catch (error) {
+    logger.error('Error auto-assigning email templates:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;
