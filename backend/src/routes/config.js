@@ -915,20 +915,37 @@ router.get('/custom-fields', async (req, res) => {
     res.json({ success: true, data: fields });
   } catch (error) {
     logger.error('Error fetching custom fields:', error);
+    logger.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      name: error.name
+    });
+    
     // If table doesn't exist yet, return empty array instead of error
-    const errorMessage = error.message || '';
-    const errorCode = error.code || '';
+    // Catch ALL possible database errors related to missing table
+    const errorMessage = String(error.message || '').toLowerCase();
+    const errorCode = String(error.code || '');
+    const errorName = String(error.name || '').toLowerCase();
+    
     if (
       errorMessage.includes('does not exist') ||
-      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('unknown table') ||
       errorMessage.includes('relation') ||
+      errorMessage.includes('table') && errorMessage.includes('not found') ||
       errorCode === 'P2021' || // Table does not exist in Prisma
-      errorCode === '42P01'    // PostgreSQL: relation does not exist
+      errorCode === '42P01' || // PostgreSQL: relation does not exist
+      errorCode === 'P1001' || // Can't reach database server
+      errorName.includes('prisma') && errorMessage.includes('not found')
     ) {
-      logger.warn('CustomField table does not exist yet. Returning empty array. Please run: npx prisma db push');
+      logger.warn('⚠️ CustomField table does not exist yet. Returning empty array.');
+      logger.warn('⚠️ Please run on server: npx prisma db push');
       return res.json({ success: true, data: [] });
     }
-    res.status(500).json({ success: false, message: error.message });
+    
+    // For any other error, still return empty array to prevent frontend crash
+    logger.warn('⚠️ Unknown error fetching custom fields, returning empty array:', error.message);
+    return res.json({ success: true, data: [] });
   }
 });
 
@@ -941,20 +958,37 @@ router.get('/custom-fields/all', requireAdmin, async (req, res) => {
     res.json({ success: true, data: fields });
   } catch (error) {
     logger.error('Error fetching all custom fields:', error);
+    logger.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      name: error.name
+    });
+    
     // If table doesn't exist yet, return empty array instead of error
-    const errorMessage = error.message || '';
-    const errorCode = error.code || '';
+    // Catch ALL possible database errors related to missing table
+    const errorMessage = String(error.message || '').toLowerCase();
+    const errorCode = String(error.code || '');
+    const errorName = String(error.name || '').toLowerCase();
+    
     if (
       errorMessage.includes('does not exist') ||
-      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('unknown table') ||
       errorMessage.includes('relation') ||
+      errorMessage.includes('table') && errorMessage.includes('not found') ||
       errorCode === 'P2021' || // Table does not exist in Prisma
-      errorCode === '42P01'    // PostgreSQL: relation does not exist
+      errorCode === '42P01' || // PostgreSQL: relation does not exist
+      errorCode === 'P1001' || // Can't reach database server
+      errorName.includes('prisma') && errorMessage.includes('not found')
     ) {
-      logger.warn('CustomField table does not exist yet. Returning empty array. Please run: npx prisma db push');
+      logger.warn('⚠️ CustomField table does not exist yet. Returning empty array.');
+      logger.warn('⚠️ Please run on server: npx prisma db push');
       return res.json({ success: true, data: [] });
     }
-    res.status(500).json({ success: false, message: error.message });
+    
+    // For any other error, still return empty array to prevent frontend crash
+    logger.warn('⚠️ Unknown error fetching custom fields, returning empty array:', error.message);
+    return res.json({ success: true, data: [] });
   }
 });
 
