@@ -16,7 +16,7 @@ const Settings = () => {
   const [editingPlan, setEditingPlan] = useState(null);
   const [newGroup, setNewGroup] = useState({ name: '', department: '', description: '' });
   const [showAddGroup, setShowAddGroup] = useState(false);
-  
+
   // Department management state
   const [departments, setDepartments] = useState([]);
   const [newDepartmentName, setNewDepartmentName] = useState('');

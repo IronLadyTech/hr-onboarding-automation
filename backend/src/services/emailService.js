@@ -395,10 +395,10 @@ const sendOfferLetter = async (prisma, candidate, attachmentPath = null) => {
     filePath = path.normalize(filePath);
     
     if (fs.existsSync(filePath)) {
-      attachments.push({
+    attachments.push({
         filename: path.basename(filePath),
         path: filePath
-      });
+    });
       logger.info(`Attaching offer letter: ${filePath}`);
     } else {
       logger.warn(`Offer letter file not found: ${filePath} (original path: ${finalAttachmentPath})`);
@@ -757,10 +757,10 @@ const sendCustomEmail = async (prisma, candidate, subject, body, attachmentPath 
     filePath = path.normalize(filePath);
     
     if (fs.existsSync(filePath)) {
-      attachments.push({
+    attachments.push({
         filename: path.basename(filePath),
         path: filePath
-      });
+    });
       logger.info(`Attaching file: ${filePath}`);
     } else {
       logger.warn(`Attachment file not found: ${filePath} (original path: ${attachmentPath})`);

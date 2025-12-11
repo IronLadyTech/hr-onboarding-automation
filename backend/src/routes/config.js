@@ -915,6 +915,11 @@ router.get('/custom-fields', async (req, res) => {
     res.json({ success: true, data: fields });
   } catch (error) {
     logger.error('Error fetching custom fields:', error);
+    // If table doesn't exist yet, return empty array instead of error
+    if (error.message && error.message.includes('does not exist')) {
+      logger.warn('CustomField table does not exist yet. Returning empty array.');
+      return res.json({ success: true, data: [] });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -928,6 +933,11 @@ router.get('/custom-fields/all', requireAdmin, async (req, res) => {
     res.json({ success: true, data: fields });
   } catch (error) {
     logger.error('Error fetching all custom fields:', error);
+    // If table doesn't exist yet, return empty array instead of error
+    if (error.message && error.message.includes('does not exist')) {
+      logger.warn('CustomField table does not exist yet. Returning empty array.');
+      return res.json({ success: true, data: [] });
+    }
     res.status(500).json({ success: false, message: error.message });
   }
 });

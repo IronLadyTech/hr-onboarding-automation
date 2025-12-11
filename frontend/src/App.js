@@ -39,29 +39,29 @@ const ProtectedRoute = ({ children }) => {
 function App() {
   return (
     <ThemeProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Dashboard />} />
-          <Route path="candidates" element={<Candidates />} />
-          <Route path="candidates/new" element={<NewCandidate />} />
-          <Route path="candidates/:id" element={<CandidateDetail />} />
-          <Route path="calendar" element={<Calendar />} />
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Dashboard />} />
+        <Route path="candidates" element={<Candidates />} />
+        <Route path="candidates/new" element={<NewCandidate />} />
+        <Route path="candidates/:id" element={<CandidateDetail />} />
+        <Route path="calendar" element={<Calendar />} />
           <Route path="steps" element={<Steps />} />
-          <Route path="templates" element={<Templates />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-        
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+        <Route path="templates" element={<Templates />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+      
+      <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
     </ThemeProvider>
   );
 }

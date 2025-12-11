@@ -136,8 +136,8 @@ const Candidates = () => {
             </button>
           )}
           <Link to="/candidates/new" className="btn btn-primary">
-            + Add Candidate
-          </Link>
+          + Add Candidate
+        </Link>
         </div>
       </div>
 

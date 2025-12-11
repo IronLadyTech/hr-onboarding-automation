@@ -118,28 +118,28 @@ model User {
 
 model Candidate {
   id String @id @default(uuid())
-
+  
   // Basic Info
   firstName String
   lastName  String
   email     String  @unique
   phone     String?
-
+  
   // Job Details
   position         String
   department       String
   salary           String?
   reportingManager String?
-
+  
   // Dates
   offerDate           DateTime?
   expectedJoiningDate DateTime?
   actualJoiningDate   DateTime?
   offerExpiryDate     DateTime?
-
+  
   // Status Tracking
   status CandidateStatus @default(OFFER_PENDING)
-
+  
   // Offer Letter
   offerLetterPath   String?
   signedOfferPath   String?
@@ -147,18 +147,18 @@ model Candidate {
   offerViewedAt     DateTime?
   offerSignedAt     DateTime?
   offerReminderSent Boolean   @default(false)
-
+  
   // Self-Service Upload Token
   uploadToken       String?   @unique
   uploadTokenExpiry DateTime?
-
+  
   // Welcome Email
   welcomeEmailSentAt DateTime?
-
+  
   // Onboarding Form
   onboardingFormSentAt      DateTime?
   onboardingFormCompletedAt DateTime?
-
+  
   // Inductions
   hrInductionScheduled    Boolean @default(false)
   ceoInductionScheduled   Boolean @default(false)
@@ -168,11 +168,11 @@ model Candidate {
 
   // Custom Fields (JSON to store dynamic field values)
   customFields Json?
-
+  
   // WhatsApp
   whatsappGroupsAdded Boolean @default(false)
   whatsappTaskCreated Boolean @default(false)
-
+  
   // Metadata
   notes       String?
   createdById String?
@@ -196,27 +196,27 @@ model Candidate {
 model Email {
   id          String @id @default(uuid())
   candidateId String
-
+  
   type    EmailType
   subject String
   body    String    @db.Text
-
+  
   status EmailStatus @default(PENDING)
-
+  
   sentAt      DateTime?
   deliveredAt DateTime?
   openedAt    DateTime?
   clickedAt   DateTime?
-
+  
   trackingId     String  @unique @default(uuid())
   attachmentPath String? // Single attachment (backward compatibility)
   attachmentPaths Json? // Multiple attachments as JSON array ["path1", "path2"]
-
+  
   errorMessage String?
   retryCount   Int     @default(0)
-
+  
   scheduledFor DateTime?
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -231,28 +231,28 @@ model Email {
 model CalendarEvent {
   id          String @id @default(uuid())
   candidateId String
-
+  
   type        EventType
   title       String
   description String?   @db.Text
-
+  
   startTime DateTime
   endTime   DateTime
-
+  
   meetingLink String?
   location    String?
-
+  
   attendees String[]
-
+  
   googleEventId String?
-
+  
   attachmentPath String? // Single attachment (backward compatibility)
   attachmentPaths Json? // Multiple attachments as JSON array ["path1", "path2"]
   
   stepNumber Int? // Step number this event belongs to (for uniquely identifying steps with same type)
 
   status EventStatus @default(SCHEDULED)
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -268,17 +268,17 @@ model CalendarEvent {
 model Reminder {
   id          String @id @default(uuid())
   candidateId String
-
+  
   type    ReminderType
   message String
-
+  
   scheduledFor DateTime
-
+  
   status ReminderStatus @default(PENDING)
-
+  
   sentAt      DateTime?
   completedAt DateTime?
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -292,21 +292,21 @@ model Reminder {
 model Task {
   id          String @id @default(uuid())
   candidateId String
-
+  
   title       String
   description String?
-
+  
   type String
-
+  
   dueDate DateTime?
-
+  
   status TaskStatus @default(PENDING)
-
+  
   completedAt DateTime?
   completedBy String?
-
+  
   metadata Json?
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -320,17 +320,17 @@ model Task {
 model CheckIn {
   id          String @id @default(uuid())
   candidateId String
-
+  
   scheduledDate DateTime
   completedDate DateTime?
-
+  
   feedback    String? @db.Text
   concerns    String? @db.Text
   actionItems String? @db.Text
   rating      Int?
-
+  
   isCompleted Boolean @default(false)
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -342,20 +342,20 @@ model CheckIn {
 
 model EmailTemplate {
   id String @id @default(uuid())
-
+  
   name String    @unique
   type EmailType
-
+  
   subject String
   body    String @db.Text
-
+  
   placeholders String[]
   
   // Custom email type name (only used when type is CUSTOM)
   customEmailType String?
 
   isActive Boolean @default(true)
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -368,39 +368,39 @@ model EmailTemplate {
 
 model WorkflowConfig {
   id String @id @default(uuid())
-
+  
   key         String  @unique
   value       String
   description String?
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model WhatsAppGroup {
   id String @id @default(uuid())
-
+  
   name        String
   department  String?
   description String?
   url         String? // WhatsApp group invite URL
-
+  
   isActive Boolean @default(true)
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model TrainingPlan {
   id String @id @default(uuid())
-
+  
   name       String
   department String?
-
+  
   dayWiseContent Json
-
+  
   isActive Boolean @default(true)
-
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -409,15 +409,15 @@ model TrainingPlan {
 
 model ActivityLog {
   id String @id @default(uuid())
-
+  
   candidateId String?
   userId      String?
-
+  
   action      String
   description String
-
+  
   metadata Json?
-
+  
   createdAt DateTime @default(now())
 
   candidate Candidate? @relation(fields: [candidateId], references: [id], onDelete: Cascade)
