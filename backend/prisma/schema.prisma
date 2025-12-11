@@ -166,6 +166,9 @@ model Candidate {
   trainingPlanSent        Boolean @default(false)
   checkinScheduled        Boolean @default(false)
 
+  // Custom Fields (JSON to store dynamic field values)
+  customFields Json?
+
   // WhatsApp
   whatsappGroupsAdded Boolean @default(false)
   whatsappTaskCreated Boolean @default(false)

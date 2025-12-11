@@ -48,7 +48,7 @@ api.interceptors.response.use(
       
       // Don't redirect if we're on login page or checking auth
       if (!isLoginPage && !isAuthCheck) {
-        localStorage.removeItem('token');
+      localStorage.removeItem('token');
         delete api.defaults.headers.common['Authorization'];
         // Use replace to avoid adding to history
         window.location.replace('/login');
@@ -227,6 +227,12 @@ export const configApi = {
   }),
   deleteLogo: () => api.delete('/config/logo'),
   updateUIColors: (data) => api.put('/config/ui-colors', data),
+  // Custom Fields
+  getCustomFields: () => api.get('/config/custom-fields'),
+  getAllCustomFields: () => api.get('/config/custom-fields/all'),
+  createCustomField: (data) => api.post('/config/custom-fields', data),
+  updateCustomField: (id, data) => api.put(`/config/custom-fields/${id}`, data),
+  deleteCustomField: (id) => api.delete(`/config/custom-fields/${id}`),
   initWorkflow: () => api.post('/config/workflow/init'),
   initTrainingPlans: () => api.post('/config/training-plans/init'),
   

@@ -273,7 +273,8 @@ router.post('/', [
     const {
       firstName, lastName, email, phone,
       position, department, salary, reportingManager,
-      expectedJoiningDate, offerExpiryDate, notes
+      expectedJoiningDate, offerExpiryDate, notes,
+      customFields
     } = req.body;
 
     // Check if candidate already exists
@@ -287,15 +288,17 @@ router.post('/', [
         firstName,
         lastName,
         email,
-        phone,
+        phone: phone || null,
         position,
         department,
-        salary,
-        reportingManager,
+        salary: salary || null,
+        reportingManager: reportingManager || null,
         expectedJoiningDate: expectedJoiningDate ? new Date(expectedJoiningDate) : null,
         offerExpiryDate: offerExpiryDate ? new Date(offerExpiryDate) : null,
-        notes,
-        createdById: req.user.id
+        notes: notes || null,
+        customFields: customFields || null,
+        createdById: req.user.id,
+        status: 'OFFER_PENDING'
       }
     });
 
@@ -338,7 +341,8 @@ router.put('/:id', async (req, res) => {
         ...(actualJoiningDate && { actualJoiningDate: new Date(actualJoiningDate) }),
         ...(offerExpiryDate && { offerExpiryDate: new Date(offerExpiryDate) }),
         ...(notes !== undefined && { notes }),
-        ...(status && { status })
+        ...(status && { status }),
+        ...(customFields !== undefined && { customFields })
       }
     });
 

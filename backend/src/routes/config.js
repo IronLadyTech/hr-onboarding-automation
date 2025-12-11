@@ -903,4 +903,128 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
   }
 });
 
+// ============ CUSTOM FORM FIELDS ============
+
+// Get all custom fields
+router.get('/custom-fields', async (req, res) => {
+  try {
+    const fields = await req.prisma.customField.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' }
+    });
+    res.json({ success: true, data: fields });
+  } catch (error) {
+    logger.error('Error fetching custom fields:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all custom fields (including inactive - for admin)
+router.get('/custom-fields/all', requireAdmin, async (req, res) => {
+  try {
+    const fields = await req.prisma.customField.findMany({
+      orderBy: [{ isActive: 'desc' }, { order: 'asc' }]
+    });
+    res.json({ success: true, data: fields });
+  } catch (error) {
+    logger.error('Error fetching all custom fields:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create custom field
+router.post('/custom-fields', requireAdmin, async (req, res) => {
+  try {
+    const { label, fieldKey, fieldType, placeholder, required, validation, options, order } = req.body;
+
+    // Validate fieldKey format (alphanumeric and underscore only)
+    if (!/^[a-zA-Z0-9_]+$/.test(fieldKey)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Field key must contain only letters, numbers, and underscores' 
+      });
+    }
+
+    // Check if fieldKey already exists
+    const existing = await req.prisma.customField.findUnique({
+      where: { fieldKey }
+    });
+
+    if (existing) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Field key already exists. Please use a different key.' 
+      });
+    }
+
+    const field = await req.prisma.customField.create({
+      data: {
+        label,
+        fieldKey,
+        fieldType,
+        placeholder: placeholder || null,
+        required: required || false,
+        validation: validation || null,
+        options: options || null,
+        order: order || 0,
+        isActive: true
+      }
+    });
+
+    logger.info(`✅ Custom field created: ${fieldKey}`);
+
+    res.json({ success: true, data: field });
+  } catch (error) {
+    logger.error('Error creating custom field:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update custom field
+router.put('/custom-fields/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label, fieldType, placeholder, required, validation, options, order, isActive } = req.body;
+
+    const field = await req.prisma.customField.update({
+      where: { id },
+      data: {
+        ...(label !== undefined && { label }),
+        ...(fieldType !== undefined && { fieldType }),
+        ...(placeholder !== undefined && { placeholder }),
+        ...(required !== undefined && { required }),
+        ...(validation !== undefined && { validation }),
+        ...(options !== undefined && { options }),
+        ...(order !== undefined && { order }),
+        ...(isActive !== undefined && { isActive })
+      }
+    });
+
+    logger.info(`✅ Custom field updated: ${field.fieldKey}`);
+
+    res.json({ success: true, data: field });
+  } catch (error) {
+    logger.error('Error updating custom field:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete custom field
+router.delete('/custom-fields/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    await req.prisma.customField.delete({
+      where: { id }
+    });
+
+    logger.info('✅ Custom field deleted');
+
+    res.json({ success: true, message: 'Custom field deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting custom field:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;
