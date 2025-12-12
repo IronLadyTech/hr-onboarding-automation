@@ -71,6 +71,18 @@ const Settings = () => {
   const [updateSmtpUser, setUpdateSmtpUser] = useState(false);
   const [newHrEmail, setNewHrEmail] = useState('');
   const [newHrName, setNewHrName] = useState('');
+  
+  // HR Email Change Wizard state
+  const [showEmailWizard, setShowEmailWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardCompleted, setWizardCompleted] = useState({
+    oauthTestUser: false,
+    appPassword: false,
+    emailSaved: false,
+    smtpUpdated: false,
+    gmailConfigured: false,
+    testSent: false
+  });
 
   useEffect(() => {
     fetchData();
