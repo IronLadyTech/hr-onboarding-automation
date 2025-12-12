@@ -234,6 +234,12 @@ export const configApi = {
   updateCustomField: (id, data) => api.put(`/config/custom-fields/${id}`, data),
   deleteCustomField: (id) => api.delete(`/config/custom-fields/${id}`),
   initStandardFields: () => api.post('/config/custom-fields/init-standard'),
+  // Custom Placeholders
+  getCustomPlaceholders: () => api.get('/config/custom-placeholders'),
+  getAllCustomPlaceholders: () => api.get('/config/custom-placeholders/all'),
+  createCustomPlaceholder: (data) => api.post('/config/custom-placeholders', data),
+  updateCustomPlaceholder: (id, data) => api.put(`/config/custom-placeholders/${id}`, data),
+  deleteCustomPlaceholder: (id) => api.delete(`/config/custom-placeholders/${id}`),
   initWorkflow: () => api.post('/config/workflow/init'),
   initTrainingPlans: () => api.post('/config/training-plans/init'),
   

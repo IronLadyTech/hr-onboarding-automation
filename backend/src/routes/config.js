@@ -1174,4 +1174,194 @@ router.post('/custom-fields/init-standard', requireAdmin, async (req, res) => {
   }
 });
 
+// ============================================================
+// CUSTOM PLACEHOLDERS - For email templates
+// ============================================================
+
+// Get all custom placeholders
+router.get('/custom-placeholders', async (req, res) => {
+  try {
+    const placeholders = await req.prisma.customPlaceholder.findMany({
+      where: { isActive: true },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }]
+    });
+    res.json({ success: true, data: placeholders });
+  } catch (error) {
+    logger.error('Error fetching custom placeholders:', error);
+    // If table doesn't exist yet, return empty array
+    const errorMessage = error.message || '';
+    const errorCode = error.code || '';
+    if (
+      errorMessage.includes('does not exist') ||
+      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('relation') ||
+      errorCode === 'P2021' ||
+      errorCode === '42P01'
+    ) {
+      logger.warn('CustomPlaceholder table does not exist yet. Returning empty array. Please run: npx prisma db push');
+      return res.json({ success: true, data: [] });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Get all custom placeholders (including inactive - for admin)
+router.get('/custom-placeholders/all', requireAdmin, async (req, res) => {
+  try {
+    const placeholders = await req.prisma.customPlaceholder.findMany({
+      orderBy: [{ isActive: 'desc' }, { order: 'asc' }, { name: 'asc' }]
+    });
+    res.json({ success: true, data: placeholders });
+  } catch (error) {
+    logger.error('Error fetching all custom placeholders:', error);
+    // If table doesn't exist yet, return empty array
+    const errorMessage = error.message || '';
+    const errorCode = error.code || '';
+    if (
+      errorMessage.includes('does not exist') ||
+      errorMessage.includes('Unknown table') ||
+      errorMessage.includes('relation') ||
+      errorCode === 'P2021' ||
+      errorCode === '42P01'
+    ) {
+      logger.warn('CustomPlaceholder table does not exist yet. Returning empty array. Please run: npx prisma db push');
+      return res.json({ success: true, data: [] });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Create custom placeholder
+router.post('/custom-placeholders', requireAdmin, async (req, res) => {
+  try {
+    const { name, placeholderKey, value, description, order } = req.body;
+
+    if (!name || !placeholderKey || value === undefined) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name, placeholderKey, and value are required' 
+      });
+    }
+
+    // Validate placeholderKey format (should be alphanumeric with camelCase)
+    if (!/^[a-z][a-zA-Z0-9]*$/.test(placeholderKey)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Placeholder key must start with lowercase letter and contain only alphanumeric characters (camelCase format)' 
+      });
+    }
+
+    // Check if placeholderKey already exists
+    const existing = await req.prisma.customPlaceholder.findUnique({
+      where: { placeholderKey }
+    });
+
+    if (existing) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Placeholder key already exists' 
+      });
+    }
+
+    const placeholder = await req.prisma.customPlaceholder.create({
+      data: {
+        name,
+        placeholderKey,
+        value,
+        description: description || null,
+        order: order || 0,
+        isActive: true
+      }
+    });
+
+    logger.info(`✅ Custom placeholder created: ${placeholderKey}`);
+    res.json({ success: true, data: placeholder });
+  } catch (error) {
+    logger.error('Error creating custom placeholder:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update custom placeholder
+router.put('/custom-placeholders/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, placeholderKey, value, description, isActive, order } = req.body;
+
+    // Check if placeholder exists
+    const existing = await req.prisma.customPlaceholder.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Placeholder not found' });
+    }
+
+    // If placeholderKey is being changed, validate it and check for duplicates
+    if (placeholderKey && placeholderKey !== existing.placeholderKey) {
+      if (!/^[a-z][a-zA-Z0-9]*$/.test(placeholderKey)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Placeholder key must start with lowercase letter and contain only alphanumeric characters (camelCase format)' 
+        });
+      }
+
+      const duplicate = await req.prisma.customPlaceholder.findUnique({
+        where: { placeholderKey }
+      });
+
+      if (duplicate) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Placeholder key already exists' 
+        });
+      }
+    }
+
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (placeholderKey !== undefined) updateData.placeholderKey = placeholderKey;
+    if (value !== undefined) updateData.value = value;
+    if (description !== undefined) updateData.description = description;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (order !== undefined) updateData.order = order;
+
+    const placeholder = await req.prisma.customPlaceholder.update({
+      where: { id },
+      data: updateData
+    });
+
+    logger.info(`✅ Custom placeholder updated: ${placeholder.placeholderKey}`);
+    res.json({ success: true, data: placeholder });
+  } catch (error) {
+    logger.error('Error updating custom placeholder:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Delete custom placeholder
+router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const placeholder = await req.prisma.customPlaceholder.findUnique({
+      where: { id }
+    });
+
+    if (!placeholder) {
+      return res.status(404).json({ success: false, message: 'Placeholder not found' });
+    }
+
+    await req.prisma.customPlaceholder.delete({
+      where: { id }
+    });
+
+    logger.info(`✅ Custom placeholder deleted: ${placeholder.placeholderKey}`);
+    res.json({ success: true, message: 'Placeholder deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting custom placeholder:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

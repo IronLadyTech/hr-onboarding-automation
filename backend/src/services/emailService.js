@@ -53,6 +53,24 @@ const getCompanyConfig = async (prisma) => {
   }
 };
 
+// Helper to get custom placeholders from database
+const getCustomPlaceholders = async (prisma) => {
+  try {
+    const placeholders = await prisma.customPlaceholder.findMany({
+      where: { isActive: true }
+    });
+    const placeholderMap = {};
+    placeholders.forEach(p => {
+      placeholderMap[`{{${p.placeholderKey}}}`] = p.value;
+    });
+    return placeholderMap;
+  } catch (error) {
+    // If table doesn't exist yet, return empty object
+    logger.warn('Failed to fetch custom placeholders, using defaults:', error.message);
+    return {};
+  }
+};
+
 // Helper to get template and replace placeholders
 const getEmailContent = async (prisma, type, candidate, customData = {}) => {
   const template = await prisma.emailTemplate.findFirst({
@@ -66,6 +84,9 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
 
   // Get company config from database
   const companyConfig = await getCompanyConfig(prisma);
+  
+  // Get custom placeholders from database
+  const customPlaceholders = await getCustomPlaceholders(prisma);
 
   let subject = template.subject;
   let body = template.body;
@@ -84,7 +105,8 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
     '{{reportingManager}}': candidate.reportingManager || '',
     '{{hrName}}': companyConfig.hr_name || process.env.HR_NAME || 'HR Team',
     '{{companyName}}': companyConfig.company_name || process.env.COMPANY_NAME || 'Company',
-    ...customData
+    ...customData,
+    ...customPlaceholders // Add custom placeholders (e.g., {{googleMeetLink}}, etc.)
   };
 
   // Add custom fields as placeholders (e.g., {{address}}, {{emergencyContact}}, etc.)
@@ -110,6 +132,9 @@ const getUniversalEmailContent = async (prisma, emailType, candidate, stepTempla
   // Get company config from database
   const companyConfig = await getCompanyConfig(prisma);
   
+  // Get custom placeholders from database
+  const customPlaceholders = await getCustomPlaceholders(prisma);
+  
   // Priority 1: If step template has a linked email template (emailTemplateId), use that specific template
   if (stepTemplate && stepTemplate.emailTemplateId && stepTemplate.emailTemplate) {
     const emailTemplate = stepTemplate.emailTemplate;
@@ -132,7 +157,8 @@ const getUniversalEmailContent = async (prisma, emailType, candidate, stepTempla
       '{{reportingManager}}': candidate.reportingManager || '',
       '{{hrName}}': companyConfig.hr_name || process.env.HR_NAME || 'HR Team',
       '{{companyName}}': companyConfig.company_name || process.env.COMPANY_NAME || 'Company',
-      ...customData
+      ...customData,
+      ...customPlaceholders // Add custom placeholders (e.g., {{googleMeetLink}}, etc.)
     };
 
     // Add custom fields as placeholders (e.g., {{address}}, {{emergencyContact}}, etc.)

@@ -476,3 +476,19 @@ model CustomField {
   @@index([isActive])
   @@index([isStandard])
 }
+
+model CustomPlaceholder {
+  id          String   @id @default(uuid())
+  name        String   // Display name (e.g., "Google Meet Link", "Company Website")
+  placeholderKey String @unique // Placeholder key (e.g., "googleMeetLink", "companyWebsite")
+  value       String   @db.Text // The value to replace (e.g., URL, text, etc.)
+  description String?  // Description/help text
+  isActive    Boolean  @default(true)
+  order       Int      @default(0) // Display order
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([placeholderKey])
+  @@index([isActive])
+  @@index([order])
+}

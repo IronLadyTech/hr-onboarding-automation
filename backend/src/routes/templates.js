@@ -236,6 +236,25 @@ router.get('/meta/placeholders', async (req, res) => {
       logger.warn('Could not fetch custom fields for placeholders:', error.message);
     }
 
+    // Fetch custom placeholders from database and add them
+    try {
+      const customPlaceholders = await req.prisma.customPlaceholder.findMany({
+        where: { isActive: true },
+        orderBy: { order: 'asc' }
+      });
+
+      customPlaceholders.forEach(placeholder => {
+        placeholders.push({
+          key: `{{${placeholder.placeholderKey}}}`,
+          description: `${placeholder.name}${placeholder.description ? ` - ${placeholder.description}` : ''} (Custom Placeholder)`,
+          category: 'Custom Placeholder'
+        });
+      });
+    } catch (error) {
+      // If CustomPlaceholder table doesn't exist yet, just skip
+      logger.warn('Could not fetch custom placeholders:', error.message);
+    }
+
     res.json({ success: true, data: placeholders });
   } catch (error) {
     logger.error('Error fetching placeholders:', error);

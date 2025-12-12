@@ -47,13 +47,42 @@ const Settings = () => {
   });
   const [customFieldLoading, setCustomFieldLoading] = useState(false);
   const [newOption, setNewOption] = useState({ label: '', value: '' });
+  
+  // Custom Placeholders state
+  const [customPlaceholders, setCustomPlaceholders] = useState([]);
+  const [showPlaceholderModal, setShowPlaceholderModal] = useState(false);
+  const [editingPlaceholder, setEditingPlaceholder] = useState(null);
+  const [placeholderForm, setPlaceholderForm] = useState({
+    name: '',
+    placeholderKey: '',
+    value: '',
+    description: '',
+    order: 0
+  });
+  const [placeholderLoading, setPlaceholderLoading] = useState(false);
 
   useEffect(() => {
     fetchData();
     fetchDepartments();
     fetchSettings();
     fetchCustomFields();
+    fetchCustomPlaceholders();
   }, []);
+
+  const fetchCustomPlaceholders = async () => {
+    try {
+      const response = await configApi.getAllCustomPlaceholders();
+      if (response.data?.success) {
+        setCustomPlaceholders(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch custom placeholders:', error);
+      if (error.response?.status === 500) {
+        console.warn('Custom placeholders table may not exist yet. Please deploy database schema.');
+        setCustomPlaceholders([]);
+      }
+    }
+  };
 
   const fetchCustomFields = async () => {
     try {
@@ -389,6 +418,7 @@ const Settings = () => {
     { id: 'company', label: 'Company', icon: '🏢' },
     { id: 'ui', label: 'UI Customization', icon: '🎨' },
     { id: 'custom-fields', label: 'Custom Form Fields', icon: '📝' },
+    { id: 'placeholders', label: 'Custom Placeholders', icon: '🔖' },
     { id: 'departments', label: 'Departments', icon: '🏛️' },
     { id: 'automation', label: 'Automation (11 Steps)', icon: '⚡' },
     { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
@@ -1851,6 +1881,115 @@ const Settings = () => {
                 className="btn btn-primary"
               >
                 {customFieldLoading ? 'Saving...' : editingCustomField ? 'Update Field' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Placeholder Modal */}
+      {showPlaceholderModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4">
+              {editingPlaceholder ? 'Edit Placeholder' : 'Add Custom Placeholder'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={placeholderForm.name}
+                  onChange={(e) => setPlaceholderForm({ ...placeholderForm, name: e.target.value })}
+                  className="input w-full"
+                  placeholder="e.g., Google Meet Link"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">Display name for this placeholder</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Placeholder Key *
+                </label>
+                <input
+                  type="text"
+                  value={placeholderForm.placeholderKey}
+                  onChange={(e) => setPlaceholderForm({ ...placeholderForm, placeholderKey: e.target.value })}
+                  className="input w-full"
+                  placeholder="e.g., googleMeetLink"
+                  required
+                  disabled={!!editingPlaceholder}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Used as <code className="bg-gray-100 px-1 rounded">{{{placeholderForm.placeholderKey || 'key'}}}</code> in templates. Must be camelCase (e.g., googleMeetLink, companyWebsite)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Value *
+                </label>
+                <textarea
+                  value={placeholderForm.value}
+                  onChange={(e) => setPlaceholderForm({ ...placeholderForm, value: e.target.value })}
+                  className="input w-full"
+                  rows={4}
+                  placeholder="e.g., https://meet.google.com/..."
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">The value that will replace the placeholder in emails</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={placeholderForm.description}
+                  onChange={(e) => setPlaceholderForm({ ...placeholderForm, description: e.target.value })}
+                  className="input w-full"
+                  placeholder="Brief description of what this placeholder is for"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Order
+                </label>
+                <input
+                  type="number"
+                  value={placeholderForm.order}
+                  onChange={(e) => setPlaceholderForm({ ...placeholderForm, order: parseInt(e.target.value) || 0 })}
+                  className="input"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Lower numbers appear first in the placeholders list
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowPlaceholderModal(false);
+                  setEditingPlaceholder(null);
+                  setPlaceholderForm({ name: '', placeholderKey: '', value: '', description: '', order: 0 });
+                }}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreatePlaceholder}
+                disabled={placeholderLoading}
+                className="btn btn-primary"
+              >
+                {placeholderLoading ? 'Saving...' : editingPlaceholder ? 'Update Placeholder' : 'Create Placeholder'}
               </button>
             </div>
           </div>
