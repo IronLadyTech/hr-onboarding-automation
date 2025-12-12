@@ -1995,6 +1995,404 @@ const Settings = () => {
           </div>
         </div>
       )}
+
+      {/* HR Email Change Wizard Modal */}
+      {showEmailWizard && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">🔄 Change HR Email - Quick Setup Wizard</h2>
+              <button
+                onClick={() => {
+                  setShowEmailWizard(false);
+                  setWizardStep(1);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Progress Steps */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                {[1, 2, 3, 4, 5, 6].map((step) => (
+                  <div key={step} className="flex items-center flex-1">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                        wizardStep >= step
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {wizardCompleted[Object.keys(wizardCompleted)[step - 1]] ? '✓' : step}
+                    </div>
+                    {step < 6 && (
+                      <div
+                        className={`flex-1 h-1 mx-2 ${
+                          wizardStep > step ? 'bg-indigo-600' : 'bg-gray-200'
+                        }`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>OAuth</span>
+                <span>App Pass</span>
+                <span>Save Email</span>
+                <span>SMTP</span>
+                <span>Gmail</span>
+                <span>Test</span>
+              </div>
+            </div>
+
+            {/* Step Content */}
+            <div className="space-y-4">
+              {/* Step 1: Add to OAuth Test Users */}
+              {wizardStep === 1 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 1: Add New Email to OAuth Test Users</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      To use Google OAuth features (Gmail API, Calendar API), you need to add the new email as a test user.
+                    </p>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                      <li>Click the button below to open Google Cloud Console</li>
+                      <li>Click "Add users" button</li>
+                      <li>Add: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
+                      <li>Click "Add"</li>
+                      <li>Come back here and mark as completed</li>
+                    </ol>
+                    <div className="flex gap-2">
+                      <a
+                        href="https://console.cloud.google.com/apis/credentials/consent"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary"
+                      >
+                        🔗 Open Google Cloud Console
+                      </a>
+                      <button
+                        onClick={() => {
+                          setWizardCompleted(prev => ({ ...prev, oauthTestUser: true }));
+                          setWizardStep(2);
+                        }}
+                        className="btn btn-secondary"
+                      >
+                        ✓ I've Added It
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Generate App Password */}
+              {wizardStep === 2 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 2: Generate Gmail App Password (Optional)</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      <strong>Note:</strong> Since you're using <code>ironladytech@gmail.com</code> for OAuth, you may not need to update SMTP. 
+                      The system will use Gmail "Send As" to send from the new HR email.
+                    </p>
+                    <p className="text-sm text-gray-700 mb-3">
+                      However, if you want to update SMTP authentication, generate an App Password for the new email:
+                    </p>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                      <li>Click the button below to open Gmail App Passwords</li>
+                      <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
+                      <li>Select "Mail" and "Other (Custom name)"</li>
+                      <li>Enter name: "HR Onboarding System"</li>
+                      <li>Click "Generate"</li>
+                      <li>Copy the 16-character password (remove spaces)</li>
+                      <li>Paste it in the field below (or skip if not needed)</li>
+                    </ol>
+                    <div className="space-y-3">
+                      <a
+                        href="https://myaccount.google.com/apppasswords"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary block text-center"
+                      >
+                        🔗 Open Gmail App Passwords
+                      </a>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Paste App Password Here (Optional - 16 characters)
+                        </label>
+                        <input
+                          type="password"
+                          value={smtpPassword}
+                          onChange={(e) => setSmtpPassword(e.target.value)}
+                          className="input w-full"
+                          placeholder="abcd efgh ijkl mnop (remove spaces) - Optional"
+                        />
+                      </div>
+                      <button
+                        onClick={() => {
+                          setWizardCompleted(prev => ({ ...prev, appPassword: true }));
+                          setWizardStep(3);
+                        }}
+                        className="btn btn-primary w-full"
+                      >
+                        ✓ Continue to Next Step
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Enter New Email */}
+              {wizardStep === 3 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 3: Enter New HR Email</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        New HR Email *
+                      </label>
+                      <input
+                        type="email"
+                        value={newHrEmail}
+                        onChange={(e) => setNewHrEmail(e.target.value)}
+                        className="input w-full"
+                        placeholder="omprakashg2026@gmail.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        HR Name (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newHrName}
+                        onChange={(e) => setNewHrName(e.target.value)}
+                        className="input w-full"
+                        placeholder="HR Team"
+                      />
+                    </div>
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <p className="text-sm text-gray-700">
+                        <strong>Current Email:</strong> {config.hr_email || 'Not set'}
+                      </p>
+                      <p className="text-sm text-gray-700">
+                        <strong>New Email:</strong> {newHrEmail || 'Enter above'}
+                      </p>
+                      <p className="text-xs text-gray-600 mt-2">
+                        <strong>OAuth Account:</strong> ironladytech@gmail.com (stays the same)
+                      </p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!newHrEmail || !newHrEmail.includes('@')) {
+                          toast.error('Please enter a valid email address');
+                          return;
+                        }
+                        setSavingHREmail(true);
+                        try {
+                          const response = await configApi.updateHREmail({
+                            hrEmail: newHrEmail,
+                            hrName: newHrName || config.hr_name,
+                            updateSmtpUser: smtpPassword ? true : false,
+                            smtpPassword: smtpPassword || undefined
+                          });
+                          if (response.data?.success) {
+                            updateConfig('hr_email', newHrEmail);
+                            if (newHrName) {
+                              updateConfig('hr_name', newHrName);
+                            }
+                            setWizardCompleted(prev => ({ 
+                              ...prev, 
+                              emailSaved: true,
+                              smtpUpdated: response.data.data?.smtpUpdated || false,
+                              gmailConfigured: response.data.data?.gmailConfigured || false,
+                              gmailConfigMessage: response.data.data?.gmailConfigMessage || ''
+                            }));
+                            setWizardStep(4);
+                            toast.success('HR email saved successfully!');
+                          }
+                        } catch (error) {
+                          toast.error(error.response?.data?.message || 'Failed to save HR email');
+                        } finally {
+                          setSavingHREmail(false);
+                        }
+                      }}
+                      disabled={savingHREmail || !newHrEmail}
+                      className="btn btn-primary w-full"
+                    >
+                      {savingHREmail ? 'Saving...' : '💾 Save HR Email & Configure'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: SMTP Updated */}
+              {wizardStep === 4 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 4: SMTP Configuration</h3>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    {wizardCompleted.smtpUpdated ? (
+                      <>
+                        <p className="text-sm text-green-800 mb-2">
+                          ✅ SMTP configuration updated successfully!
+                        </p>
+                        <p className="text-sm text-yellow-700 mb-3">
+                          ⚠️ <strong>Important:</strong> You need to restart the backend server for SMTP changes to take effect.
+                        </p>
+                        <div className="bg-white p-3 rounded border border-green-200 mb-3">
+                          <p className="text-xs font-mono text-gray-700">
+                            SSH to your server and run:<br />
+                            <code className="text-indigo-600">pm2 restart hr-onboarding-backend</code>
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setWizardStep(5)}
+                          className="btn btn-primary w-full"
+                        >
+                          Continue to Next Step
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-700 mb-3">
+                          SMTP configuration was not updated. The system will use Gmail "Send As" to send emails from the new HR email address.
+                        </p>
+                        <button
+                          onClick={() => setWizardStep(5)}
+                          className="btn btn-primary w-full"
+                        >
+                          Continue
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 5: Gmail Send As */}
+              {wizardStep === 5 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 5: Gmail "Send As" Configuration</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    {wizardCompleted.gmailConfigured ? (
+                      <>
+                        <p className="text-sm text-green-800 mb-3">
+                          ✅ {wizardCompleted.gmailConfigMessage || 'Gmail "Send As" configured automatically via Gmail API!'}
+                        </p>
+                        <p className="text-xs text-gray-700 mb-3">
+                          The system has configured <code>ironladytech@gmail.com</code> to send emails as <strong>{newHrEmail}</strong>
+                        </p>
+                        <button
+                          onClick={() => setWizardStep(6)}
+                          className="btn btn-primary w-full"
+                        >
+                          Continue to Test
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-sm text-gray-700 mb-3">
+                          Gmail "Send As" was not configured automatically. You need to configure it manually:
+                        </p>
+                        <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                          <li>Go to Gmail (sign in as <code>ironladytech@gmail.com</code>)</li>
+                          <li>Go to Settings → Accounts and Import</li>
+                          <li>Under "Send mail as", click "Add another email address"</li>
+                          <li>Add: <strong>{newHrEmail}</strong></li>
+                          <li>Verify the email</li>
+                        </ol>
+                        <div className="flex gap-2">
+                          <a
+                            href="https://mail.google.com/mail/u/0/#settings/accounts"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary flex-1"
+                          >
+                            🔗 Open Gmail Settings
+                          </a>
+                          <button
+                            onClick={() => setWizardStep(6)}
+                            className="btn btn-secondary"
+                          >
+                            Skip & Continue
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Step 6: Test Email */}
+              {wizardStep === 6 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 6: Test Email Configuration</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      Send a test email to verify everything is working correctly.
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Your Email Address (to receive test)
+                        </label>
+                        <input
+                          type="email"
+                          value={testEmailAddress}
+                          onChange={(e) => setTestEmailAddress(e.target.value)}
+                          className="input w-full"
+                          placeholder="your-email@example.com"
+                        />
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!testEmailAddress || !testEmailAddress.includes('@')) {
+                            toast.error('Please enter a valid email address');
+                            return;
+                          }
+                          setTestingEmail(true);
+                          try {
+                            await configApi.testHREmail(testEmailAddress);
+                            setWizardCompleted(prev => ({ ...prev, testSent: true }));
+                            toast.success(`Test email sent to ${testEmailAddress}! Check your inbox.`, { duration: 5000 });
+                          } catch (error) {
+                            toast.error(error.response?.data?.message || 'Failed to send test email');
+                          } finally {
+                            setTestingEmail(false);
+                          }
+                        }}
+                        disabled={testingEmail || !testEmailAddress}
+                        className="btn btn-primary w-full"
+                      >
+                        {testingEmail ? 'Sending...' : '📧 Send Test Email'}
+                      </button>
+                      {wizardCompleted.testSent && (
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm text-green-800">
+                            ✅ Test email sent! Check your inbox and verify the "From" address shows: <strong>{newHrEmail || config.hr_email}</strong>
+                          </p>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setShowEmailWizard(false);
+                          setWizardStep(1);
+                          setHrEmailChanged(true);
+                          toast.success('HR email change completed! All future emails will use the new address.');
+                        }}
+                        className="btn btn-success w-full"
+                      >
+                        ✅ Complete Setup
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

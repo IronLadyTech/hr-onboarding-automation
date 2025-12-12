@@ -406,12 +406,16 @@ router.get('/settings', async (req, res) => {
       // Use API_URL from env, or construct from request
       let baseUrl = process.env.API_URL;
       if (!baseUrl) {
-        const protocol = req.protocol || (req.secure ? 'https' : 'http');
+        // Always use HTTPS in production, HTTP only for localhost
         const host = req.get('host') || 'localhost:5000';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
         baseUrl = `${protocol}://${host}`;
       }
-      // Ensure baseUrl doesn't end with /api
+      // Ensure baseUrl uses HTTPS (except localhost) and doesn't end with /api
       baseUrl = baseUrl.replace(/\/api$/, '');
+      if (!baseUrl.includes('localhost') && baseUrl.startsWith('http://')) {
+        baseUrl = baseUrl.replace('http://', 'https://');
+      }
       logoUrl = `${baseUrl}/api/uploads/${configMap.company_logo_path}`;
     }
     
