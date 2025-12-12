@@ -481,9 +481,6 @@ const Settings = () => {
     { id: 'custom-fields', label: 'Custom Form Fields', icon: '📝' },
     { id: 'placeholders', label: 'Custom Placeholders', icon: '🔖' },
     { id: 'departments', label: 'Departments', icon: '🏛️' },
-    { id: 'automation', label: 'Automation (11 Steps)', icon: '⚡' },
-    { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-    { id: 'training', label: 'Training Plans', icon: '📚' },
   ];
 
   return (
@@ -1188,8 +1185,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Automation Settings (11 Steps) */}
-      {activeTab === 'automation' && (
+      {/* Automation Settings (11 Steps) - REMOVED */}
+      {false && activeTab === 'automation' && (
         <div className="space-y-6">
           {/* Master Switch */}
           <div className="card bg-indigo-50 border-indigo-200">
@@ -1666,8 +1663,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* WhatsApp Groups */}
-      {activeTab === 'whatsapp' && (
+      {/* WhatsApp Groups - REMOVED */}
+      {false && activeTab === 'whatsapp' && (
         <div className="card">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold">💬 WhatsApp Groups</h2>
@@ -1749,8 +1746,8 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Training Plans */}
-      {activeTab === 'training' && (
+      {/* Training Plans - REMOVED */}
+      {false && activeTab === 'training' && (
         <div className="card">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold">📚 Training Plans</h2>
