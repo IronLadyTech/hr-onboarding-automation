@@ -195,23 +195,52 @@ router.post('/:id/preview', async (req, res) => {
 
 // Get available placeholders
 router.get('/meta/placeholders', async (req, res) => {
-  const placeholders = [
-    { key: '{{firstName}}', description: 'Candidate first name' },
-    { key: '{{lastName}}', description: 'Candidate last name' },
-    { key: '{{fullName}}', description: 'Candidate full name' },
-    { key: '{{email}}', description: 'Candidate email' },
-    { key: '{{position}}', description: 'Job position' },
-    { key: '{{department}}', description: 'Department' },
-    { key: '{{salary}}', description: 'Salary package' },
-    { key: '{{joiningDate}}', description: 'Expected joining date' },
-    { key: '{{reportingManager}}', description: 'Reporting manager name' },
-    { key: '{{hrName}}', description: 'HR representative name' },
-    { key: '{{companyName}}', description: 'Company name' },
-    { key: '{{formLink}}', description: 'Onboarding form link' },
-    { key: '{{trainingPlanContent}}', description: 'Training plan details' }
-  ];
+  try {
+    // Standard placeholders
+    const placeholders = [
+      { key: '{{firstName}}', description: 'Candidate first name', category: 'Standard' },
+      { key: '{{lastName}}', description: 'Candidate last name', category: 'Standard' },
+      { key: '{{fullName}}', description: 'Candidate full name', category: 'Standard' },
+      { key: '{{candidateName}}', description: 'Candidate full name (alias)', category: 'Standard' },
+      { key: '{{email}}', description: 'Candidate email', category: 'Standard' },
+      { key: '{{position}}', description: 'Job position', category: 'Standard' },
+      { key: '{{department}}', description: 'Department', category: 'Standard' },
+      { key: '{{salary}}', description: 'Salary package', category: 'Standard' },
+      { key: '{{joiningDate}}', description: 'Expected joining date', category: 'Standard' },
+      { key: '{{reportingManager}}', description: 'Reporting manager name', category: 'Standard' },
+      { key: '{{hrName}}', description: 'HR representative name', category: 'Company' },
+      { key: '{{companyName}}', description: 'Company name', category: 'Company' },
+      { key: '{{formLink}}', description: 'Onboarding form link', category: 'Dynamic' },
+      { key: '{{trainingPlanContent}}', description: 'Training plan details', category: 'Dynamic' }
+    ];
 
-  res.json({ success: true, data: placeholders });
+    // Fetch custom fields from database and add them as placeholders
+    try {
+      const customFields = await req.prisma.customField.findMany({
+        where: { isActive: true },
+        orderBy: { order: 'asc' }
+      });
+
+      customFields.forEach(field => {
+        // Only add custom fields (not standard fields, as they're already in the list above)
+        if (!field.isStandard) {
+          placeholders.push({
+            key: `{{${field.fieldKey}}}`,
+            description: `${field.label} (Custom Field)`,
+            category: 'Custom'
+          });
+        }
+      });
+    } catch (error) {
+      // If CustomField table doesn't exist yet, just skip custom fields
+      logger.warn('Could not fetch custom fields for placeholders:', error.message);
+    }
+
+    res.json({ success: true, data: placeholders });
+  } catch (error) {
+    logger.error('Error fetching placeholders:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 });
 
 module.exports = router;

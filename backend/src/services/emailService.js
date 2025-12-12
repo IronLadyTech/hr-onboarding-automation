@@ -87,6 +87,15 @@ const getEmailContent = async (prisma, type, candidate, customData = {}) => {
     ...customData
   };
 
+  // Add custom fields as placeholders (e.g., {{address}}, {{emergencyContact}}, etc.)
+  if (candidate.customFields && typeof candidate.customFields === 'object') {
+    Object.entries(candidate.customFields).forEach(([fieldKey, fieldValue]) => {
+      // Convert fieldKey to placeholder format: address -> {{address}}
+      const placeholderKey = `{{${fieldKey}}}`;
+      placeholders[placeholderKey] = fieldValue || '';
+    });
+  }
+
   Object.entries(placeholders).forEach(([key, value]) => {
     subject = subject.replace(new RegExp(key, 'g'), value || '');
     body = body.replace(new RegExp(key, 'g'), value || '');
@@ -125,6 +134,15 @@ const getUniversalEmailContent = async (prisma, emailType, candidate, stepTempla
       '{{companyName}}': companyConfig.company_name || process.env.COMPANY_NAME || 'Company',
       ...customData
     };
+
+    // Add custom fields as placeholders (e.g., {{address}}, {{emergencyContact}}, etc.)
+    if (candidate.customFields && typeof candidate.customFields === 'object') {
+      Object.entries(candidate.customFields).forEach(([fieldKey, fieldValue]) => {
+        // Convert fieldKey to placeholder format: address -> {{address}}
+        const placeholderKey = `{{${fieldKey}}}`;
+        placeholders[placeholderKey] = fieldValue || '';
+      });
+    }
 
     Object.entries(placeholders).forEach(([key, value]) => {
       subject = subject.replace(new RegExp(key, 'g'), value || '');
