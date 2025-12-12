@@ -1615,9 +1615,27 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     });
   } catch (error) {
     logger.error('Error sending test email:', error);
+    
+    // Provide user-friendly error messages
+    let errorMessage = 'Failed to send test email. ';
+    
+    if (error.code === 'EAUTH' || error.message?.includes('Invalid login') || error.message?.includes('535-5.7.8')) {
+      errorMessage += 'SMTP authentication failed. Please check:';
+      errorMessage += '\n1. The App Password you provided in Step 2 is correct';
+      errorMessage += '\n2. 2-Step Verification is enabled on the email account';
+      errorMessage += '\n3. The email address matches the one you configured';
+      errorMessage += '\n\nIf you didn\'t provide an App Password, go back to Step 2 and generate one.';
+    } else if (error.code === 'ECONNECTION' || error.message?.includes('connection')) {
+      errorMessage += 'Could not connect to SMTP server. Please check your SMTP_HOST and SMTP_PORT settings.';
+    } else {
+      errorMessage += error.message || 'Please check your SMTP configuration.';
+    }
+    
     res.status(500).json({ 
       success: false, 
-      message: error.message || 'Failed to send test email. Please check your SMTP configuration.' 
+      message: errorMessage,
+      errorCode: error.code,
+      errorDetails: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
