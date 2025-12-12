@@ -2092,18 +2092,21 @@ const Settings = () => {
               {/* Step 2: Generate App Password */}
               {wizardStep === 2 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Optional)</h3>
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-md mb-4">
-                    <p className="text-sm text-green-800 mb-2">
-                      ✅ <strong>Good News!</strong> You can skip this step!
+                  <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
+                    <p className="text-sm text-yellow-800 mb-2">
+                      ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email.
+                    </p>
+                    <p className="text-sm text-gray-700 mb-2">
+                      <strong>Why?</strong> Gmail requires you to authenticate with the same email address you want to send FROM. You cannot use <code>ironladytech@gmail.com</code> SMTP credentials to send FROM a different email address.
                     </p>
                     <p className="text-sm text-gray-700">
-                      The system will use your existing SMTP credentials (from <code>ironladytech@gmail.com</code>) and automatically use the new HR email as the "from" address. This works without any additional setup!
+                      <strong>Solution:</strong> Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
                     </p>
                   </div>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
-                      <strong>Optional:</strong> Only if you want to authenticate SMTP with the new email directly (instead of using the existing credentials), you can generate an App Password:
+                      <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
                     </p>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Click the button below to open Gmail App Passwords</li>
@@ -2125,38 +2128,34 @@ const Settings = () => {
                       </a>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Paste App Password Here (Optional - 16 characters)
+                          Paste App Password Here * (16 characters, remove spaces)
                         </label>
                         <input
                           type="password"
                           value={smtpPassword}
                           onChange={(e) => setSmtpPassword(e.target.value)}
                           className="input w-full"
-                          placeholder="abcd efgh ijkl mnop (remove spaces) - Optional"
+                          placeholder="abcdefghijklmnop (16 characters, no spaces)"
+                          required
                         />
+                        <p className="text-xs text-gray-600 mt-1">
+                          This App Password will be used to authenticate SMTP for <strong>{newHrEmail || 'your new HR email'}</strong>
+                        </p>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            setWizardCompleted(prev => ({ ...prev, appPassword: false }));
-                            setSmtpPassword(''); // Clear password if skipping
-                            setWizardStep(3);
-                          }}
-                          className="btn btn-secondary flex-1"
-                        >
-                          Skip (Use Existing SMTP)
-                        </button>
-                        <button
-                          onClick={() => {
-                            setWizardCompleted(prev => ({ ...prev, appPassword: true }));
-                            setWizardStep(3);
-                          }}
-                          className="btn btn-primary flex-1"
-                          disabled={!smtpPassword && wizardCompleted.appPassword === false}
-                        >
-                          Continue with App Password
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          if (!smtpPassword || smtpPassword.length < 16) {
+                            toast.error('Please enter a valid 16-character App Password');
+                            return;
+                          }
+                          setWizardCompleted(prev => ({ ...prev, appPassword: true }));
+                          setWizardStep(3);
+                        }}
+                        className="btn btn-primary w-full"
+                        disabled={!smtpPassword || smtpPassword.length < 16}
+                      >
+                        ✓ Continue with App Password
+                      </button>
                     </div>
                   </div>
                 </div>
