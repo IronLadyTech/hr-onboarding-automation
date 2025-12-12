@@ -798,7 +798,7 @@ router.post('/:id/schedule-hr-induction', async (req, res) => {
       createMeet: true
     };
 
-    const googleEvent = await calendarService.createGoogleEvent(eventData);
+    const googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
 
     const event = await req.prisma.calendarEvent.create({
       data: {
@@ -855,7 +855,7 @@ router.post('/:id/schedule-ceo-induction', async (req, res) => {
       createMeet: !meetingLink
     };
 
-    const googleEvent = await calendarService.createGoogleEvent(eventData);
+    const googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
 
     const event = await req.prisma.calendarEvent.create({
       data: {
@@ -912,7 +912,7 @@ router.post('/:id/schedule-sales-induction', async (req, res) => {
       createMeet: !meetingLink
     };
 
-    const googleEvent = await calendarService.createGoogleEvent(eventData);
+    const googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
 
     const event = await req.prisma.calendarEvent.create({
       data: {
@@ -1008,7 +1008,7 @@ router.post('/:id/schedule-checkin', async (req, res) => {
       createMeet: true
     };
 
-    const googleEvent = await calendarService.createGoogleEvent(eventData);
+    const googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
 
     const event = await req.prisma.calendarEvent.create({
       data: {
@@ -1547,7 +1547,7 @@ router.post('/batch/schedule', async (req, res) => {
     // Create Google Calendar event (optional - continue even if it fails)
     let googleEvent = null;
     try {
-      googleEvent = await calendarService.createGoogleEvent(eventData);
+      googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
     } catch (gcalError) {
       logger.warn('Google Calendar event creation failed, continuing with local events:', gcalError.message);
       // Continue without Google Calendar event

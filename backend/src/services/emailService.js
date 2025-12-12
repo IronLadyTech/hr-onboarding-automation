@@ -360,12 +360,20 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     
+    // Get HR email from database (WorkflowConfig)
+    const companyConfig = await getCompanyConfig(prisma);
+    const hrEmail = companyConfig.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || process.env.SMTP_USER;
+    const hrName = companyConfig.hr_name || process.env.HR_NAME || 'HR Team';
+    
+    // Format "from" address: "HR Team <hr@company.com>" or just email
+    const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
+    
     // Add tracking
     let htmlBody = emailRecord.body.replace(/\n/g, '<br>');
     htmlBody = addTracking(htmlBody, emailRecord.trackingId, backendUrl);
 
     const mailOptions = {
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      from: fromAddress,
       to: candidate.email,
       subject: emailRecord.subject,
       html: htmlBody,

@@ -306,7 +306,7 @@ router.post('/', (req, res, next) => {
       logger.info(`📎 New attachment added. Total: ${attachmentPaths.length} attachment(s)`);
     }
 
-    // Create event in Google Calendar
+    // Create event in Google Calendar (pass prisma to get HR email)
     let googleEventId = null;
     try {
       const googleEvent = await calendarService.createEvent({
@@ -317,8 +317,8 @@ router.post('/', (req, res, next) => {
         attendees: attendees || [],
         location,
         meetingLink
-      });
-      googleEventId = googleEvent.id;
+      }, req.prisma);
+      googleEventId = googleEvent?.id;
     } catch (gcalError) {
       logger.warn('Google Calendar event creation failed:', gcalError);
     }

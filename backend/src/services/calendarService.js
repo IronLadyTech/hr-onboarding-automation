@@ -15,9 +15,46 @@ oauth2Client.setCredentials({
 
 const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-// Helper to create calendar event
-const createGoogleEvent = async (eventData) => {
+// Helper to get company config (for HR email)
+const getCompanyConfig = async (prisma) => {
   try {
+    const configs = await prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['hr_email', 'hr_name', 'company_name']
+        }
+      }
+    });
+    const configMap = {};
+    configs.forEach(c => { configMap[c.key] = c.value; });
+    return configMap;
+  } catch (error) {
+    logger.warn('Failed to fetch company config for calendar:', error);
+    return {};
+  }
+};
+
+// Helper to create calendar event
+const createGoogleEvent = async (eventData, prisma = null) => {
+  try {
+    // Get HR email from database if prisma is provided
+    let hrEmail = null;
+    let calendarId = 'primary'; // Default to OAuth account's primary calendar
+    
+    if (prisma) {
+      const companyConfig = await getCompanyConfig(prisma);
+      hrEmail = companyConfig.hr_email || process.env.HR_EMAIL;
+      
+      // If HR email is set and different from OAuth account, try to use it as calendarId
+      // Note: This works if the OAuth account has access to the HR email's calendar
+      // (e.g., shared calendar or domain-wide delegation in Google Workspace)
+      if (hrEmail) {
+        // Try using HR email as calendarId (works if calendar is shared/accessible)
+        // If it fails, we'll fallback to 'primary'
+        calendarId = hrEmail;
+      }
+    }
+
     const event = {
       summary: eventData.title,
       description: eventData.description,
@@ -44,18 +81,41 @@ const createGoogleEvent = async (eventData) => {
       }
     };
 
+    // Add HR email as organizer if available (this ensures invites come from HR email)
+    if (hrEmail && !event.attendees.find(a => a.email === hrEmail)) {
+      event.attendees.unshift({ email: hrEmail, organizer: true });
+    }
+
     if (eventData.location) {
       event.location = eventData.location;
     }
 
-    const response = await calendar.events.insert({
-      calendarId: 'primary',
-      resource: event,
-      conferenceDataVersion: eventData.createMeet ? 1 : 0,
-      sendUpdates: 'all'
-    });
+    // Try to create event in HR email's calendar, fallback to primary if it fails
+    let response;
+    try {
+      response = await calendar.events.insert({
+        calendarId: calendarId,
+        resource: event,
+        conferenceDataVersion: eventData.createMeet ? 1 : 0,
+        sendUpdates: 'all'
+      });
+      logger.info(`Google Calendar event created in ${calendarId}: ${response.data.id}`);
+    } catch (calendarError) {
+      // If using HR email as calendarId fails, fallback to 'primary'
+      if (calendarId !== 'primary' && calendarError.code === 404) {
+        logger.warn(`Calendar ${calendarId} not accessible, using 'primary' calendar instead`);
+        response = await calendar.events.insert({
+          calendarId: 'primary',
+          resource: event,
+          conferenceDataVersion: eventData.createMeet ? 1 : 0,
+          sendUpdates: 'all'
+        });
+        logger.info(`Google Calendar event created in primary calendar: ${response.data.id}`);
+      } else {
+        throw calendarError;
+      }
+    }
 
-    logger.info(`Google Calendar event created: ${response.data.id}`);
     return response.data;
   } catch (error) {
     logger.error('Error creating Google Calendar event:', error);
@@ -83,8 +143,8 @@ const createHRInduction = async (prisma, candidate) => {
     createMeet: true
   };
 
-  // Create in Google Calendar
-  const googleEvent = await createGoogleEvent(eventData);
+  // Create in Google Calendar (pass prisma to get HR email)
+  const googleEvent = await createGoogleEvent(eventData, prisma);
 
   // Create local record
   const event = await prisma.calendarEvent.create({
@@ -133,7 +193,7 @@ const createCEOInduction = async (prisma, candidate, dateTime, meetingLink = nul
     createMeet: !meetingLink
   };
 
-  const googleEvent = await createGoogleEvent(eventData);
+  const googleEvent = await createGoogleEvent(eventData, prisma);
 
   const event = await prisma.calendarEvent.create({
     data: {
@@ -174,7 +234,7 @@ const createSalesInduction = async (prisma, candidate, dateTime, meetingLink = n
     createMeet: !meetingLink
   };
 
-  const googleEvent = await createGoogleEvent(eventData);
+  const googleEvent = await createGoogleEvent(eventData, prisma);
 
   const event = await prisma.calendarEvent.create({
     data: {
@@ -225,7 +285,7 @@ const createCheckInCall = async (prisma, candidate, dateTime = null) => {
     createMeet: true
   };
 
-  const googleEvent = await createGoogleEvent(eventData);
+  const googleEvent = await createGoogleEvent(eventData, prisma);
 
   const event = await prisma.calendarEvent.create({
     data: {

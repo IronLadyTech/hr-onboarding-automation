@@ -577,7 +577,12 @@ const Settings = () => {
                   value={config.hr_email || ''}
                   onChange={(e) => updateConfig('hr_email', e.target.value)}
                   className="input"
+                  placeholder="hr@company.com"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  💡 This email will be used as the "from" address for all emails and for creating calendar events. 
+                  Uses the same Google Cloud API credentials configured in your environment.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR Phone</label>
