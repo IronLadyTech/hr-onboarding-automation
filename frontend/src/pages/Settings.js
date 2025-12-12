@@ -76,9 +76,13 @@ const Settings = () => {
     try {
       const response = await configApi.getSettings();
       if (response.data?.success) {
-        setSettings(response.data.data || {});
-        if (response.data.data?.companyLogoUrl) {
-          setLogoPreview(response.data.data.companyLogoUrl);
+        const settingsData = response.data.data || {};
+        setSettings(settingsData);
+        // Always update logo preview from settings
+        if (settingsData.companyLogoUrl) {
+          setLogoPreview(settingsData.companyLogoUrl);
+        } else {
+          setLogoPreview(null);
         }
       }
     } catch (error) {
@@ -575,18 +579,25 @@ const Settings = () => {
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">🎨 Company Logo</h2>
             <div className="space-y-4">
-              {logoPreview && (
+              {(logoPreview || settings.companyLogoUrl) && (
                 <div className="flex items-center space-x-4">
                   <img 
-                    src={logoPreview} 
+                    src={logoPreview || settings.companyLogoUrl} 
                     alt="Company Logo" 
-                    className="h-20 w-auto object-contain border rounded p-2"
+                    className="h-20 w-auto object-contain border rounded p-2 bg-white"
+                    onError={(e) => {
+                      console.error('Failed to load logo image:', logoPreview || settings.companyLogoUrl);
+                      e.target.style.display = 'none';
+                    }}
                   />
                   <div>
-                    <p className="text-sm text-gray-600">Current Logo</p>
+                    <p className="text-sm text-gray-600 font-medium">Current Logo</p>
+                    <p className="text-xs text-gray-400 mt-1 break-all max-w-xs">
+                      URL: {logoPreview || settings.companyLogoUrl}
+                    </p>
                     <button
                       onClick={handleDeleteLogo}
-                      className="text-sm text-red-600 hover:text-red-700 mt-1"
+                      className="text-sm text-red-600 hover:text-red-700 mt-2"
                     >
                       Delete Logo
                     </button>

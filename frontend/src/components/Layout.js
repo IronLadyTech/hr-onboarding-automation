@@ -61,7 +61,18 @@ const Layout = () => {
                 <img 
                   src={companyLogo} 
                   alt={companyName} 
-                  className="h-8 w-auto object-contain"
+                  className="h-8 w-auto object-contain max-w-[120px]"
+                  onError={(e) => {
+                    console.error('Failed to load logo in sidebar:', companyLogo);
+                    e.target.style.display = 'none';
+                    // Show emoji fallback
+                    if (!e.target.nextElementSibling || e.target.nextElementSibling.tagName !== 'SPAN') {
+                      const emoji = document.createElement('span');
+                      emoji.className = 'text-2xl';
+                      emoji.textContent = '👩‍💼';
+                      e.target.parentNode.insertBefore(emoji, e.target);
+                    }
+                  }}
                 />
               ) : (
                 <span className="text-2xl">👩‍💼</span>
