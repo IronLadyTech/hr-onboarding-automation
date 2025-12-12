@@ -20,6 +20,7 @@ const Layout = () => {
             setCompanyName(response.data.data.companyName);
           }
           if (response.data.data?.companyLogoUrl) {
+            // Use the full URL from the API
             setCompanyLogo(response.data.data.companyLogoUrl);
           }
         }
@@ -28,6 +29,10 @@ const Layout = () => {
       }
     };
     fetchCompanyInfo();
+    
+    // Refresh logo every 30 seconds in case it was updated
+    const interval = setInterval(fetchCompanyInfo, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleLogout = () => {

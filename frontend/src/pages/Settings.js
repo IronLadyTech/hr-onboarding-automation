@@ -97,7 +97,12 @@ const Settings = () => {
       const response = await configApi.uploadLogo(formData);
       if (response.data?.success) {
         toast.success('Logo uploaded successfully!');
+        // Update logo preview immediately with the returned URL
+        if (response.data.data?.logoUrl) {
+          setLogoPreview(response.data.data.logoUrl);
+        }
         setLogoFile(null);
+        // Refresh settings to get updated logo URL
         await fetchSettings();
       }
     } catch (error) {

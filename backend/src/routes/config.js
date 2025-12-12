@@ -403,7 +403,15 @@ router.get('/settings', async (req, res) => {
     // Build logo URL if logo path exists
     let logoUrl = null;
     if (configMap.company_logo_path) {
-      const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:5000';
+      // Use API_URL from env, or construct from request
+      let baseUrl = process.env.API_URL;
+      if (!baseUrl) {
+        const protocol = req.protocol || (req.secure ? 'https' : 'http');
+        const host = req.get('host') || 'localhost:5000';
+        baseUrl = `${protocol}://${host}`;
+      }
+      // Ensure baseUrl doesn't end with /api
+      baseUrl = baseUrl.replace(/\/api$/, '');
       logoUrl = `${baseUrl}/api/uploads/${configMap.company_logo_path}`;
     }
     
@@ -454,7 +462,14 @@ router.post('/logo', requireAdmin, uploadLogo.single('logo'), async (req, res) =
     });
 
     // Build logo URL
-    const baseUrl = process.env.FRONTEND_URL || process.env.API_URL || 'http://localhost:5000';
+    let baseUrl = process.env.API_URL;
+    if (!baseUrl) {
+      const protocol = req.protocol || (req.secure ? 'https' : 'http');
+      const host = req.get('host') || 'localhost:5000';
+      baseUrl = `${protocol}://${host}`;
+    }
+    // Ensure baseUrl doesn't end with /api
+    baseUrl = baseUrl.replace(/\/api$/, '');
     const logoUrl = `${baseUrl}/api/uploads/${logoPath}`;
 
     logger.info(`✅ Company logo uploaded: ${logoPath}`);
