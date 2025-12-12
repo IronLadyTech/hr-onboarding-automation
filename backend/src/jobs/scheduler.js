@@ -745,6 +745,7 @@ const replacePlaceholders = (text, candidate, config, extra = {}) => {
     '{{firstName}}': candidate.firstName || '',
     '{{lastName}}': candidate.lastName || '',
     '{{fullName}}': `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
+    '{{candidateName}}': `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim(),
     '{{email}}': candidate.email || '',
     '{{phone}}': candidate.phone || '',
     '{{position}}': candidate.position || '',
@@ -768,6 +769,15 @@ const replacePlaceholders = (text, candidate, config, extra = {}) => {
     '{{ceoName}}': extra.ceoName || config.ceo_name || '',
     '{{salesHeadName}}': extra.salesHeadName || config.sales_head_name || ''
   };
+
+  // Add custom fields as placeholders (e.g., {{address}}, {{emergencyContact}}, etc.)
+  if (candidate.customFields && typeof candidate.customFields === 'object') {
+    Object.entries(candidate.customFields).forEach(([fieldKey, fieldValue]) => {
+      // Convert fieldKey to placeholder format: address -> {{address}}
+      const placeholderKey = `{{${fieldKey}}}`;
+      replacements[placeholderKey] = fieldValue || '';
+    });
+  }
 
   let result = text;
   for (const [key, value] of Object.entries(replacements)) {
