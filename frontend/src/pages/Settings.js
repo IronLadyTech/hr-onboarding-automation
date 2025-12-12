@@ -953,7 +953,7 @@ const Settings = () => {
               </button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Create custom placeholders that can be used in email templates. Use the format <code className="bg-gray-100 px-1 rounded">{{placeholderKey}}</code> in your templates.
+              Create custom placeholders that can be used in email templates. Use the format <code className="bg-gray-100 px-1 rounded">{'{{placeholderKey}}'}</code> in your templates.
             </p>
 
             {customPlaceholders.length === 0 ? (
@@ -977,7 +977,7 @@ const Settings = () => {
                           )}
                         </div>
                         <p className="text-sm text-gray-600 mt-1">
-                          <code className="bg-gray-100 px-1 rounded">{{{placeholder.placeholderKey}}}</code>
+                          <code className="bg-gray-100 px-1 rounded">{`{{${placeholder.placeholderKey}}}`}</code>
                         </p>
                         {placeholder.description && (
                           <p className="text-xs text-gray-500 mt-1">{placeholder.description}</p>
@@ -2004,7 +2004,7 @@ const Settings = () => {
                   disabled={!!editingPlaceholder}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Used as <code className="bg-gray-100 px-1 rounded">{{{placeholderForm.placeholderKey || 'key'}}}</code> in templates. Must be camelCase (e.g., googleMeetLink, companyWebsite)
+                  Used as <code className="bg-gray-100 px-1 rounded">{`{{${placeholderForm.placeholderKey || 'key'}}}`}</code> in templates. Must be camelCase (e.g., googleMeetLink, companyWebsite)
                 </p>
               </div>
 
