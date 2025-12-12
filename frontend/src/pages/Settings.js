@@ -1937,11 +1937,11 @@ const Settings = () => {
               {wizardStep === 1 && (
                 <div className="space-y-3 sm:space-y-4">
                   <h3 className="text-base sm:text-lg font-semibold">Step 1: Add New Email to OAuth Test Users</h3>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
+                  <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
                       To use Google OAuth features (Gmail API, Calendar API), you need to add the new email as a test user.
                     </p>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                    <ol className="list-decimal list-inside space-y-1.5 sm:space-y-2 text-xs sm:text-sm text-gray-700 mb-3 sm:mb-4">
                       <li>Sign in to Google Cloud Console with <strong>ironladytech@gmail.com</strong></li>
                       <li>Click the button below to open OAuth consent screen</li>
                       <li>Go to <strong>"Audience"</strong> section (or "Test users" tab)</li>
@@ -1950,12 +1950,12 @@ const Settings = () => {
                       <li>Click "Add"</li>
                       <li>Come back here and mark as completed</li>
                     </ol>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <a
                         href="https://console.cloud.google.com/apis/credentials/consent"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary"
+                        className="btn btn-primary text-sm sm:text-base py-2 sm:py-2.5 flex-1 sm:flex-none"
                       >
                         🔗 Open Google Cloud Console (Sign in as ironladytech@gmail.com)
                       </a>
@@ -1964,7 +1964,7 @@ const Settings = () => {
                           setWizardCompleted(prev => ({ ...prev, oauthTestUser: true }));
                           setWizardStep(2);
                         }}
-                        className="btn btn-secondary"
+                        className="btn btn-secondary text-sm sm:text-base py-2 sm:py-2.5"
                       >
                         ✓ I've Added It
                       </button>
@@ -2041,41 +2041,41 @@ const Settings = () => {
 
               {/* Step 3: Enter New Email */}
               {wizardStep === 3 && (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <h3 className="text-base sm:text-lg font-semibold">Step 3: Enter New HR Email</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                         New HR Email *
                       </label>
                       <input
                         type="email"
                         value={newHrEmail}
                         onChange={(e) => setNewHrEmail(e.target.value)}
-                        className="input w-full"
+                        className="input w-full text-sm sm:text-base"
                         placeholder="omprakashg2026@gmail.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                         HR Name (Optional)
                       </label>
                       <input
                         type="text"
                         value={newHrName}
                         onChange={(e) => setNewHrName(e.target.value)}
-                        className="input w-full"
+                        className="input w-full text-sm sm:text-base"
                         placeholder="HR Team"
                       />
                     </div>
                     <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-                      <p className="text-sm text-gray-700">
+                      <p className="text-xs sm:text-sm text-gray-700">
                         <strong>Current Email:</strong> {config.hr_email || 'Not set'}
                       </p>
-                      <p className="text-sm text-gray-700">
+                      <p className="text-xs sm:text-sm text-gray-700">
                         <strong>New Email:</strong> {newHrEmail || 'Enter above'}
                       </p>
-                      <p className="text-xs text-gray-600 mt-2">
+                      <p className="text-[10px] sm:text-xs text-gray-600 mt-2">
                         <strong>OAuth Account:</strong> ironladytech@gmail.com (stays the same)
                       </p>
                     </div>
@@ -2119,7 +2119,7 @@ const Settings = () => {
                         }
                       }}
                       disabled={savingHREmail || !newHrEmail}
-                      className="btn btn-primary w-full"
+                      className="btn btn-primary w-full text-sm sm:text-base py-2 sm:py-2.5"
                     >
                       {savingHREmail ? 'Saving...' : '💾 Save HR Email & Configure'}
                     </button>
@@ -2129,22 +2129,22 @@ const Settings = () => {
 
               {/* Step 4: Test Email */}
               {wizardStep === 4 && (
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   <h3 className="text-base sm:text-lg font-semibold">Step 4: Test Email Configuration</h3>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
+                  <div className="p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
                       Send a test email to verify everything is working correctly.
                     </p>
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                           Your Email Address (to receive test)
                         </label>
                         <input
                           type="email"
                           value={testEmailAddress}
                           onChange={(e) => setTestEmailAddress(e.target.value)}
-                          className="input w-full"
+                          className="input w-full text-sm sm:text-base"
                           placeholder="your-email@example.com"
                         />
                       </div>
@@ -2166,13 +2166,13 @@ const Settings = () => {
                           }
                         }}
                         disabled={testingEmail || !testEmailAddress}
-                        className="btn btn-primary w-full"
+                        className="btn btn-primary w-full text-sm sm:text-base py-2 sm:py-2.5"
                       >
                         {testingEmail ? 'Sending...' : '📧 Send Test Email'}
                       </button>
                       {wizardCompleted.testSent && (
                         <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                          <p className="text-sm text-green-800">
+                          <p className="text-xs sm:text-sm text-green-800">
                             ✅ Test email sent! Check your inbox and verify the "From" address shows: <strong>{newHrEmail || config.hr_email}</strong>
                           </p>
                         </div>
@@ -2184,7 +2184,7 @@ const Settings = () => {
                           setHrEmailChanged(true);
                           toast.success('HR email change completed! All future emails will use the new address.');
                         }}
-                        className="btn btn-success w-full"
+                        className="btn btn-success w-full text-sm sm:text-base py-2 sm:py-2.5"
                       >
                         ✅ Complete Setup
                       </button>
