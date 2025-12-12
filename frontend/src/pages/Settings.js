@@ -81,6 +81,7 @@ const Settings = () => {
     emailSaved: false,
     smtpUpdated: false,
     gmailConfigured: false,
+    gmailConfigMessage: '',
     testSent: false
   });
 
@@ -667,7 +668,32 @@ const Settings = () => {
 
           {/* HR Configuration */}
           <div className="card">
-            <h2 className="text-lg font-semibold mb-4">👤 HR Configuration</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">👤 HR Configuration</h2>
+              {config.hr_email && (
+                <button
+                  onClick={() => {
+                    setShowEmailWizard(true);
+                    setWizardStep(1);
+                    setWizardCompleted({
+                      oauthTestUser: false,
+                      appPassword: false,
+                      emailSaved: false,
+                      smtpUpdated: false,
+                      gmailConfigured: false,
+                      testSent: false
+                    });
+                    setNewHrEmail('');
+                    setNewHrName('');
+                    setSmtpPassword('');
+                    setUpdateSmtpUser(true);
+                  }}
+                  className="btn btn-primary text-sm"
+                >
+                  🔄 Change HR Email (Quick Setup)
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR Name (for emails)</label>
@@ -775,10 +801,15 @@ const Settings = () => {
                   )}
                 </div>
 
-                <p className="text-xs text-gray-500 mt-3">
-                  💡 This email will be used as the "from" address for all emails and for creating calendar events. 
-                  The system will automatically configure Google Cloud if OAuth is set up.
-                </p>
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs font-medium text-blue-900 mb-2">ℹ️ How It Works</p>
+                  <p className="text-xs text-blue-800">
+                    • <strong>Google Cloud OAuth:</strong> Uses <code>ironladytech@gmail.com</code> (configured in backend .env)<br/>
+                    • <strong>HR Email:</strong> This is the email address that will appear as "from" in all emails<br/>
+                    • <strong>Gmail "Send As":</strong> System automatically configures <code>ironladytech@gmail.com</code> to send as the HR email<br/>
+                    • <strong>Calendar Events:</strong> Will be created using the HR email as organizer
+                  </p>
+                </div>
                 
                 {/* Test Email Section */}
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">

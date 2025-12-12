@@ -1436,7 +1436,9 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
     }
 
     // Try to configure Gmail "Send As" using Gmail API if OAuth is configured
+    // Note: The OAuth account (ironladytech@gmail.com) needs to have permission to send as the HR email
     let gmailConfigured = false;
+    let gmailConfigMessage = '';
     try {
       if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_REFRESH_TOKEN) {
         const { google } = require('googleapis');
@@ -1451,27 +1453,50 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
         
-        // Try to add "Send As" alias (this requires the email to be verified first)
-        // Note: This might fail if the email is not verified in Gmail
+        // Get the authenticated user's email (should be ironladytech@gmail.com)
+        let authenticatedEmail = 'me';
+        try {
+          const profile = await gmail.users.getProfile({ userId: 'me' });
+          authenticatedEmail = profile.data.emailAddress;
+          logger.info(`📧 Authenticated Gmail account: ${authenticatedEmail}`);
+        } catch (profileError) {
+          logger.warn('Could not get Gmail profile:', profileError.message);
+        }
+        
+        // Try to add "Send As" alias
+        // This allows ironladytech@gmail.com to send emails as the HR email
         try {
           await gmail.users.settings.sendAs.create({
             userId: 'me',
             requestBody: {
               sendAsEmail: hrEmail,
               displayName: hrName || 'HR Team',
-              isDefault: true,
+              isDefault: false, // Don't make it default, just add it
               treatAsAlias: false
             }
           });
           gmailConfigured = true;
-          logger.info(`✅ Gmail "Send As" configured for ${hrEmail}`);
+          gmailConfigMessage = `Gmail "Send As" configured: ${authenticatedEmail} can now send as ${hrEmail}`;
+          logger.info(`✅ Gmail "Send As" configured: ${authenticatedEmail} → ${hrEmail}`);
         } catch (gmailError) {
-          logger.warn(`⚠️ Could not automatically configure Gmail "Send As" for ${hrEmail}: ${gmailError.message}`);
-          logger.info('💡 You may need to manually add this email in Gmail Settings → Accounts and Import → Send mail as');
+          // If email already exists as send-as, that's okay
+          if (gmailError.message && gmailError.message.includes('already exists')) {
+            gmailConfigured = true;
+            gmailConfigMessage = `Gmail "Send As" already configured: ${authenticatedEmail} can send as ${hrEmail}`;
+            logger.info(`✅ Gmail "Send As" already exists: ${authenticatedEmail} → ${hrEmail}`);
+          } else {
+            gmailConfigMessage = `Could not auto-configure Gmail "Send As". Please manually add ${hrEmail} in Gmail Settings (${authenticatedEmail}) → Accounts and Import → Send mail as`;
+            logger.warn(`⚠️ Could not automatically configure Gmail "Send As" for ${hrEmail}: ${gmailError.message}`);
+            logger.info(`💡 Manual setup: In Gmail (${authenticatedEmail}), go to Settings → Accounts and Import → Send mail as → Add ${hrEmail}`);
+          }
         }
+      } else {
+        gmailConfigMessage = 'Google OAuth not configured. Emails will use SMTP only.';
+        logger.info('ℹ️ Google OAuth not configured, skipping Gmail API setup');
       }
     } catch (gmailError) {
-      logger.warn('⚠️ Gmail API not configured or error:', gmailError.message);
+      gmailConfigMessage = `Gmail API error: ${gmailError.message}`;
+      logger.warn('⚠️ Gmail API error:', gmailError.message);
     }
 
     res.json({ 
@@ -1482,6 +1507,7 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         newHrEmail: hrEmail,
         smtpUpdated,
         gmailConfigured,
+        gmailConfigMessage,
         requiresRestart: smtpUpdated
       }
     });
