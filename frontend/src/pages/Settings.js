@@ -1185,29 +1185,7 @@ const Settings = () => {
         </div>
       )}
 
-      {/* Automation Settings (11 Steps) - REMOVED */}
-      {false && activeTab === 'automation' && (
-        <div className="space-y-6">
-          {/* Master Switch */}
-          <div className="card bg-indigo-50 border-indigo-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-indigo-900">🔌 Master Automation Switch</h2>
-                <p className="text-sm text-indigo-700">Enable/disable all automations</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={config.automation_enabled === 'true'}
-                  onChange={(e) => updateConfig('automation_enabled', e.target.checked ? 'true' : 'false')}
-                  className="sr-only peer"
-                />
-                <div className="w-14 h-7 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-indigo-600 after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all"></div>
-              </label>
-            </div>
-          </div>
-
-          {/* Step 1: Offer Letter */}
+      {/* Save Button (Fixed at bottom) */}
           <div className="card">
             <h3 className="text-md font-semibold mb-3 flex items-center">
               <span className="bg-indigo-100 text-indigo-700 w-6 h-6 rounded-full flex items-center justify-center text-sm mr-2">1</span>
