@@ -224,12 +224,43 @@ const Settings = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const oldHrEmail = config.hr_email;
       await configApi.updateWorkflow(config);
-      toast.success('Settings saved successfully!');
+      
+      // Check if HR email was changed
+      if (oldHrEmail && config.hr_email && oldHrEmail !== config.hr_email) {
+        setHrEmailChanged(true);
+        toast.success(`HR email updated! All future emails will be sent from: ${config.hr_email}`, { duration: 5000 });
+      } else {
+        toast.success('Settings saved successfully!');
+      }
     } catch (error) {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestHREmail = async () => {
+    if (!testEmailAddress || !testEmailAddress.includes('@')) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (!config.hr_email) {
+      toast.error('Please set an HR email first and save it');
+      return;
+    }
+
+    setTestingEmail(true);
+    try {
+      await configApi.testHREmail(testEmailAddress);
+      toast.success(`Test email sent to ${testEmailAddress}! Check your inbox.`, { duration: 5000 });
+      setTestEmailAddress('');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to send test email');
+    } finally {
+      setTestingEmail(false);
     }
   };
 
