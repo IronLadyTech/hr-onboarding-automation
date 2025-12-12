@@ -704,138 +704,24 @@ const Settings = () => {
                   className="input"
                 />
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   HR Email
                   {config.hr_email && (
                     <span className="ml-2 text-xs text-green-600 font-normal">
-                      ✓ Currently Active: {config.hr_email}
+                      ✓ Currently Active
                     </span>
                   )}
                 </label>
-                
-                {/* Current HR Email Display */}
-                {config.hr_email && (
-                  <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                {config.hr_email ? (
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
                     <p className="text-sm text-gray-700">
-                      <strong>Current HR Email:</strong> {config.hr_email}
+                      {config.hr_email}
                     </p>
                   </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No HR email configured</p>
                 )}
-
-                {/* New HR Email Input */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">New HR Email</label>
-                    <input
-                      type="email"
-                      value={newHrEmail}
-                      onChange={(e) => setNewHrEmail(e.target.value)}
-                      className="input w-full"
-                      placeholder="Enter new HR email (e.g., hr@company.com)"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">HR Name (Optional)</label>
-                    <input
-                      type="text"
-                      value={newHrName}
-                      onChange={(e) => setNewHrName(e.target.value)}
-                      className="input w-full"
-                      placeholder="HR Team"
-                    />
-                  </div>
-
-                  {/* SMTP Configuration Option */}
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="updateSmtp"
-                      checked={updateSmtpUser}
-                      onChange={(e) => {
-                        setUpdateSmtpUser(e.target.checked);
-                        setShowSmtpConfig(e.target.checked);
-                      }}
-                      className="form-checkbox"
-                    />
-                    <label htmlFor="updateSmtp" className="text-sm text-gray-700">
-                      Also update SMTP authentication (requires password)
-                    </label>
-                  </div>
-
-                  {showSmtpConfig && (
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        SMTP Password / App Password
-                      </label>
-                      <input
-                        type="password"
-                        value={smtpPassword}
-                        onChange={(e) => setSmtpPassword(e.target.value)}
-                        className="input w-full"
-                        placeholder="Enter SMTP password for the new email"
-                      />
-                      <p className="text-xs text-yellow-700 mt-1">
-                        ⚠️ This will update SMTP_USER in .env file. Server restart required after saving.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Save HR Email Button */}
-                  <button
-                    type="button"
-                    onClick={handleSaveHREmail}
-                    disabled={savingHREmail || !newHrEmail || (updateSmtpUser && !smtpPassword)}
-                    className="btn btn-primary w-full"
-                  >
-                    {savingHREmail ? 'Saving...' : '💾 Save HR Email & Configure'}
-                  </button>
-                  
-                  {hrEmailChanged && (
-                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-                      <p className="text-sm text-green-800">
-                        ✅ <strong>HR Email Updated!</strong> All future emails to candidates will be sent from: <strong>{config.hr_email}</strong>
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs font-medium text-blue-900 mb-2">ℹ️ How It Works</p>
-                  <p className="text-xs text-blue-800">
-                    • <strong>Google Cloud OAuth:</strong> Uses <code>ironladytech@gmail.com</code> (configured in backend .env)<br/>
-                    • <strong>HR Email:</strong> This is the email address that will appear as "from" in all emails<br/>
-                    • <strong>Gmail "Send As":</strong> System automatically configures <code>ironladytech@gmail.com</code> to send as the HR email<br/>
-                    • <strong>Calendar Events:</strong> Will be created using the HR email as organizer
-                  </p>
-                </div>
-                
-                {/* Test Email Section */}
-                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-xs font-medium text-blue-900 mb-2">🧪 Test Email Configuration</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="email"
-                      value={testEmailAddress}
-                      onChange={(e) => setTestEmailAddress(e.target.value)}
-                      className="input flex-1 text-sm"
-                      placeholder="Enter your email to test"
-                      disabled={testingEmail || !config.hr_email}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleTestHREmail}
-                      disabled={testingEmail || !config.hr_email || !testEmailAddress}
-                      className="btn btn-secondary text-sm whitespace-nowrap"
-                    >
-                      {testingEmail ? 'Sending...' : 'Send Test Email'}
-                    </button>
-                  </div>
-                  <p className="text-xs text-blue-700 mt-2">
-                    Send a test email to verify that emails will come from <strong>{config.hr_email || 'the configured HR email'}</strong>
-                  </p>
-                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR Phone</label>
