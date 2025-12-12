@@ -1364,6 +1364,136 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Update HR email and optionally configure Google Cloud
+router.post('/update-hr-email', requireAdmin, async (req, res) => {
+  try {
+    const { hrEmail, hrName, updateSmtpUser, smtpPassword } = req.body;
+    
+    if (!hrEmail || !hrEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
+    }
+
+    // Get old HR email for comparison
+    const oldConfig = await req.prisma.workflowConfig.findUnique({
+      where: { key: 'hr_email' }
+    });
+    const oldHrEmail = oldConfig?.value;
+
+    // Update HR email in database
+    await req.prisma.workflowConfig.upsert({
+      where: { key: 'hr_email' },
+      update: { value: hrEmail },
+      create: { key: 'hr_email', value: hrEmail }
+    });
+
+    // Update HR name if provided
+    if (hrName) {
+      await req.prisma.workflowConfig.upsert({
+        where: { key: 'hr_name' },
+        update: { value: hrName },
+        create: { key: 'hr_name', value: hrName }
+      });
+    }
+
+    logger.info(`✅ HR email updated from ${oldHrEmail || 'none'} to ${hrEmail}`);
+
+    // If user wants to update SMTP_USER, we need to update .env file
+    // Note: This requires server restart to take effect
+    let smtpUpdated = false;
+    if (updateSmtpUser && smtpPassword) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const envPath = path.join(__dirname, '../../.env');
+        
+        if (fs.existsSync(envPath)) {
+          let envContent = fs.readFileSync(envPath, 'utf8');
+          
+          // Update SMTP_USER
+          if (envContent.includes('SMTP_USER=')) {
+            envContent = envContent.replace(/SMTP_USER=.*/g, `SMTP_USER=${hrEmail}`);
+          } else {
+            envContent += `\nSMTP_USER=${hrEmail}`;
+          }
+          
+          // Update SMTP_PASS
+          if (envContent.includes('SMTP_PASS=')) {
+            envContent = envContent.replace(/SMTP_PASS=.*/g, `SMTP_PASS=${smtpPassword}`);
+          } else {
+            envContent += `\nSMTP_PASS=${smtpPassword}`;
+          }
+          
+          fs.writeFileSync(envPath, envContent);
+          smtpUpdated = true;
+          logger.info(`✅ SMTP_USER updated to ${hrEmail} in .env file`);
+        } else {
+          logger.warn('⚠️ .env file not found, cannot update SMTP_USER');
+        }
+      } catch (envError) {
+        logger.error('Error updating .env file:', envError);
+        // Don't fail the request, just log the error
+      }
+    }
+
+    // Try to configure Gmail "Send As" using Gmail API if OAuth is configured
+    let gmailConfigured = false;
+    try {
+      if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_REFRESH_TOKEN) {
+        const { google } = require('googleapis');
+        const oauth2Client = new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          process.env.GOOGLE_REDIRECT_URI
+        );
+        oauth2Client.setCredentials({
+          refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+        });
+
+        const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+        
+        // Try to add "Send As" alias (this requires the email to be verified first)
+        // Note: This might fail if the email is not verified in Gmail
+        try {
+          await gmail.users.settings.sendAs.create({
+            userId: 'me',
+            requestBody: {
+              sendAsEmail: hrEmail,
+              displayName: hrName || 'HR Team',
+              isDefault: true,
+              treatAsAlias: false
+            }
+          });
+          gmailConfigured = true;
+          logger.info(`✅ Gmail "Send As" configured for ${hrEmail}`);
+        } catch (gmailError) {
+          logger.warn(`⚠️ Could not automatically configure Gmail "Send As" for ${hrEmail}: ${gmailError.message}`);
+          logger.info('💡 You may need to manually add this email in Gmail Settings → Accounts and Import → Send mail as');
+        }
+      }
+    } catch (gmailError) {
+      logger.warn('⚠️ Gmail API not configured or error:', gmailError.message);
+    }
+
+    res.json({ 
+      success: true, 
+      message: `HR email updated successfully to ${hrEmail}`,
+      data: {
+        oldHrEmail,
+        newHrEmail: hrEmail,
+        smtpUpdated,
+        gmailConfigured,
+        requiresRestart: smtpUpdated
+      }
+    });
+  } catch (error) {
+    logger.error('Error updating HR email:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to update HR email' 
+    });
+  }
+});
+
 // Test HR email - Send a test email to verify the HR email is working
 router.post('/test-hr-email', requireAdmin, async (req, res) => {
   try {

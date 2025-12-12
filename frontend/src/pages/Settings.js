@@ -65,6 +65,12 @@ const Settings = () => {
   const [testingEmail, setTestingEmail] = useState(false);
   const [testEmailAddress, setTestEmailAddress] = useState('');
   const [hrEmailChanged, setHrEmailChanged] = useState(false);
+  const [savingHREmail, setSavingHREmail] = useState(false);
+  const [showSmtpConfig, setShowSmtpConfig] = useState(false);
+  const [smtpPassword, setSmtpPassword] = useState('');
+  const [updateSmtpUser, setUpdateSmtpUser] = useState(false);
+  const [newHrEmail, setNewHrEmail] = useState('');
+  const [newHrName, setNewHrName] = useState('');
 
   useEffect(() => {
     fetchData();
@@ -606,37 +612,106 @@ const Settings = () => {
                   className="input"
                 />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   HR Email
                   {config.hr_email && (
                     <span className="ml-2 text-xs text-green-600 font-normal">
-                      ✓ Active: {config.hr_email}
+                      ✓ Currently Active: {config.hr_email}
                     </span>
                   )}
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={config.hr_email || ''}
-                    onChange={(e) => {
-                      updateConfig('hr_email', e.target.value);
-                      setHrEmailChanged(false);
-                    }}
-                    className="input flex-1"
-                    placeholder="hr@company.com"
-                  />
-                </div>
-                {hrEmailChanged && (
-                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                    <p className="text-sm text-green-800">
-                      ✅ <strong>HR Email Updated!</strong> All future emails to candidates will be sent from: <strong>{config.hr_email}</strong>
+                
+                {/* Current HR Email Display */}
+                {config.hr_email && (
+                  <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                    <p className="text-sm text-gray-700">
+                      <strong>Current HR Email:</strong> {config.hr_email}
                     </p>
                   </div>
                 )}
-                <p className="text-xs text-gray-500 mt-2">
+
+                {/* New HR Email Input */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">New HR Email</label>
+                    <input
+                      type="email"
+                      value={newHrEmail}
+                      onChange={(e) => setNewHrEmail(e.target.value)}
+                      className="input w-full"
+                      placeholder="Enter new HR email (e.g., hr@company.com)"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">HR Name (Optional)</label>
+                    <input
+                      type="text"
+                      value={newHrName}
+                      onChange={(e) => setNewHrName(e.target.value)}
+                      className="input w-full"
+                      placeholder="HR Team"
+                    />
+                  </div>
+
+                  {/* SMTP Configuration Option */}
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="updateSmtp"
+                      checked={updateSmtpUser}
+                      onChange={(e) => {
+                        setUpdateSmtpUser(e.target.checked);
+                        setShowSmtpConfig(e.target.checked);
+                      }}
+                      className="form-checkbox"
+                    />
+                    <label htmlFor="updateSmtp" className="text-sm text-gray-700">
+                      Also update SMTP authentication (requires password)
+                    </label>
+                  </div>
+
+                  {showSmtpConfig && (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        SMTP Password / App Password
+                      </label>
+                      <input
+                        type="password"
+                        value={smtpPassword}
+                        onChange={(e) => setSmtpPassword(e.target.value)}
+                        className="input w-full"
+                        placeholder="Enter SMTP password for the new email"
+                      />
+                      <p className="text-xs text-yellow-700 mt-1">
+                        ⚠️ This will update SMTP_USER in .env file. Server restart required after saving.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Save HR Email Button */}
+                  <button
+                    type="button"
+                    onClick={handleSaveHREmail}
+                    disabled={savingHREmail || !newHrEmail || (updateSmtpUser && !smtpPassword)}
+                    className="btn btn-primary w-full"
+                  >
+                    {savingHREmail ? 'Saving...' : '💾 Save HR Email & Configure'}
+                  </button>
+                  
+                  {hrEmailChanged && (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        ✅ <strong>HR Email Updated!</strong> All future emails to candidates will be sent from: <strong>{config.hr_email}</strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-gray-500 mt-3">
                   💡 This email will be used as the "from" address for all emails and for creating calendar events. 
-                  Uses the same Google Cloud API credentials configured in your environment.
+                  The system will automatically configure Google Cloud if OAuth is set up.
                 </p>
                 
                 {/* Test Email Section */}

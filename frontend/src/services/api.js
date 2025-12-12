@@ -209,6 +209,8 @@ export const dashboardApi = {
 // Config APIs
 // Config APIs
 export const configApi = {
+  // Update HR email with Google Cloud configuration
+  updateHREmail: (data) => api.post('/config/update-hr-email', data),
   // Test HR email
   testHREmail: (testEmail) => api.post('/config/test-hr-email', { testEmail }),
   getWorkflow: () => api.get('/config/workflow'),
