@@ -935,6 +935,86 @@ const Settings = () => {
       )}
 
       {/* Department Management */}
+      {/* Custom Placeholders */}
+      {activeTab === 'placeholders' && (
+        <div className="space-y-6">
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">🔖 Custom Placeholders</h2>
+              <button
+                onClick={() => {
+                  setEditingPlaceholder(null);
+                  setPlaceholderForm({ name: '', placeholderKey: '', value: '', description: '', order: 0 });
+                  setShowPlaceholderModal(true);
+                }}
+                className="btn btn-primary text-sm"
+              >
+                + Add Placeholder
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Create custom placeholders that can be used in email templates. Use the format <code className="bg-gray-100 px-1 rounded">{{placeholderKey}}</code> in your templates.
+            </p>
+
+            {customPlaceholders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No custom placeholders yet. Click "Add Placeholder" to create one.</p>
+                <p className="text-xs mt-2">Example: Name: "Google Meet Link", Key: "googleMeetLink", Value: "https://meet.google.com/..."</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customPlaceholders.map((placeholder) => (
+                  <div
+                    key={placeholder.id}
+                    className={`p-4 border rounded-lg ${placeholder.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <h3 className="font-medium">{placeholder.name}</h3>
+                          {!placeholder.isActive && (
+                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          <code className="bg-gray-100 px-1 rounded">{{{placeholder.placeholderKey}}}</code>
+                        </p>
+                        {placeholder.description && (
+                          <p className="text-xs text-gray-500 mt-1">{placeholder.description}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-2 break-all">
+                          Value: {placeholder.value.length > 100 ? `${placeholder.value.substring(0, 100)}...` : placeholder.value}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <button
+                          onClick={() => handleTogglePlaceholderActive(placeholder)}
+                          className={`text-xs px-2 py-1 rounded ${placeholder.isActive ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}
+                        >
+                          {placeholder.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => handleEditPlaceholder(placeholder)}
+                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlaceholder(placeholder.id)}
+                          className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'departments' && (
         <div className="space-y-6">
           <div className="card">
