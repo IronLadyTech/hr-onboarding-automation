@@ -1902,7 +1902,7 @@ const Settings = () => {
             {/* Progress Steps */}
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
-                {[1, 2, 3, 4, 5, 6].map((step) => (
+                {[1, 2, 3, 4].map((step) => (
                   <div key={step} className="flex items-center flex-1">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
@@ -1913,7 +1913,7 @@ const Settings = () => {
                     >
                       {wizardCompleted[Object.keys(wizardCompleted)[step - 1]] ? '✓' : step}
                     </div>
-                    {step < 6 && (
+                    {step < 4 && (
                       <div
                         className={`flex-1 h-1 mx-2 ${
                           wizardStep > step ? 'bg-indigo-600' : 'bg-gray-200'
@@ -1927,8 +1927,6 @@ const Settings = () => {
                 <span>OAuth</span>
                 <span>App Pass</span>
                 <span>Save Email</span>
-                <span>SMTP</span>
-                <span>Gmail</span>
                 <span>Test</span>
               </div>
             </div>
@@ -1981,13 +1979,7 @@ const Settings = () => {
                   <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
                     <p className="text-sm text-yellow-800 mb-2">
-                      ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email.
-                    </p>
-                    <p className="text-sm text-gray-700 mb-2">
-                      <strong>Why?</strong> Gmail requires you to authenticate with the same email address you want to send FROM. You cannot use <code>ironladytech@gmail.com</code> SMTP credentials to send FROM a different email address.
-                    </p>
-                    <p className="text-sm text-gray-700">
-                      <strong>Solution:</strong> Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
+                      ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email. Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
                     </p>
                   </div>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
@@ -2117,7 +2109,7 @@ const Settings = () => {
                               gmailConfigured: response.data.data?.gmailConfigured || false,
                               gmailConfigMessage: response.data.data?.gmailConfigMessage || ''
                             }));
-                            setWizardStep(4);
+                            setWizardStep(4); // Go directly to Test Email (Step 4, which was Step 6)
                             toast.success('HR email saved successfully!');
                           }
                         } catch (error) {
@@ -2135,84 +2127,10 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 4: SMTP Updated */}
+              {/* Step 4: Test Email */}
               {wizardStep === 4 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 4: SMTP Configuration</h3>
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                    {wizardCompleted.smtpUpdated ? (
-                      <>
-                        <p className="text-sm text-green-800 mb-2">
-                          ✅ SMTP configuration saved successfully!
-                        </p>
-                        <p className="text-sm text-green-700 mb-3">
-                          🎉 <strong>Great news!</strong> SMTP credentials are now stored in the database and will be used automatically. No server restart needed!
-                        </p>
-                        <p className="text-sm text-gray-700 mb-3">
-                          The system will now use <strong>{newHrEmail || 'your new HR email'}</strong> for SMTP authentication when sending emails.
-                        </p>
-                        <button
-                          onClick={() => setWizardStep(5)}
-                          className="btn btn-primary w-full"
-                        >
-                          Continue to Next Step
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-gray-700 mb-3">
-                          SMTP configuration was not updated. The system will use the existing SMTP settings or Gmail OAuth to send emails from the new HR email address.
-                        </p>
-                        <p className="text-sm text-blue-700 mb-3">
-                          💡 <strong>Tip:</strong> If you want to authenticate SMTP with the new email, go back to Step 2 and provide an App Password.
-                        </p>
-                        <button
-                          onClick={() => setWizardStep(5)}
-                          className="btn btn-primary w-full"
-                        >
-                          Continue
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Step 5: Gmail Send As - Optional */}
-              {wizardStep === 5 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 5: Gmail "Send As" Configuration (Optional)</h3>
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
-                      <strong>Good News!</strong> You don't need to configure "Send As" manually. The system will automatically use the HR email as the "from" address.
-                    </p>
-                    <p className="text-sm text-gray-700 mb-3">
-                      Since you're using <code>ironladytech@gmail.com</code> for OAuth, the system will:
-                    </p>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 mb-4">
-                      <li>Use <strong>{newHrEmail || 'new HR email'}</strong> as the "from" address in all emails</li>
-                      <li>Authenticate using <code>ironladytech@gmail.com</code> OAuth credentials</li>
-                      <li>Gmail will handle the email sending automatically</li>
-                    </ul>
-                    {wizardCompleted.gmailConfigured && (
-                      <p className="text-sm text-green-800 mb-3">
-                        ✅ {wizardCompleted.gmailConfigMessage || 'Gmail "Send As" was automatically configured via Gmail API!'}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => setWizardStep(6)}
-                      className="btn btn-primary w-full"
-                    >
-                      Continue to Test
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 6: Test Email */}
-              {wizardStep === 6 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 6: Test Email Configuration</h3>
+                  <h3 className="text-lg font-semibold">Step 4: Test Email Configuration</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
                       Send a test email to verify everything is working correctly.
