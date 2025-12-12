@@ -1046,25 +1046,42 @@ router.put('/custom-fields/:id', requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { label, fieldType, placeholder, required, validation, options, order, isActive } = req.body;
 
-    const field = await req.prisma.customField.update({
-      where: { id },
-      data: {
-        ...(label !== undefined && { label }),
-        ...(fieldType !== undefined && { fieldType }),
-        ...(placeholder !== undefined && { placeholder }),
-        ...(required !== undefined && { required }),
-        ...(validation !== undefined && { validation }),
-        ...(options !== undefined && { options }),
-        ...(order !== undefined && { order }),
-        ...(isActive !== undefined && { isActive })
-      }
+    // Check if it's a standard field - don't allow changing fieldKey or isStandard
+    const existingField = await req.prisma.customField.findUnique({
+      where: { id }
     });
 
-    logger.info(`✅ Custom field updated: ${field.fieldKey}`);
+    if (!existingField) {
+      return res.status(404).json({ success: false, message: 'Field not found' });
+    }
+
+    // For standard fields, only allow editing label, placeholder, required, order, isActive
+    // Don't allow changing fieldKey, fieldType, or isStandard
+    const updateData = {
+      ...(label !== undefined && { label }),
+      ...(placeholder !== undefined && { placeholder }),
+      ...(required !== undefined && { required }),
+      ...(validation !== undefined && { validation }),
+      ...(options !== undefined && { options }),
+      ...(order !== undefined && { order }),
+      ...(isActive !== undefined && { isActive })
+    };
+
+    // Only allow fieldType change for custom fields
+    if (!existingField.isStandard && fieldType !== undefined) {
+      updateData.fieldType = fieldType;
+    }
+
+    const field = await req.prisma.customField.update({
+      where: { id },
+      data: updateData
+    });
+
+    logger.info(`✅ Field updated: ${field.fieldKey}`);
 
     res.json({ success: true, data: field });
   } catch (error) {
-    logger.error('Error updating custom field:', error);
+    logger.error('Error updating field:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -1073,6 +1090,18 @@ router.put('/custom-fields/:id', requireAdmin, async (req, res) => {
 router.delete('/custom-fields/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Check if it's a standard field - don't allow deletion, only deactivation
+    const field = await req.prisma.customField.findUnique({
+      where: { id }
+    });
+
+    if (field && field.isStandard) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Standard fields cannot be deleted. You can hide them by deactivating.' 
+      });
+    }
 
     await req.prisma.customField.delete({
       where: { id }
@@ -1083,6 +1112,49 @@ router.delete('/custom-fields/:id', requireAdmin, async (req, res) => {
     res.json({ success: true, message: 'Custom field deleted successfully' });
   } catch (error) {
     logger.error('Error deleting custom field:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Initialize standard candidate form fields
+router.post('/custom-fields/init-standard', requireAdmin, async (req, res) => {
+  try {
+    const standardFields = [
+      { fieldKey: 'firstName', label: 'First Name', fieldType: 'text', placeholder: 'John', required: true, order: 1, isStandard: true },
+      { fieldKey: 'lastName', label: 'Last Name', fieldType: 'text', placeholder: 'Doe', required: true, order: 2, isStandard: true },
+      { fieldKey: 'email', label: 'Email Address', fieldType: 'email', placeholder: 'john@example.com', required: true, order: 3, isStandard: true },
+      { fieldKey: 'phone', label: 'Phone Number', fieldType: 'phone', placeholder: '+91 98765 43210', required: false, order: 4, isStandard: true },
+      { fieldKey: 'position', label: 'Position', fieldType: 'text', placeholder: 'Software Engineer', required: true, order: 5, isStandard: true },
+      { fieldKey: 'department', label: 'Department', fieldType: 'select', placeholder: 'Select Department', required: true, order: 6, isStandard: true },
+      { fieldKey: 'expectedJoiningDate', label: 'Expected Joining Date', fieldType: 'date', required: true, order: 7, isStandard: true },
+      { fieldKey: 'salary', label: 'Annual CTC (₹)', fieldType: 'text', placeholder: '10,00,000', required: false, order: 8, isStandard: true },
+      { fieldKey: 'reportingManager', label: 'Reporting Manager', fieldType: 'text', placeholder: 'Manager Name', required: false, order: 9, isStandard: true },
+      { fieldKey: 'notes', label: 'Notes', fieldType: 'textarea', placeholder: 'Any additional notes...', required: false, order: 10, isStandard: true },
+    ];
+
+    const createdFields = [];
+    for (const field of standardFields) {
+      const existing = await req.prisma.customField.findUnique({
+        where: { fieldKey: field.fieldKey }
+      });
+
+      if (!existing) {
+        const created = await req.prisma.customField.create({
+          data: field
+        });
+        createdFields.push(created);
+      }
+    }
+
+    logger.info(`✅ Initialized ${createdFields.length} standard fields`);
+
+    res.json({ 
+      success: true, 
+      message: `Initialized ${createdFields.length} standard fields`,
+      data: createdFields
+    });
+  } catch (error) {
+    logger.error('Error initializing standard fields:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });

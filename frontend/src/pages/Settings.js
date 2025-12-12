@@ -311,7 +311,8 @@ const Settings = () => {
       required: field.required || false,
       validation: field.validation,
       options: field.options || [],
-      order: field.order || 0
+      order: field.order || 0,
+      isStandard: field.isStandard || false
     });
     setShowCustomFieldModal(true);
   };
@@ -562,6 +563,148 @@ const Settings = () => {
         </div>
       )}
 
+      {/* UI Customization */}
+      {activeTab === 'ui' && (
+        <div className="space-y-6">
+          {/* Logo Upload */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">🎨 Company Logo</h2>
+            <div className="space-y-4">
+              {logoPreview && (
+                <div className="flex items-center space-x-4">
+                  <img 
+                    src={logoPreview} 
+                    alt="Company Logo" 
+                    className="h-20 w-auto object-contain border rounded p-2"
+                  />
+                  <div>
+                    <p className="text-sm text-gray-600">Current Logo</p>
+                    <button
+                      onClick={handleDeleteLogo}
+                      className="text-sm text-red-600 hover:text-red-700 mt-1"
+                    >
+                      Delete Logo
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Upload New Logo
+                </label>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/svg+xml,image/gif"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setLogoFile(file);
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setLogoPreview(reader.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="input"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Supported formats: PNG, JPG, JPEG, SVG, GIF (Max 2MB)
+                </p>
+              </div>
+              {logoFile && (
+                <button
+                  onClick={handleUploadLogo}
+                  disabled={uploadingLogo}
+                  className="btn btn-primary"
+                >
+                  {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Color Customization */}
+          <div className="card">
+            <h2 className="text-lg font-semibold mb-4">🎨 UI Colors</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Customize the primary, secondary, and accent colors for your application theme.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Primary Color
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={settings.uiPrimaryColor || '#4F46E5'}
+                    onChange={(e) => setSettings({ ...settings, uiPrimaryColor: e.target.value })}
+                    className="h-10 w-20 rounded border"
+                  />
+                  <input
+                    type="text"
+                    value={settings.uiPrimaryColor || '#4F46E5'}
+                    onChange={(e) => setSettings({ ...settings, uiPrimaryColor: e.target.value })}
+                    className="input flex-1"
+                    placeholder="#4F46E5"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Secondary Color
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={settings.uiSecondaryColor || '#7C3AED'}
+                    onChange={(e) => setSettings({ ...settings, uiSecondaryColor: e.target.value })}
+                    className="h-10 w-20 rounded border"
+                  />
+                  <input
+                    type="text"
+                    value={settings.uiSecondaryColor || '#7C3AED'}
+                    onChange={(e) => setSettings({ ...settings, uiSecondaryColor: e.target.value })}
+                    className="input flex-1"
+                    placeholder="#7C3AED"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Accent Color (Optional)
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={settings.uiAccentColor || '#10B981'}
+                    onChange={(e) => setSettings({ ...settings, uiAccentColor: e.target.value })}
+                    className="h-10 w-20 rounded border"
+                  />
+                  <input
+                    type="text"
+                    value={settings.uiAccentColor || '#10B981'}
+                    onChange={(e) => setSettings({ ...settings, uiAccentColor: e.target.value })}
+                    className="input flex-1"
+                    placeholder="#10B981"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <button
+                onClick={handleSaveColors}
+                disabled={savingColors}
+                className="btn btn-primary"
+              >
+                {savingColors ? 'Saving...' : 'Save Colors'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Custom Form Fields */}
       {activeTab === 'custom-fields' && (
         <div className="space-y-6">
@@ -590,69 +733,155 @@ const Settings = () => {
               </button>
             </div>
             <p className="text-sm text-gray-600 mb-4">
-              Create custom fields that will appear in the candidate creation form. These fields will be stored with each candidate record.
+              Manage all candidate form fields. Edit standard fields (First Name, Email, etc.) or add new custom fields. Changes will appear in the candidate creation form.
             </p>
             
             {customFields.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No custom fields created yet.</p>
-                <p className="text-sm mt-2">Click "Add Custom Field" to create your first field.</p>
+                <p>No fields configured yet.</p>
+                <p className="text-sm mt-2">Click "Add Custom Field" to create your first field, or initialize standard fields.</p>
+                <button
+                  onClick={async () => {
+                    try {
+                      await configApi.initStandardFields();
+                      toast.success('Standard fields initialized!');
+                      fetchCustomFields();
+                    } catch (error) {
+                      toast.error('Failed to initialize standard fields');
+                    }
+                  }}
+                  className="btn btn-secondary mt-4"
+                >
+                  Initialize Standard Fields
+                </button>
               </div>
             ) : (
               <div className="space-y-3">
-                {customFields.map((field) => (
-                  <div
-                    key={field.id}
-                    className={`flex items-center justify-between p-4 border rounded-lg ${
-                      field.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'
-                    }`}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium">{field.label}</span>
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                          {field.fieldType}
-                        </span>
-                        {!field.isActive && (
-                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
-                            Inactive
-                          </span>
-                        )}
-                        {field.required && (
-                          <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">
-                            Required
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Key: <code className="bg-gray-100 px-1 rounded">{field.fieldKey}</code>
-                        {field.placeholder && ` • Placeholder: ${field.placeholder}`}
-                        {field.order !== undefined && ` • Order: ${field.order}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleToggleCustomFieldActive(field)}
-                        className="text-sm text-blue-600 hover:text-blue-700"
-                        title={field.isActive ? 'Deactivate' : 'Activate'}
-                      >
-                        {field.isActive ? '👁️' : '👁️‍🗨️'}
-                      </button>
-                      <button
-                        onClick={() => handleEditCustomField(field)}
-                        className="text-sm text-indigo-600 hover:text-indigo-700"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteCustomField(field.id)}
-                        className="text-sm text-red-600 hover:text-red-700"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {/* Standard Fields Section */}
+                {customFields.filter(f => f.isStandard).length > 0 && (
+                  <>
+                    <h3 className="text-md font-semibold text-gray-700 mb-2">Standard Fields</h3>
+                    {customFields
+                      .filter(f => f.isStandard)
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((field) => (
+                        <div
+                          key={field.id}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${
+                            field.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3">
+                              <span className="font-medium">{field.label}</span>
+                              <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded">
+                                Standard
+                              </span>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                {field.fieldType}
+                              </span>
+                              {!field.isActive && (
+                                <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                                  Hidden
+                                </span>
+                              )}
+                              {field.required && (
+                                <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">
+                                  Required
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Key: <code className="bg-gray-100 px-1 rounded">{field.fieldKey}</code>
+                              {field.placeholder && ` • Placeholder: ${field.placeholder}`}
+                              {field.order !== undefined && ` • Order: ${field.order}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleToggleCustomFieldActive(field)}
+                              className="text-sm text-blue-600 hover:text-blue-700"
+                              title={field.isActive ? 'Hide' : 'Show'}
+                            >
+                              {field.isActive ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button
+                              onClick={() => handleEditCustomField(field)}
+                              className="text-sm text-indigo-600 hover:text-indigo-700"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </>
+                )}
+
+                {/* Custom Fields Section */}
+                {customFields.filter(f => !f.isStandard).length > 0 && (
+                  <>
+                    <h3 className="text-md font-semibold text-gray-700 mb-2 mt-4">Custom Fields</h3>
+                    {customFields
+                      .filter(f => !f.isStandard)
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((field) => (
+                        <div
+                          key={field.id}
+                          className={`flex items-center justify-between p-4 border rounded-lg ${
+                            field.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3">
+                              <span className="font-medium">{field.label}</span>
+                              <span className="text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded">
+                                Custom
+                              </span>
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                {field.fieldType}
+                              </span>
+                              {!field.isActive && (
+                                <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded">
+                                  Inactive
+                                </span>
+                              )}
+                              {field.required && (
+                                <span className="text-xs bg-yellow-100 text-yellow-600 px-2 py-1 rounded">
+                                  Required
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Key: <code className="bg-gray-100 px-1 rounded">{field.fieldKey}</code>
+                              {field.placeholder && ` • Placeholder: ${field.placeholder}`}
+                              {field.order !== undefined && ` • Order: ${field.order}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleToggleCustomFieldActive(field)}
+                              className="text-sm text-blue-600 hover:text-blue-700"
+                              title={field.isActive ? 'Deactivate' : 'Activate'}
+                            >
+                              {field.isActive ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                            <button
+                              onClick={() => handleEditCustomField(field)}
+                              className="text-sm text-indigo-600 hover:text-indigo-700"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCustomField(field.id)}
+                              className="text-sm text-red-600 hover:text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1434,10 +1663,12 @@ const Settings = () => {
                   className="input"
                   placeholder="e.g., emergencyContact"
                   required
-                  disabled={!!editingCustomField}
+                  disabled={!!editingCustomField || customFieldForm.isStandard}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Only letters, numbers, and underscores allowed. Cannot be changed after creation.
+                  {customFieldForm.isStandard 
+                    ? 'Standard field key cannot be changed.'
+                    : 'Only letters, numbers, and underscores allowed. Cannot be changed after creation.'}
                 </p>
               </div>
 
@@ -1450,6 +1681,7 @@ const Settings = () => {
                   onChange={(e) => setCustomFieldForm({ ...customFieldForm, fieldType: e.target.value, options: e.target.value === 'select' ? customFieldForm.options : [] })}
                   className="input"
                   required
+                  disabled={customFieldForm.isStandard}
                 >
                   <option value="text">Text</option>
                   <option value="email">Email</option>
@@ -1459,6 +1691,11 @@ const Settings = () => {
                   <option value="select">Select (Dropdown)</option>
                   <option value="textarea">Textarea</option>
                 </select>
+                {customFieldForm.isStandard && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Standard field type cannot be changed.
+                  </p>
+                )}
               </div>
 
               <div>

@@ -455,3 +455,24 @@ model DepartmentStepTemplate {
   @@index([stepNumber])
   @@index([emailTemplateId])
 }
+
+model CustomField {
+  id        String   @id @default(uuid())
+  label     String   // Display label (e.g., "Emergency Contact", "First Name")
+  fieldKey  String   @unique // Field key (e.g., "emergencyContact", "firstName")
+  fieldType String   // Field type: text, email, phone, number, date, select, textarea
+  placeholder String? // Placeholder text
+  required  Boolean  @default(false) // Is field required?
+  validation Json?   // Validation rules (min, max, pattern, etc.)
+  options   Json?    // Options for select type: [{label: "Option 1", value: "opt1"}]
+  order     Int      @default(0) // Display order
+  isActive  Boolean  @default(true) // Is field active/visible?
+  isStandard Boolean @default(false) // Is this a standard field (firstName, lastName, etc.)?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([fieldKey])
+  @@index([order])
+  @@index([isActive])
+  @@index([isStandard])
+}

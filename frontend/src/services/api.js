@@ -233,6 +233,7 @@ export const configApi = {
   createCustomField: (data) => api.post('/config/custom-fields', data),
   updateCustomField: (id, data) => api.put(`/config/custom-fields/${id}`, data),
   deleteCustomField: (id) => api.delete(`/config/custom-fields/${id}`),
+  initStandardFields: () => api.post('/config/custom-fields/init-standard'),
   initWorkflow: () => api.post('/config/workflow/init'),
   initTrainingPlans: () => api.post('/config/training-plans/init'),
   
