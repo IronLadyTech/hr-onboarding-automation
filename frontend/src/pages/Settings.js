@@ -2207,13 +2207,17 @@ const Settings = () => {
                           toast.error('Please enter a valid email address');
                           return;
                         }
+                        if (!smtpPassword || smtpPassword.length < 16) {
+                          toast.error('Please go back to Step 2 and provide an App Password for the new email');
+                          return;
+                        }
                         setSavingHREmail(true);
                         try {
                           const response = await configApi.updateHREmail({
                             hrEmail: newHrEmail,
                             hrName: newHrName || config.hr_name,
-                            updateSmtpUser: smtpPassword ? true : false,
-                            smtpPassword: smtpPassword || undefined
+                            updateSmtpUser: true, // Always update SMTP when password is provided
+                            smtpPassword: smtpPassword
                           });
                           if (response.data?.success) {
                             updateConfig('hr_email', newHrEmail);
