@@ -1524,11 +1524,11 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide a valid test email address' });
     }
 
-    // Get current HR email and name from database
+    // Get current HR email, name, and SMTP credentials from database
     const configs = await req.prisma.workflowConfig.findMany({
       where: {
         key: {
-          in: ['hr_email', 'hr_name', 'company_name']
+          in: ['hr_email', 'hr_name', 'company_name', 'smtp_user', 'smtp_pass']
         }
       }
     });
@@ -1539,24 +1539,36 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     const hrName = configMap.hr_name || process.env.HR_NAME || 'HR Team';
     const companyName = configMap.company_name || process.env.COMPANY_NAME || 'Company';
     
+    // Get SMTP credentials from database if available, else use env
+    let smtpUser = configMap.smtp_user || process.env.SMTP_USER;
+    let smtpPass = configMap.smtp_pass || process.env.SMTP_PASS;
+    
     if (!hrEmail) {
       return res.status(400).json({ success: false, message: 'HR email is not configured. Please set it in Settings first.' });
     }
 
-    // Import email service
-    const emailService = require('../services/emailService');
+    // Validate SMTP configuration
+    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'SMTP configuration is missing. Please provide SMTP credentials in Step 2 of the wizard, or ensure SMTP_HOST, SMTP_USER, and SMTP_PASS are set in the backend .env file.' 
+      });
+    }
+
     const nodemailer = require('nodemailer');
     
-    // Create transporter
+    // Create transporter with dynamic credentials (from database or env)
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT),
+      port: parseInt(process.env.SMTP_PORT) || 587,
       secure: process.env.SMTP_SECURE === 'true',
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+        user: smtpUser,
+        pass: smtpPass
       }
     });
+    
+    logger.info(`📧 Test email - Using SMTP user: ${smtpUser} (${configMap.smtp_user ? 'from database' : 'from env'})`);
 
     // Format "from" address
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
