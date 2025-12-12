@@ -2237,17 +2237,14 @@ const Settings = () => {
                     {wizardCompleted.smtpUpdated ? (
                       <>
                         <p className="text-sm text-green-800 mb-2">
-                          ✅ SMTP configuration updated successfully!
+                          ✅ SMTP configuration saved successfully!
                         </p>
-                        <p className="text-sm text-yellow-700 mb-3">
-                          ⚠️ <strong>Important:</strong> You need to restart the backend server for SMTP changes to take effect.
+                        <p className="text-sm text-green-700 mb-3">
+                          🎉 <strong>Great news!</strong> SMTP credentials are now stored in the database and will be used automatically. No server restart needed!
                         </p>
-                        <div className="bg-white p-3 rounded border border-green-200 mb-3">
-                          <p className="text-xs font-mono text-gray-700">
-                            SSH to your server and run:<br />
-                            <code className="text-indigo-600">pm2 restart hr-onboarding-backend</code>
-                          </p>
-                        </div>
+                        <p className="text-sm text-gray-700 mb-3">
+                          The system will now use <strong>{newHrEmail || 'your new HR email'}</strong> for SMTP authentication when sending emails.
+                        </p>
                         <button
                           onClick={() => setWizardStep(5)}
                           className="btn btn-primary w-full"
@@ -2258,7 +2255,10 @@ const Settings = () => {
                     ) : (
                       <>
                         <p className="text-sm text-gray-700 mb-3">
-                          SMTP configuration was not updated. The system will use Gmail "Send As" to send emails from the new HR email address.
+                          SMTP configuration was not updated. The system will use the existing SMTP settings or Gmail OAuth to send emails from the new HR email address.
+                        </p>
+                        <p className="text-sm text-blue-700 mb-3">
+                          💡 <strong>Tip:</strong> If you want to authenticate SMTP with the new email, go back to Step 2 and provide an App Password.
                         </p>
                         <button
                           onClick={() => setWizardStep(5)}
