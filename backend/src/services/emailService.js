@@ -360,10 +360,14 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
 
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     
-    // Get HR email from database (WorkflowConfig)
+    // Get HR email from database (WorkflowConfig) - ALWAYS fetch fresh from database
     const companyConfig = await getCompanyConfig(prisma);
     const hrEmail = companyConfig.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || process.env.SMTP_USER;
     const hrName = companyConfig.hr_name || process.env.HR_NAME || 'HR Team';
+    
+    // Log what we're using for debugging
+    logger.info(`📧 HR Email Configuration - Database hr_email: ${companyConfig.hr_email || 'NOT SET'}, Using: ${hrEmail}`);
+    logger.info(`📧 HR Name Configuration - Database hr_name: ${companyConfig.hr_name || 'NOT SET'}, Using: ${hrName}`);
     
     // Format "from" address: "HR Team <hr@company.com>" or just email
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
@@ -380,7 +384,9 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
       attachments
     };
 
-    logger.info(`Attempting to send email: ${emailRecord.type} to ${candidate.email}`);
+    logger.info(`📧 Attempting to send email: ${emailRecord.type} to ${candidate.email}`);
+    logger.info(`📧 FROM ADDRESS: ${mailOptions.from}`);
+    logger.info(`📧 SMTP AUTH USER: ${process.env.SMTP_USER}`);
     logger.debug(`Email options:`, { from: mailOptions.from, to: mailOptions.to, subject: mailOptions.subject });
 
     await transporter.sendMail(mailOptions);

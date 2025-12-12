@@ -656,6 +656,11 @@ const sendPendingEmails = async () => {
     const hrName = config.hr_name || process.env.HR_NAME || 'HR Team';
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
 
+    // Log what we're using for debugging
+    logger.info(`📧 Scheduler HR Email Configuration - Database hr_email: ${config.hr_email || 'NOT SET'}, Using: ${hrEmail}`);
+    logger.info(`📧 Scheduler FROM ADDRESS: ${fromAddress}`);
+    logger.info(`📧 Scheduler SMTP AUTH USER: ${process.env.SMTP_USER}`);
+
     const emails = await prisma.email.findMany({
       where: { status: 'PENDING', scheduledFor: { lte: new Date() } },
       take: 20,
@@ -671,7 +676,7 @@ const sendPendingEmails = async () => {
 
     for (const email of emails) {
       try {
-        logger.info(`Attempting to send pending email: ${email.type} to ${email.toEmail} from ${fromAddress}`);
+        logger.info(`📧 Attempting to send pending email: ${email.type} to ${email.toEmail} from ${fromAddress}`);
         
         await transporter.sendMail({
           from: fromAddress, // Always use current HR email from database
