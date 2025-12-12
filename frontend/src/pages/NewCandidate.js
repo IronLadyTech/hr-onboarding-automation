@@ -10,18 +10,8 @@ const NewCandidate = () => {
   const [customFields, setCustomFields] = useState([]);
   const [customFieldValues, setCustomFieldValues] = useState({});
   
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    position: '',
-    department: '',
-    expectedJoiningDate: '',
-    salary: '',
-    reportingManager: '',
-    notes: ''
-  });
+  const [formData, setFormData] = useState({});
+  const [allFields, setAllFields] = useState([]); // All fields (standard + custom)
 
   useEffect(() => {
     fetchDepartments();
@@ -30,19 +20,41 @@ const NewCandidate = () => {
 
   const fetchCustomFields = async () => {
     try {
-      const response = await configApi.getCustomFields();
+      const response = await configApi.getAllCustomFields();
       if (response.data?.success) {
         const fields = response.data.data || [];
-        setCustomFields(fields);
-        // Initialize custom field values
-        const initialValues = {};
-        fields.forEach(field => {
-          initialValues[field.fieldKey] = '';
+        // Filter only active fields and sort by order
+        const activeFields = fields
+          .filter(f => f.isActive)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        setAllFields(activeFields);
+        setCustomFields(activeFields.filter(f => !f.isStandard));
+        
+        // Initialize form data with all field keys
+        const initialFormData = {};
+        const initialCustomValues = {};
+        
+        activeFields.forEach(field => {
+          if (field.isStandard) {
+            initialFormData[field.fieldKey] = '';
+          } else {
+            initialCustomValues[field.fieldKey] = '';
+          }
         });
-        setCustomFieldValues(initialValues);
+        
+        setFormData(initialFormData);
+        setCustomFieldValues(initialCustomValues);
       }
     } catch (error) {
-      console.error('Failed to fetch custom fields:', error);
+      console.error('Failed to fetch fields:', error);
+      // Fallback to default fields if API fails
+      const defaultFields = [
+        { fieldKey: 'firstName', label: 'First Name', fieldType: 'text', required: true, isStandard: true },
+        { fieldKey: 'lastName', label: 'Last Name', fieldType: 'text', required: true, isStandard: true },
+        { fieldKey: 'email', label: 'Email', fieldType: 'email', required: true, isStandard: true },
+      ];
+      setAllFields(defaultFields);
     }
   };
 
@@ -62,12 +74,37 @@ const NewCandidate = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCustomFieldChange = (fieldKey, value) => {
-    setCustomFieldValues(prev => ({ ...prev, [fieldKey]: value }));
+  const handleFieldChange = (fieldKey, value, isStandard) => {
+    if (isStandard) {
+      setFormData(prev => ({ ...prev, [fieldKey]: value }));
+    } else {
+      setCustomFieldValues(prev => ({ ...prev, [fieldKey]: value }));
+    }
   };
 
-  const renderCustomField = (field) => {
-    const value = customFieldValues[field.fieldKey] || '';
+
+  const renderField = (field) => {
+    const isStandard = field.isStandard || false;
+    const value = isStandard 
+      ? (formData[field.fieldKey] || '') 
+      : (customFieldValues[field.fieldKey] || '');
+    
+    // Special handling for department field (select from departments)
+    if (field.fieldKey === 'department' && field.fieldType === 'select') {
+      return (
+        <select
+          value={value}
+          onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
+          className="input"
+          required={field.required}
+        >
+          <option value="">{field.placeholder || 'Select Department'}</option>
+          {departments.map((dept) => (
+            <option key={dept} value={dept}>{dept}</option>
+          ))}
+        </select>
+      );
+    }
     
     switch (field.fieldType) {
       case 'text':
@@ -77,8 +114,9 @@ const NewCandidate = () => {
         return (
           <input
             type={field.fieldType === 'number' ? 'number' : field.fieldType === 'email' ? 'email' : field.fieldType === 'phone' ? 'tel' : 'text'}
+            name={isStandard ? field.fieldKey : undefined}
             value={value}
-            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
             className="input"
             placeholder={field.placeholder || ''}
             required={field.required}
@@ -89,26 +127,28 @@ const NewCandidate = () => {
         return (
           <input
             type="date"
+            name={isStandard ? field.fieldKey : undefined}
             value={value}
-            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
             className="input"
             required={field.required}
           />
         );
       
       case 'select':
-        const options = field.options || [];
+        const options = Array.isArray(field.options) ? field.options : [];
         return (
           <select
+            name={isStandard ? field.fieldKey : undefined}
             value={value}
-            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
             className="input"
             required={field.required}
           >
             <option value="">{field.placeholder || 'Select an option'}</option>
             {options.map((option, idx) => (
-              <option key={idx} value={option.value}>
-                {option.label}
+              <option key={idx} value={option.value || option}>
+                {option.label || option}
               </option>
             ))}
           </select>
@@ -117,8 +157,9 @@ const NewCandidate = () => {
       case 'textarea':
         return (
           <textarea
+            name={isStandard ? field.fieldKey : undefined}
             value={value}
-            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
             className="input"
             rows={3}
             placeholder={field.placeholder || ''}
@@ -130,8 +171,9 @@ const NewCandidate = () => {
         return (
           <input
             type="text"
+            name={isStandard ? field.fieldKey : undefined}
             value={value}
-            onChange={(e) => handleCustomFieldChange(field.fieldKey, e.target.value)}
+            onChange={(e) => handleFieldChange(field.fieldKey, e.target.value, isStandard)}
             className="input"
             placeholder={field.placeholder || ''}
             required={field.required}
@@ -145,17 +187,26 @@ const NewCandidate = () => {
     setLoading(true);
 
     try {
-      // Merge custom fields into formData
+      // Separate standard fields and custom fields
+      const standardFieldsData = {};
       const customFieldsData = {};
-      customFields.forEach(field => {
-        const value = customFieldValues[field.fieldKey];
+      
+      allFields.forEach(field => {
+        const value = field.isStandard 
+          ? formData[field.fieldKey] 
+          : customFieldValues[field.fieldKey];
+        
         if (value !== undefined && value !== null && value !== '') {
-          customFieldsData[field.fieldKey] = value;
+          if (field.isStandard) {
+            standardFieldsData[field.fieldKey] = value;
+          } else {
+            customFieldsData[field.fieldKey] = value;
+          }
         }
       });
 
       const submitData = {
-        ...formData,
+        ...standardFieldsData,
         customFields: Object.keys(customFieldsData).length > 0 ? customFieldsData : null
       };
 
@@ -184,185 +235,25 @@ const NewCandidate = () => {
 
       <form onSubmit={handleSubmit} className="card">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* First Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              First Name *
-            </label>
-            <input
-              type="text"
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleChange}
-              className="input"
-              placeholder="John"
-              required
-            />
-          </div>
-
-          {/* Last Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Last Name *
-            </label>
-            <input
-              type="text"
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleChange}
-              className="input"
-              placeholder="Doe"
-              required
-            />
-          </div>
-
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              className="input"
-              placeholder="john@example.com"
-              required
-            />
-          </div>
-
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Phone Number
-            </label>
-            <input
-              type="tel"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              className="input"
-              placeholder="+91 98765 43210"
-            />
-          </div>
-
-          {/* Position */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Position *
-            </label>
-            <input
-              type="text"
-              name="position"
-              value={formData.position}
-              onChange={handleChange}
-              className="input"
-              placeholder="Software Engineer"
-              required
-            />
-          </div>
-
-          {/* Department */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Department *
-            </label>
-            <select
-              name="department"
-              value={formData.department}
-              onChange={handleChange}
-              className="input"
-              required
-            >
-              <option value="">Select Department</option>
-              {departments.map((dept) => (
-                <option key={dept} value={dept}>{dept}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Joining Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Expected Joining Date *
-            </label>
-            <input
-              type="date"
-              name="expectedJoiningDate"
-              value={formData.expectedJoiningDate}
-              onChange={handleChange}
-              className="input"
-              required
-            />
-          </div>
-
-          {/* Salary */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Annual CTC (₹)
-            </label>
-            <input
-              type="text"
-              name="salary"
-              value={formData.salary}
-              onChange={handleChange}
-              className="input"
-              placeholder="10,00,000"
-            />
-          </div>
-
-          {/* Reporting Manager */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Reporting Manager
-            </label>
-            <input
-              type="text"
-              name="reportingManager"
-              value={formData.reportingManager}
-              onChange={handleChange}
-              className="input"
-              placeholder="Manager Name"
-            />
-          </div>
-
-          {/* Notes */}
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Notes
-            </label>
-            <textarea
-              name="notes"
-              value={formData.notes}
-              onChange={handleChange}
-              className="input"
-              rows={3}
-              placeholder="Any additional notes..."
-            />
-          </div>
-
-          {/* Custom Fields */}
-          {customFields.length > 0 && (
-            <>
-              <div className="md:col-span-2">
-                <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-4 border-t pt-4">
-                  Additional Information
-                </h3>
+          {/* Dynamically render all fields (standard + custom) */}
+          {allFields.length > 0 ? (
+            allFields.map((field) => (
+              <div 
+                key={field.id || field.fieldKey} 
+                className={field.fieldType === 'textarea' ? 'md:col-span-2' : ''}
+              >
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {field.label}
+                  {field.required && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                {renderField(field)}
               </div>
-              {customFields
-                .filter(field => field.isActive)
-                .sort((a, b) => (a.order || 0) - (b.order || 0))
-                .map((field) => (
-                  <div key={field.id} className={field.fieldType === 'textarea' ? 'md:col-span-2' : ''}>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {field.label}
-                      {field.required && <span className="text-red-500 ml-1">*</span>}
-                    </label>
-                    {renderCustomField(field)}
-                  </div>
-                ))}
-            </>
+            ))
+          ) : (
+            // Fallback if no fields loaded
+            <div className="md:col-span-2 text-center py-8 text-gray-500">
+              <p>Loading form fields...</p>
+            </div>
           )}
         </div>
 
