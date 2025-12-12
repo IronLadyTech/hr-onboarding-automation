@@ -21,6 +21,16 @@
 
 
 ssh -i "$HOME\Downloads\lightsail.pem" bitnami@43.204.155.68
+cd ~/hr-onboarding-automation/backend
+git pull origin main
+
+# Then restart the backend
+
+npx prisma db push
+pm2 restart hr-onboarding-backend
+
+# Check logs to ensure it's working
+pm2 logs hr-onboarding-backend --lines 20
 
 
 

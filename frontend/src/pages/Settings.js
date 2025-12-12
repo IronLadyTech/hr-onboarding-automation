@@ -377,6 +377,67 @@ const Settings = () => {
     }
   };
 
+  // Custom Placeholders handlers
+  const handleCreatePlaceholder = async () => {
+    if (!placeholderForm.name.trim() || !placeholderForm.placeholderKey.trim() || !placeholderForm.value.trim()) {
+      toast.error('Name, Placeholder Key, and Value are required');
+      return;
+    }
+
+    setPlaceholderLoading(true);
+    try {
+      if (editingPlaceholder) {
+        await configApi.updateCustomPlaceholder(editingPlaceholder.id, placeholderForm);
+        toast.success('Placeholder updated successfully!');
+      } else {
+        await configApi.createCustomPlaceholder(placeholderForm);
+        toast.success('Placeholder created successfully!');
+      }
+      setShowPlaceholderModal(false);
+      setEditingPlaceholder(null);
+      setPlaceholderForm({ name: '', placeholderKey: '', value: '', description: '', order: 0 });
+      fetchCustomPlaceholders();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save placeholder');
+    } finally {
+      setPlaceholderLoading(false);
+    }
+  };
+
+  const handleEditPlaceholder = (placeholder) => {
+    setEditingPlaceholder(placeholder);
+    setPlaceholderForm({
+      name: placeholder.name,
+      placeholderKey: placeholder.placeholderKey,
+      value: placeholder.value,
+      description: placeholder.description || '',
+      order: placeholder.order || 0
+    });
+    setShowPlaceholderModal(true);
+  };
+
+  const handleDeletePlaceholder = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this placeholder?')) return;
+    
+    try {
+      await configApi.deleteCustomPlaceholder(id);
+      toast.success('Placeholder deleted successfully!');
+      fetchCustomPlaceholders();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete placeholder');
+    }
+  };
+
+  const handleTogglePlaceholderActive = async (placeholder) => {
+    try {
+      await configApi.updateCustomPlaceholder(placeholder.id, { isActive: !placeholder.isActive });
+      toast.success(`Placeholder ${!placeholder.isActive ? 'activated' : 'deactivated'} successfully!`);
+      fetchCustomPlaceholders();
+    } catch (error) {
+      toast.error('Failed to update placeholder status');
+    }
+  };
+
   const handleAddOption = () => {
     if (!newOption.label.trim() || !newOption.value.trim()) {
       toast.error('Option label and value are required');
