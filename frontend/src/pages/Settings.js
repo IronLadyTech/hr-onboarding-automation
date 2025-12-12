@@ -247,13 +247,67 @@ const Settings = () => {
     }
   };
 
+  const handleSaveHREmail = async () => {
+    if (!newHrEmail || !newHrEmail.includes('@')) {
+      toast.error('Please enter a valid HR email address');
+      return;
+    }
+
+    if (updateSmtpUser && !smtpPassword) {
+      toast.error('Please enter SMTP password to update SMTP configuration');
+      return;
+    }
+
+    setSavingHREmail(true);
+    try {
+      const response = await configApi.updateHREmail({
+        hrEmail: newHrEmail,
+        hrName: newHrName || config.hr_name,
+        updateSmtpUser,
+        smtpPassword: updateSmtpUser ? smtpPassword : undefined
+      });
+
+      if (response.data?.success) {
+        // Update local config
+        updateConfig('hr_email', newHrEmail);
+        if (newHrName) {
+          updateConfig('hr_name', newHrName);
+        }
+        
+        setHrEmailChanged(true);
+        setShowSmtpConfig(false);
+        setSmtpPassword('');
+        setUpdateSmtpUser(false);
+        setNewHrEmail('');
+        setNewHrName('');
+        
+        let message = `✅ HR email updated to ${newHrEmail}! All future emails will use this address.`;
+        if (response.data.data?.requiresRestart) {
+          message += ' Please restart the backend server for SMTP changes to take effect.';
+        }
+        if (response.data.data?.gmailConfigured) {
+          message += ' Gmail "Send As" has been automatically configured.';
+        } else if (!response.data.data?.gmailConfigured && process.env.REACT_APP_API_URL) {
+          message += ' Note: You may need to manually configure Gmail "Send As" in Gmail Settings.';
+        }
+        
+        toast.success(message, { duration: 7000 });
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update HR email');
+    } finally {
+      setSavingHREmail(false);
+    }
+  };
+
   const handleTestHREmail = async () => {
     if (!testEmailAddress || !testEmailAddress.includes('@')) {
       toast.error('Please enter a valid email address');
       return;
     }
 
-    if (!config.hr_email) {
+    const emailToTest = config.hr_email || newHrEmail;
+    if (!emailToTest) {
       toast.error('Please set an HR email first and save it');
       return;
     }
