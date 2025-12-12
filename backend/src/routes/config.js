@@ -1364,4 +1364,99 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Test HR email - Send a test email to verify the HR email is working
+router.post('/test-hr-email', requireAdmin, async (req, res) => {
+  try {
+    const { testEmail } = req.body;
+    
+    if (!testEmail || !testEmail.includes('@')) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid test email address' });
+    }
+
+    // Get current HR email and name from database
+    const configs = await req.prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['hr_email', 'hr_name', 'company_name']
+        }
+      }
+    });
+    const configMap = {};
+    configs.forEach(c => { configMap[c.key] = c.value; });
+    
+    const hrEmail = configMap.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || process.env.SMTP_USER;
+    const hrName = configMap.hr_name || process.env.HR_NAME || 'HR Team';
+    const companyName = configMap.company_name || process.env.COMPANY_NAME || 'Company';
+    
+    if (!hrEmail) {
+      return res.status(400).json({ success: false, message: 'HR email is not configured. Please set it in Settings first.' });
+    }
+
+    // Import email service
+    const emailService = require('../services/emailService');
+    const nodemailer = require('nodemailer');
+    
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    // Format "from" address
+    const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
+    
+    // Send test email
+    await transporter.sendMail({
+      from: fromAddress,
+      to: testEmail,
+      subject: `Test Email from ${companyName} HR System`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4F46E5;">✅ HR Email Test Successful!</h2>
+          <p>This is a test email to verify that your HR email configuration is working correctly.</p>
+          <div style="background-color: #F3F4F6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <p><strong>HR Email:</strong> ${hrEmail}</p>
+            <p><strong>HR Name:</strong> ${hrName}</p>
+            <p><strong>Company:</strong> ${companyName}</p>
+            <p><strong>From Address:</strong> ${fromAddress}</p>
+          </div>
+          <p>If you received this email, it means:</p>
+          <ul>
+            <li>✅ The HR email is correctly configured in the system</li>
+            <li>✅ The SMTP server is working properly</li>
+            <li>✅ All future emails to candidates will be sent from: <strong>${hrEmail}</strong></li>
+          </ul>
+          <p style="color: #6B7280; font-size: 12px; margin-top: 30px;">
+            This is an automated test email from the HR Onboarding System.
+          </p>
+        </div>
+      `
+    });
+
+    logger.info(`✅ Test email sent successfully from ${fromAddress} to ${testEmail}`);
+    
+    res.json({ 
+      success: true, 
+      message: `Test email sent successfully to ${testEmail} from ${fromAddress}`,
+      data: {
+        from: fromAddress,
+        to: testEmail,
+        hrEmail,
+        hrName
+      }
+    });
+  } catch (error) {
+    logger.error('Error sending test email:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to send test email. Please check your SMTP configuration.' 
+    });
+  }
+});
+
 module.exports = router;

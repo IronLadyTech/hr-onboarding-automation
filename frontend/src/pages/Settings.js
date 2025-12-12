@@ -60,6 +60,11 @@ const Settings = () => {
     order: 0
   });
   const [placeholderLoading, setPlaceholderLoading] = useState(false);
+  
+  // HR Email test state
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmailAddress, setTestEmailAddress] = useState('');
+  const [hrEmailChanged, setHrEmailChanged] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -571,18 +576,63 @@ const Settings = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">HR Email</label>
-                <input
-                  type="email"
-                  value={config.hr_email || ''}
-                  onChange={(e) => updateConfig('hr_email', e.target.value)}
-                  className="input"
-                  placeholder="hr@company.com"
-                />
-                <p className="text-xs text-gray-500 mt-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  HR Email
+                  {config.hr_email && (
+                    <span className="ml-2 text-xs text-green-600 font-normal">
+                      ✓ Active: {config.hr_email}
+                    </span>
+                  )}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={config.hr_email || ''}
+                    onChange={(e) => {
+                      updateConfig('hr_email', e.target.value);
+                      setHrEmailChanged(false);
+                    }}
+                    className="input flex-1"
+                    placeholder="hr@company.com"
+                  />
+                </div>
+                {hrEmailChanged && (
+                  <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-green-800">
+                      ✅ <strong>HR Email Updated!</strong> All future emails to candidates will be sent from: <strong>{config.hr_email}</strong>
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
                   💡 This email will be used as the "from" address for all emails and for creating calendar events. 
                   Uses the same Google Cloud API credentials configured in your environment.
                 </p>
+                
+                {/* Test Email Section */}
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-xs font-medium text-blue-900 mb-2">🧪 Test Email Configuration</p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={testEmailAddress}
+                      onChange={(e) => setTestEmailAddress(e.target.value)}
+                      className="input flex-1 text-sm"
+                      placeholder="Enter your email to test"
+                      disabled={testingEmail || !config.hr_email}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestHREmail}
+                      disabled={testingEmail || !config.hr_email || !testEmailAddress}
+                      className="btn btn-secondary text-sm whitespace-nowrap"
+                    >
+                      {testingEmail ? 'Sending...' : 'Send Test Email'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Send a test email to verify that emails will come from <strong>{config.hr_email || 'the configured HR email'}</strong>
+                  </p>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">HR Phone</label>

@@ -209,6 +209,8 @@ export const dashboardApi = {
 // Config APIs
 // Config APIs
 export const configApi = {
+  // Test HR email
+  testHREmail: (testEmail) => api.post('/config/test-hr-email', { testEmail }),
   getWorkflow: () => api.get('/config/workflow'),
   updateWorkflow: (data) => api.put('/config/workflow', data),
   getWhatsAppGroups: () => api.get('/config/whatsapp-groups'),
