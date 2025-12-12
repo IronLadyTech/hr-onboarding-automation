@@ -1238,6 +1238,175 @@ const Settings = () => {
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Field Type *
+                </label>
+                <select
+                  value={customFieldForm.fieldType}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, fieldType: e.target.value, options: e.target.value === 'select' ? customFieldForm.options : [] })}
+                  className="input"
+                  required
+                  disabled={customFieldForm.isStandard}
+                >
+                  <option value="text">Text</option>
+                  <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                  <option value="select">Select (Dropdown)</option>
+                  <option value="textarea">Textarea</option>
+                </select>
+                {customFieldForm.isStandard && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Standard field type cannot be changed.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Placeholder
+                </label>
+                <input
+                  type="text"
+                  value={customFieldForm.placeholder}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, placeholder: e.target.value })}
+                  className="input"
+                  placeholder="Enter placeholder text"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="required"
+                  checked={customFieldForm.required}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, required: e.target.checked })}
+                  className="mr-2"
+                />
+                <label htmlFor="required" className="text-sm font-medium text-gray-700">
+                  Required Field
+                </label>
+              </div>
+
+              {customFieldForm.fieldType === 'select' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Options *
+                  </label>
+                  <div className="space-y-2">
+                    {customFieldForm.options.map((option, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <input
+                          type="text"
+                          value={option.label}
+                          onChange={(e) => {
+                            const newOptions = [...customFieldForm.options];
+                            newOptions[index].label = e.target.value;
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="input flex-1"
+                          placeholder="Display Label"
+                        />
+                        <input
+                          type="text"
+                          value={option.value}
+                          onChange={(e) => {
+                            const newOptions = [...customFieldForm.options];
+                            newOptions[index].value = e.target.value;
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="input flex-1"
+                          placeholder="Value"
+                        />
+                        <button
+                          onClick={() => {
+                            const newOptions = customFieldForm.options.filter((_, i) => i !== index);
+                            setCustomFieldForm({ ...customFieldForm, options: newOptions });
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="text"
+                        value={newOption.label}
+                        onChange={(e) => setNewOption({ ...newOption, label: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Display Label"
+                      />
+                      <input
+                        type="text"
+                        value={newOption.value}
+                        onChange={(e) => setNewOption({ ...newOption, value: e.target.value })}
+                        className="input flex-1"
+                        placeholder="Value"
+                      />
+                      <button
+                        onClick={handleAddOption}
+                        className="btn btn-secondary text-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Display Order
+                </label>
+                <input
+                  type="number"
+                  value={customFieldForm.order}
+                  onChange={(e) => setCustomFieldForm({ ...customFieldForm, order: parseInt(e.target.value) || 0 })}
+                  className="input"
+                  min="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Lower numbers appear first in the form
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCustomFieldModal(false);
+                  setEditingCustomField(null);
+                  setCustomFieldForm({
+                    label: '',
+                    fieldKey: '',
+                    fieldType: 'text',
+                    placeholder: '',
+                    required: false,
+                    validation: null,
+                    options: [],
+                    order: 0
+                  });
+                  setNewOption({ label: '', value: '' });
+                }}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCustomField}
+                disabled={customFieldLoading}
+                className="btn btn-primary"
+              >
+                {customFieldLoading ? 'Saving...' : editingCustomField ? 'Update Field' : 'Create Field'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Save Button (Fixed at bottom) */}
       <div className="fixed bottom-6 right-6">
         <button 
