@@ -468,12 +468,16 @@ router.post('/logo', requireAdmin, uploadLogo.single('logo'), async (req, res) =
     // Build logo URL
     let baseUrl = process.env.API_URL;
     if (!baseUrl) {
-      const protocol = req.protocol || (req.secure ? 'https' : 'http');
+      // Always use HTTPS in production, HTTP only for localhost
       const host = req.get('host') || 'localhost:5000';
+      const protocol = host.includes('localhost') ? 'http' : 'https';
       baseUrl = `${protocol}://${host}`;
     }
-    // Ensure baseUrl doesn't end with /api
+    // Ensure baseUrl uses HTTPS (except localhost) and doesn't end with /api
     baseUrl = baseUrl.replace(/\/api$/, '');
+    if (!baseUrl.includes('localhost') && baseUrl.startsWith('http://')) {
+      baseUrl = baseUrl.replace('http://', 'https://');
+    }
     const logoUrl = `${baseUrl}/api/uploads/${logoPath}`;
 
     logger.info(`✅ Company logo uploaded: ${logoPath}`);
