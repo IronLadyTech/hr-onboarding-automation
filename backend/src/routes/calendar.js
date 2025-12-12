@@ -215,7 +215,9 @@ router.post('/', (req, res, next) => {
       title, 
       description, 
       startTime, 
-      endTime, 
+      endTime,
+      dateTime,  // Alternative: dateTime + duration (from FormData)
+      duration,  // Duration in minutes (from FormData)
       attendees,
       location,
       meetingLink,
@@ -223,6 +225,20 @@ router.post('/', (req, res, next) => {
       eventId,
       existingAttachmentPaths
     } = req.body;
+
+    // If dateTime and duration are provided (from FormData), convert to startTime and endTime
+    // This handles the timezone correctly by treating the datetime-local value as local time
+    if (dateTime && !startTime) {
+      // Parse the datetime-local string as local time
+      // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone info, treated as local)
+      const localDate = new Date(dateTime);
+      startTime = localDate.toISOString(); // Convert to ISO string for storage
+      
+      // Calculate endTime by adding duration
+      const endDate = new Date(localDate);
+      endDate.setMinutes(endDate.getMinutes() + (parseInt(duration) || 60));
+      endTime = endDate.toISOString();
+    }
 
     // Handle attendees if it's a JSON string (from FormData)
     if (typeof attendees === 'string') {
@@ -458,9 +474,12 @@ router.post('/:id/reschedule', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    const newStartTime = new Date(dateTime);
-    const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newEndTime.getMinutes() + (duration || 60));
+    // Parse datetime-local string as local time
+    // When you create a Date from "YYYY-MM-DDTHH:mm", JavaScript treats it as local time
+    const localDate = new Date(dateTime);
+    const newStartTime = localDate;
+    const newEndTime = new Date(localDate);
+    newEndTime.setMinutes(newEndTime.getMinutes() + (parseInt(duration) || 60));
 
     // Update in Google Calendar
     if (existing.googleEventId) {
