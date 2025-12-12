@@ -2092,14 +2092,18 @@ const Settings = () => {
               {/* Step 2: Generate App Password */}
               {wizardStep === 2 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 2: Generate Gmail App Password (Optional)</h3>
+                  <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Optional)</h3>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md mb-4">
+                    <p className="text-sm text-green-800 mb-2">
+                      ✅ <strong>Good News!</strong> You can skip this step!
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      The system will use your existing SMTP credentials (from <code>ironladytech@gmail.com</code>) and automatically use the new HR email as the "from" address. This works without any additional setup!
+                    </p>
+                  </div>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
-                      <strong>Note:</strong> Since you're using <code>ironladytech@gmail.com</code> for OAuth, you typically don't need to update SMTP. 
-                      The system will use the HR email as the "from" address, and Gmail will handle it automatically.
-                    </p>
-                    <p className="text-sm text-gray-700 mb-3">
-                      However, if you want to authenticate SMTP with the new email directly, generate an App Password:
+                      <strong>Optional:</strong> Only if you want to authenticate SMTP with the new email directly (instead of using the existing credentials), you can generate an App Password:
                     </p>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Click the button below to open Gmail App Passwords</li>
@@ -2131,15 +2135,28 @@ const Settings = () => {
                           placeholder="abcd efgh ijkl mnop (remove spaces) - Optional"
                         />
                       </div>
-                      <button
-                        onClick={() => {
-                          setWizardCompleted(prev => ({ ...prev, appPassword: true }));
-                          setWizardStep(3);
-                        }}
-                        className="btn btn-primary w-full"
-                      >
-                        ✓ Continue to Next Step
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setWizardCompleted(prev => ({ ...prev, appPassword: false }));
+                            setSmtpPassword(''); // Clear password if skipping
+                            setWizardStep(3);
+                          }}
+                          className="btn btn-secondary flex-1"
+                        >
+                          Skip (Use Existing SMTP)
+                        </button>
+                        <button
+                          onClick={() => {
+                            setWizardCompleted(prev => ({ ...prev, appPassword: true }));
+                            setWizardStep(3);
+                          }}
+                          className="btn btn-primary flex-1"
+                          disabled={!smtpPassword && wizardCompleted.appPassword === false}
+                        >
+                          Continue with App Password
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

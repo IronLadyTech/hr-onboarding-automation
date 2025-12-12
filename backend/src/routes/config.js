@@ -1539,7 +1539,8 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     const hrName = configMap.hr_name || process.env.HR_NAME || 'HR Team';
     const companyName = configMap.company_name || process.env.COMPANY_NAME || 'Company';
     
-    // Get SMTP credentials from database if available, else use env
+    // Get SMTP credentials from database if available, else use env (existing credentials)
+    // If user didn't provide new SMTP credentials, we'll use the existing ones from .env
     let smtpUser = configMap.smtp_user || process.env.SMTP_USER;
     let smtpPass = configMap.smtp_pass || process.env.SMTP_PASS;
     
@@ -1548,12 +1549,16 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     }
 
     // Validate SMTP configuration
+    // Note: We use existing SMTP credentials from .env if new ones aren't provided
     if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
       return res.status(400).json({ 
         success: false, 
-        message: 'SMTP configuration is missing. Please provide SMTP credentials in Step 2 of the wizard, or ensure SMTP_HOST, SMTP_USER, and SMTP_PASS are set in the backend .env file.' 
+        message: 'SMTP configuration is missing. The system needs SMTP credentials to send emails. Please either:\n1. Provide an App Password in Step 2 of the wizard, OR\n2. Ensure SMTP_HOST, SMTP_USER, and SMTP_PASS are set in the backend .env file.' 
       });
     }
+    
+    logger.info(`📧 Test email - Using SMTP user: ${smtpUser} (${configMap.smtp_user ? 'from database (new)' : 'from env (existing)'})`);
+    logger.info(`📧 Test email - From address will be: ${hrEmail}`);
 
     const nodemailer = require('nodemailer');
     
