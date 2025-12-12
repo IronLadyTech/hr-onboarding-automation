@@ -1975,18 +1975,18 @@ const Settings = () => {
 
               {/* Step 2: Generate App Password */}
               {wizardStep === 2 && (
-                <div className="space-y-4">
-                  <h3 className="text-base sm:text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
-                    <p className="text-sm text-yellow-800 mb-2">
+                <div className="space-y-2.5 sm:space-y-4">
+                  <h3 className="text-sm sm:text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
+                  <div className="p-2.5 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-2.5 sm:mb-4">
+                    <p className="text-xs sm:text-sm text-yellow-800 mb-1 sm:mb-2">
                       ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email. Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
                     </p>
                   </div>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
+                  <div className="p-2.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
                       <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
                     </p>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                    <ol className="list-decimal list-inside space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 mb-2.5 sm:mb-4">
                       <li>Click the button below to open Gmail App Passwords</li>
                       <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
                       <li>Select "Mail" and "Other (Custom name)"</li>
@@ -1995,28 +1995,28 @@ const Settings = () => {
                       <li>Copy the 16-character password (remove spaces)</li>
                       <li>Paste it in the field below (or skip if not needed)</li>
                     </ol>
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       <a
                         href="https://myaccount.google.com/apppasswords"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary block text-center text-sm sm:text-base py-2 sm:py-2.5"
+                        className="btn btn-primary block text-center text-xs sm:text-base py-1.5 sm:py-2.5"
                       >
                         🔗 Open Gmail App Passwords
                       </a>
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
                           Paste App Password Here * (16 characters, remove spaces)
                         </label>
                         <input
                           type="password"
                           value={smtpPassword}
                           onChange={(e) => setSmtpPassword(e.target.value)}
-                          className="input w-full text-sm sm:text-base"
+                          className="input w-full text-xs sm:text-base py-1.5 sm:py-2"
                           placeholder="abcdefghijklmnop (16 characters, no spaces)"
                           required
                         />
-                        <p className="text-[10px] sm:text-xs text-gray-600 mt-1">
+                        <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1">
                           This App Password will be used to authenticate SMTP for <strong>{newHrEmail || 'your new HR email'}</strong>
                         </p>
                       </div>
@@ -2029,7 +2029,7 @@ const Settings = () => {
                           setWizardCompleted(prev => ({ ...prev, appPassword: true }));
                           setWizardStep(3);
                         }}
-                        className="btn btn-primary w-full text-sm sm:text-base py-2 sm:py-2.5"
+                        className="btn btn-primary w-full text-xs sm:text-base py-1.5 sm:py-2.5"
                         disabled={!smtpPassword || smtpPassword.length < 16}
                       >
                         ✓ Continue with App Password
