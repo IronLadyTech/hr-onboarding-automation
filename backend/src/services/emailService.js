@@ -3,7 +3,47 @@ const path = require('path');
 const fs = require('fs');
 const logger = require('../utils/logger');
 
-// Create transporter
+// Helper to create transporter dynamically (uses database credentials if available, falls back to env)
+const createTransporter = async (prisma = null) => {
+  let smtpUser = process.env.SMTP_USER;
+  let smtpPass = process.env.SMTP_PASS;
+  
+  // If prisma is provided, try to get SMTP credentials from database (dynamic)
+  if (prisma) {
+    try {
+      const smtpConfigs = await prisma.workflowConfig.findMany({
+        where: {
+          key: {
+            in: ['smtp_user', 'smtp_pass']
+          }
+        }
+      });
+      const smtpConfigMap = {};
+      smtpConfigs.forEach(c => { smtpConfigMap[c.key] = c.value; });
+      
+      if (smtpConfigMap.smtp_user) {
+        smtpUser = smtpConfigMap.smtp_user;
+      }
+      if (smtpConfigMap.smtp_pass) {
+        smtpPass = smtpConfigMap.smtp_pass;
+      }
+    } catch (error) {
+      logger.warn('Could not fetch SMTP credentials from database, using env vars:', error.message);
+    }
+  }
+  
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    }
+  });
+};
+
+// Create default transporter (for backward compatibility and scheduler)
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT),
@@ -340,11 +380,38 @@ const addTracking = (body, trackingId, backendUrl) => {
 // Send email function
 const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
   try {
+    // Get SMTP credentials (from database if available, else from env)
+    let smtpUser = process.env.SMTP_USER;
+    let smtpPass = process.env.SMTP_PASS;
+    
+    if (prisma) {
+      try {
+        const smtpConfigs = await prisma.workflowConfig.findMany({
+          where: {
+            key: {
+              in: ['smtp_user', 'smtp_pass']
+            }
+          }
+        });
+        const smtpConfigMap = {};
+        smtpConfigs.forEach(c => { smtpConfigMap[c.key] = c.value; });
+        
+        if (smtpConfigMap.smtp_user) {
+          smtpUser = smtpConfigMap.smtp_user;
+        }
+        if (smtpConfigMap.smtp_pass) {
+          smtpPass = smtpConfigMap.smtp_pass;
+        }
+      } catch (error) {
+        logger.warn('Could not fetch SMTP credentials from database, using env vars');
+      }
+    }
+    
     // Validate SMTP configuration
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      const errorMsg = 'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file.';
+    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
+      const errorMsg = 'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file or update HR email with SMTP credentials.';
       logger.error(`❌ ${errorMsg}`);
-      logger.error(`Current SMTP config - Host: ${process.env.SMTP_HOST || 'NOT SET'}, User: ${process.env.SMTP_USER ? 'SET' : 'NOT SET'}, Pass: ${process.env.SMTP_PASS ? 'SET' : 'NOT SET'}`);
+      logger.error(`Current SMTP config - Host: ${process.env.SMTP_HOST || 'NOT SET'}, User: ${smtpUser ? 'SET' : 'NOT SET'}, Pass: ${smtpPass ? 'SET' : 'NOT SET'}`);
       
       // Update email record with error
       await prisma.email.update({
@@ -358,16 +425,20 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
       throw new Error(errorMsg);
     }
 
+    // Create dynamic transporter with current credentials
+    const dynamicTransporter = await createTransporter(prisma);
+
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
     
     // Get HR email from database (WorkflowConfig) - ALWAYS fetch fresh from database
     const companyConfig = await getCompanyConfig(prisma);
-    const hrEmail = companyConfig.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || process.env.SMTP_USER;
+    const hrEmail = companyConfig.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || smtpUser;
     const hrName = companyConfig.hr_name || process.env.HR_NAME || 'HR Team';
     
     // Log what we're using for debugging
     logger.info(`📧 HR Email Configuration - Database hr_email: ${companyConfig.hr_email || 'NOT SET'}, Using: ${hrEmail}`);
     logger.info(`📧 HR Name Configuration - Database hr_name: ${companyConfig.hr_name || 'NOT SET'}, Using: ${hrName}`);
+    logger.info(`📧 SMTP Auth User: ${smtpUser} (${smtpUser === process.env.SMTP_USER ? 'from env' : 'from database'})`);
     
     // Format "from" address: "HR Team <hr@company.com>" or just email
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
@@ -386,10 +457,9 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
 
     logger.info(`📧 Attempting to send email: ${emailRecord.type} to ${candidate.email}`);
     logger.info(`📧 FROM ADDRESS: ${mailOptions.from}`);
-    logger.info(`📧 SMTP AUTH USER: ${process.env.SMTP_USER}`);
     logger.debug(`Email options:`, { from: mailOptions.from, to: mailOptions.to, subject: mailOptions.subject });
 
-    await transporter.sendMail(mailOptions);
+    await dynamicTransporter.sendMail(mailOptions);
 
     // Update email record
     await prisma.email.update({

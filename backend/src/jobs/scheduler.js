@@ -644,22 +644,37 @@ const scheduleSalesInduction = async (candidateId, dateTime) => {
 // ============================================================
 const sendPendingEmails = async () => {
   try {
-    // Validate SMTP configuration
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      logger.error('SMTP configuration is missing. Cannot send pending emails. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file.');
-      return;
-    }
-
-    // Get latest HR email from database (always use current HR email, not stored fromEmail)
+    // Get latest HR email and SMTP credentials from database (always use current, not stored)
     const config = await getConfig();
     const hrEmail = config.hr_email || process.env.HR_EMAIL || process.env.EMAIL_FROM || process.env.SMTP_USER;
     const hrName = config.hr_name || process.env.HR_NAME || 'HR Team';
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
+    
+    // Get SMTP credentials from database if available, else use env
+    let smtpUser = config.smtp_user || process.env.SMTP_USER;
+    let smtpPass = config.smtp_pass || process.env.SMTP_PASS;
+
+    // Validate SMTP configuration
+    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
+      logger.error('SMTP configuration is missing. Cannot send pending emails. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file or update HR email with SMTP credentials.');
+      return;
+    }
+
+    // Create dynamic transporter with current credentials
+    const dynamicTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: smtpUser,
+        pass: smtpPass
+      }
+    });
 
     // Log what we're using for debugging
     logger.info(`📧 Scheduler HR Email Configuration - Database hr_email: ${config.hr_email || 'NOT SET'}, Using: ${hrEmail}`);
     logger.info(`📧 Scheduler FROM ADDRESS: ${fromAddress}`);
-    logger.info(`📧 Scheduler SMTP AUTH USER: ${process.env.SMTP_USER}`);
+    logger.info(`📧 Scheduler SMTP AUTH USER: ${smtpUser} (${smtpUser === process.env.SMTP_USER ? 'from env' : 'from database'})`);
 
     const emails = await prisma.email.findMany({
       where: { status: 'PENDING', scheduledFor: { lte: new Date() } },
@@ -678,7 +693,7 @@ const sendPendingEmails = async () => {
       try {
         logger.info(`📧 Attempting to send pending email: ${email.type} to ${email.toEmail} from ${fromAddress}`);
         
-        await transporter.sendMail({
+        await dynamicTransporter.sendMail({
           from: fromAddress, // Always use current HR email from database
           to: email.toEmail,
           subject: email.subject,

@@ -1405,40 +1405,27 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
 
     logger.info(`✅ HR email updated from ${oldHrEmail || 'none'} to ${hrEmail}`);
 
-    // If user wants to update SMTP_USER, we need to update .env file
-    // Note: This requires server restart to take effect
+    // Store SMTP credentials in database (dynamic, no restart needed)
     let smtpUpdated = false;
     if (updateSmtpUser && smtpPassword) {
       try {
-        const fs = require('fs');
-        const path = require('path');
-        const envPath = path.join(__dirname, '../../.env');
+        // Store SMTP credentials in WorkflowConfig (dynamic, no restart needed)
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'smtp_user' },
+          update: { value: hrEmail },
+          create: { key: 'smtp_user', value: hrEmail }
+        });
         
-        if (fs.existsSync(envPath)) {
-          let envContent = fs.readFileSync(envPath, 'utf8');
-          
-          // Update SMTP_USER
-          if (envContent.includes('SMTP_USER=')) {
-            envContent = envContent.replace(/SMTP_USER=.*/g, `SMTP_USER=${hrEmail}`);
-          } else {
-            envContent += `\nSMTP_USER=${hrEmail}`;
-          }
-          
-          // Update SMTP_PASS
-          if (envContent.includes('SMTP_PASS=')) {
-            envContent = envContent.replace(/SMTP_PASS=.*/g, `SMTP_PASS=${smtpPassword}`);
-          } else {
-            envContent += `\nSMTP_PASS=${smtpPassword}`;
-          }
-          
-          fs.writeFileSync(envPath, envContent);
-          smtpUpdated = true;
-          logger.info(`✅ SMTP_USER updated to ${hrEmail} in .env file`);
-        } else {
-          logger.warn('⚠️ .env file not found, cannot update SMTP_USER');
-        }
-      } catch (envError) {
-        logger.error('Error updating .env file:', envError);
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'smtp_pass' },
+          update: { value: smtpPassword },
+          create: { key: 'smtp_pass', value: smtpPassword }
+        });
+        
+        smtpUpdated = true;
+        logger.info(`✅ SMTP credentials stored in database for ${hrEmail} (no restart needed)`);
+      } catch (smtpError) {
+        logger.error('Error storing SMTP credentials:', smtpError);
         // Don't fail the request, just log the error
       }
     }

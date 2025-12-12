@@ -2058,8 +2058,10 @@ const Settings = () => {
                       To use Google OAuth features (Gmail API, Calendar API), you need to add the new email as a test user.
                     </p>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
-                      <li>Click the button below to open Google Cloud Console</li>
-                      <li>Click "Add users" button</li>
+                      <li>Sign in to Google Cloud Console with <strong>ironladytech@gmail.com</strong></li>
+                      <li>Click the button below to open OAuth consent screen</li>
+                      <li>Go to <strong>"Audience"</strong> section (or "Test users" tab)</li>
+                      <li>Click <strong>"Add users"</strong> button</li>
                       <li>Add: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
                       <li>Click "Add"</li>
                       <li>Come back here and mark as completed</li>
@@ -2071,7 +2073,7 @@ const Settings = () => {
                         rel="noopener noreferrer"
                         className="btn btn-primary"
                       >
-                        🔗 Open Google Cloud Console
+                        🔗 Open Google Cloud Console (Sign in as ironladytech@gmail.com)
                       </a>
                       <button
                         onClick={() => {
@@ -2093,11 +2095,11 @@ const Settings = () => {
                   <h3 className="text-lg font-semibold">Step 2: Generate Gmail App Password (Optional)</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
-                      <strong>Note:</strong> Since you're using <code>ironladytech@gmail.com</code> for OAuth, you may not need to update SMTP. 
-                      The system will use Gmail "Send As" to send from the new HR email.
+                      <strong>Note:</strong> Since you're using <code>ironladytech@gmail.com</code> for OAuth, you typically don't need to update SMTP. 
+                      The system will use the HR email as the "from" address, and Gmail will handle it automatically.
                     </p>
                     <p className="text-sm text-gray-700 mb-3">
-                      However, if you want to update SMTP authentication, generate an App Password for the new email:
+                      However, if you want to authenticate SMTP with the new email directly, generate an App Password:
                     </p>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Click the button below to open Gmail App Passwords</li>
@@ -2270,56 +2272,33 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 5: Gmail Send As */}
+              {/* Step 5: Gmail Send As - Optional */}
               {wizardStep === 5 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 5: Gmail "Send As" Configuration</h3>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    {wizardCompleted.gmailConfigured ? (
-                      <>
-                        <p className="text-sm text-green-800 mb-3">
-                          ✅ {wizardCompleted.gmailConfigMessage || 'Gmail "Send As" configured automatically via Gmail API!'}
-                        </p>
-                        <p className="text-xs text-gray-700 mb-3">
-                          The system has configured <code>ironladytech@gmail.com</code> to send emails as <strong>{newHrEmail}</strong>
-                        </p>
-                        <button
-                          onClick={() => setWizardStep(6)}
-                          className="btn btn-primary w-full"
-                        >
-                          Continue to Test
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-gray-700 mb-3">
-                          Gmail "Send As" was not configured automatically. You need to configure it manually:
-                        </p>
-                        <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
-                          <li>Go to Gmail (sign in as <code>ironladytech@gmail.com</code>)</li>
-                          <li>Go to Settings → Accounts and Import</li>
-                          <li>Under "Send mail as", click "Add another email address"</li>
-                          <li>Add: <strong>{newHrEmail}</strong></li>
-                          <li>Verify the email</li>
-                        </ol>
-                        <div className="flex gap-2">
-                          <a
-                            href="https://mail.google.com/mail/u/0/#settings/accounts"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-primary flex-1"
-                          >
-                            🔗 Open Gmail Settings
-                          </a>
-                          <button
-                            onClick={() => setWizardStep(6)}
-                            className="btn btn-secondary"
-                          >
-                            Skip & Continue
-                          </button>
-                        </div>
-                      </>
+                  <h3 className="text-lg font-semibold">Step 5: Gmail "Send As" Configuration (Optional)</h3>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      <strong>Good News!</strong> You don't need to configure "Send As" manually. The system will automatically use the HR email as the "from" address.
+                    </p>
+                    <p className="text-sm text-gray-700 mb-3">
+                      Since you're using <code>ironladytech@gmail.com</code> for OAuth, the system will:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-sm text-gray-700 mb-4">
+                      <li>Use <strong>{newHrEmail || 'new HR email'}</strong> as the "from" address in all emails</li>
+                      <li>Authenticate using <code>ironladytech@gmail.com</code> OAuth credentials</li>
+                      <li>Gmail will handle the email sending automatically</li>
+                    </ul>
+                    {wizardCompleted.gmailConfigured && (
+                      <p className="text-sm text-green-800 mb-3">
+                        ✅ {wizardCompleted.gmailConfigMessage || 'Gmail "Send As" was automatically configured via Gmail API!'}
+                      </p>
                     )}
+                    <button
+                      onClick={() => setWizardStep(6)}
+                      className="btn btn-primary w-full"
+                    >
+                      Continue to Test
+                    </button>
                   </div>
                 </div>
               )}
