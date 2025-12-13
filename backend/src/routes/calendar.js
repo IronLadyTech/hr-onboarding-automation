@@ -230,9 +230,17 @@ router.post('/', (req, res, next) => {
     // This handles the timezone correctly by treating the datetime-local value as local time
     if (dateTime && !startTime) {
       // Parse the datetime-local string as local time
-      // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone info, treated as local)
-      const localDate = new Date(dateTime);
-      startTime = localDate.toISOString(); // Convert to ISO string for storage
+      // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone, treated as local time)
+      // Split the dateTime string to get date and time components
+      const [datePart, timePart] = dateTime.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [hours, minutes] = timePart.split(':').map(Number);
+      
+      // Create a Date object in local timezone (this represents the exact time the user selected)
+      const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+      
+      // Convert to ISO string for storage (this will be in UTC, but represents the correct local time)
+      startTime = localDate.toISOString();
       
       // Calculate endTime by adding duration
       const endDate = new Date(localDate);
