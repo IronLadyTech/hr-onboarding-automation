@@ -44,8 +44,18 @@ const getRelativeFilePath = (filePath) => {
 };
 
 // Get system settings (PUBLIC - no auth required for login page and theme)
+// IMPORTANT: This route MUST be defined BEFORE router.use(authenticateToken) below
 router.get('/settings', async (req, res) => {
   try {
+    // Check if prisma is available
+    if (!req.prisma) {
+      logger.error('Prisma not available in /settings route');
+      return res.status(500).json({ 
+        success: false, 
+        message: 'Database connection not available' 
+      });
+    }
+
     // Get company config from database
     const configs = await req.prisma.workflowConfig.findMany({
       where: {
@@ -53,9 +63,15 @@ router.get('/settings', async (req, res) => {
           in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location', 'company_logo_path', 'ui_primary_color', 'ui_secondary_color', 'ui_accent_color']
         }
       }
+    }).catch(err => {
+      logger.error('Database error in /settings:', err);
+      return []; // Return empty array on error
     });
+    
     const configMap = {};
-    configs.forEach(c => { configMap[c.key] = c.value; });
+    if (configs && Array.isArray(configs)) {
+      configs.forEach(c => { configMap[c.key] = c.value; });
+    }
     
     // Build logo URL if logo path exists
     let logoUrl = null;
@@ -102,7 +118,18 @@ router.get('/settings', async (req, res) => {
     res.json({ success: true, data: settings });
   } catch (error) {
     logger.error('Error fetching settings:', error);
-    res.status(500).json({ success: false, message: error.message });
+    // Return default settings on error instead of 500
+    res.json({ 
+      success: true, 
+      data: {
+        companyName: process.env.COMPANY_NAME || 'Company',
+        hrEmail: process.env.HR_EMAIL || 'hr@company.com',
+        hrName: process.env.HR_NAME || 'HR Team',
+        uiPrimaryColor: '#4F46E5',
+        uiSecondaryColor: '#7C3AED',
+        companyLogoUrl: null
+      }
+    });
   }
 });
 
