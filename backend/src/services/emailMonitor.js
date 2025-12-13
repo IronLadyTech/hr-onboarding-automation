@@ -258,10 +258,10 @@ const processMessage = async (messageId) => {
         logger.info(`Comparing: Reply="${cleanReplySubject}" vs Original="${cleanOfferSubject}"`);
         
         // Check if reply subject matches or contains the original email subject
-        // Also check if original subject is contained in reply (common in email threads)
+        // STRICT: Only accept if the reply subject actually matches the original offer email subject
+        // This ensures we only capture replies to the actual offer letter email, not other emails
         if (cleanReplySubject.includes(cleanOfferSubject) || 
-            cleanOfferSubject.includes(cleanReplySubject) ||
-            subjectLower.includes('re:') && (cleanReplySubject.length > 0 && cleanOfferSubject.length > 0)) {
+            cleanOfferSubject.includes(cleanReplySubject)) {
           isReplyToOfferEmail = true;
           originalEmailType = offerEmail.type;
           logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
