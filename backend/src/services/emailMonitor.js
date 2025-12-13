@@ -228,37 +228,42 @@ const processMessage = async (messageId) => {
     const subjectLower = subject.toLowerCase();
     
     // Find the most recent OFFER_LETTER or OFFER_REMINDER email sent to this candidate
+    // Check both SENT and PENDING status in case email was queued but not yet marked as SENT
     const offerEmails = await prisma.email.findMany({
       where: {
         candidateId: candidate.id,
         type: { in: ['OFFER_LETTER', 'OFFER_REMINDER'] },
-        status: 'SENT'
+        status: { in: ['SENT', 'PENDING'] } // Include PENDING in case email was just sent
       },
-      orderBy: { sentAt: 'desc' },
+      orderBy: { createdAt: 'desc' }, // Use createdAt instead of sentAt in case sentAt is null
       take: 10 // Check last 10 offer-related emails to find the match
     });
     
-    logger.info(`Found ${offerEmails.length} offer-related email(s) for candidate ${candidate.email}`);
+    logger.info(`Found ${offerEmails.length} offer-related email(s) for candidate ${candidate.email} (ID: ${candidate.id})`);
     logger.info(`Email headers - In-Reply-To: ${inReplyTo || 'none'}, References: ${references || 'none'}, Subject: "${subject}"`);
     
-    // Method 1: Check In-Reply-To and References headers to see if this is a reply to an offer email
-    // This is the most reliable method - email clients set these headers when replying
-    if (inReplyTo || references) {
-      for (const offerEmail of offerEmails) {
-        // Check if the offer email's tracking ID or message ID matches the In-Reply-To or References
-        // Note: We need to check if the original email's Message-ID is in the reply's In-Reply-To or References
-        // Since we store trackingId in the database, we can use that to match
-        // The trackingId is used in email headers, so we can check if it appears in In-Reply-To or References
+    // If no offer emails found in database, but candidate has offerSentAt, still try to match by subject
+    // This handles cases where emails might not be saved to database yet or were sent manually
+    if (offerEmails.length === 0) {
+      logger.warn(`⚠️ No offer emails found in database for candidate ${candidate.email}, but offerSentAt is ${candidate.offerSentAt}. Will try subject-based matching.`);
+      
+      // Check if subject contains offer-related keywords - if yes, accept it as a reply
+      const subjectLower = subject.toLowerCase();
+      const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'));
+      
+      if (hasOfferKeywords && (inReplyTo || references)) {
+        // If subject has offer keywords and has In-Reply-To/References, it's likely a reply to an offer email
+        isReplyToOfferEmail = true;
+        originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER
+        logger.info(`✅ Detected as offer email reply - subject contains offer keywords and has In-Reply-To/References. Subject: "${subject}"`);
+      }
+    } else {
+      // Method 1: Check In-Reply-To and References headers to see if this is a reply to an offer email
+      // This is the most reliable method - email clients set these headers when replying
+      if (inReplyTo || references) {
+        logger.info(`In-Reply-To/References found, checking subject matching with ${offerEmails.length} offer email(s)...`);
         
-        // Extract message IDs from In-Reply-To and References (they're usually in angle brackets)
-        const inReplyToIds = inReplyTo ? inReplyTo.match(/<[^>]+>/g) || [] : [];
-        const referencesIds = references ? references.match(/<[^>]+>/g) || [] : [];
-        const allMessageIds = [...inReplyToIds, ...referencesIds].map(id => id.toLowerCase());
-        
-        // Check if any of the message IDs contain the tracking ID or if we can match by subject
-        // For now, we'll rely on subject matching combined with In-Reply-To/References presence
-        // The presence of In-Reply-To or References indicates this is a reply
-        if (inReplyTo || references) {
+        for (const offerEmail of offerEmails) {
           // If In-Reply-To or References exist, this is definitely a reply
           // Now check if the subject matches the offer email subject
           const offerSubjectLower = offerEmail.subject.toLowerCase();
@@ -279,33 +284,33 @@ const processMessage = async (messageId) => {
           }
         }
       }
-    }
-    
-    // Method 2: If In-Reply-To/References not found, check subject matching (fallback)
-    // This handles cases where email clients don't set proper reply headers
-    if (!isReplyToOfferEmail) {
-      logger.info(`No In-Reply-To/References found, checking subject matching...`);
       
-      for (const offerEmail of offerEmails) {
-        const offerSubjectLower = offerEmail.subject.toLowerCase();
-        // Remove "Re:" and "Fwd:" prefixes for comparison
-        const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
-        const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
+      // Method 2: If In-Reply-To/References not found or no match, check subject matching (fallback)
+      // This handles cases where email clients don't set proper reply headers
+      if (!isReplyToOfferEmail) {
+        logger.info(`No In-Reply-To/References match found, checking subject matching...`);
         
-        logger.info(`Comparing subjects - Original: "${cleanOfferSubject}", Reply: "${cleanReplySubject}"`);
-        
-        // Check if reply subject matches or contains the original email subject
-        // Must contain key offer-related words to ensure it's about the offer
-        const hasOfferKeywords = cleanReplySubject.includes('offer') || cleanReplySubject.includes('letter') || cleanReplySubject.includes('signed');
-        const originalHasOfferKeywords = cleanOfferSubject.includes('offer') || cleanOfferSubject.includes('letter');
-        
-        if ((cleanReplySubject.includes(cleanOfferSubject) || 
-            cleanOfferSubject.includes(cleanReplySubject)) &&
-            hasOfferKeywords && originalHasOfferKeywords) {
-          isReplyToOfferEmail = true;
-          originalEmailType = offerEmail.type;
-          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
-          break;
+        for (const offerEmail of offerEmails) {
+          const offerSubjectLower = offerEmail.subject.toLowerCase();
+          // Remove "Re:" and "Fwd:" prefixes for comparison
+          const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
+          const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
+          
+          logger.info(`Comparing subjects - Original: "${cleanOfferSubject}", Reply: "${cleanReplySubject}"`);
+          
+          // Check if reply subject matches or contains the original email subject
+          // Must contain key offer-related words to ensure it's about the offer
+          const hasOfferKeywords = cleanReplySubject.includes('offer') || cleanReplySubject.includes('letter') || cleanReplySubject.includes('signed');
+          const originalHasOfferKeywords = cleanOfferSubject.includes('offer') || cleanOfferSubject.includes('letter');
+          
+          if ((cleanReplySubject.includes(cleanOfferSubject) || 
+              cleanOfferSubject.includes(cleanReplySubject)) &&
+              hasOfferKeywords && originalHasOfferKeywords) {
+            isReplyToOfferEmail = true;
+            originalEmailType = offerEmail.type;
+            logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
+            break;
+          }
         }
       }
     }
