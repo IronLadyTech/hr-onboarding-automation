@@ -51,7 +51,7 @@ const Layout = () => {
   ];
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
+    <div className="min-h-screen bg-gray-100 lg:flex">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -158,7 +158,7 @@ const Layout = () => {
       </aside>
 
       {/* Main content - Full width on mobile, normal on desktop */}
-      <main className="flex-1 overflow-auto w-full lg:flex-1">
+      <main className="w-full lg:flex-1 overflow-auto min-h-screen">
         {/* Top bar */}
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center space-x-3">

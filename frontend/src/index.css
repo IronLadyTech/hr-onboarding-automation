@@ -14,6 +14,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #f3f4f6;
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  margin: 0;
+  padding: 0;
+}
+
+/* Ensure root container doesn't cause layout issues */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar */
