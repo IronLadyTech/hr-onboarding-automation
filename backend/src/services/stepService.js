@@ -181,6 +181,15 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
       };
     }
 
+    // Check if step should be skipped (e.g., offer reminder if signed offer already exists)
+    // For step 2 (OFFER_REMINDER), skip if candidate already has signed offer letter
+    if (stepNumber === 2 || (stepTemplate && stepTemplate.type === 'OFFER_REMINDER')) {
+      if (candidate.signedOfferPath || candidate.offerSignedAt) {
+        logger.info(`⏭️ Skipping offer reminder (step ${stepNumber}) for ${candidate.email} - signed offer letter already exists`);
+        return { success: true, skipped: true, reason: 'Signed offer letter already exists' };
+      }
+    }
+
     // Send email if needed
     if (stepConfig.sendEmail && stepConfig.emailType) {
       try {
