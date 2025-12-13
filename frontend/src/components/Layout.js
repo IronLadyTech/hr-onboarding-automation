@@ -51,7 +51,7 @@ const Layout = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-gray-100 lg:flex">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
