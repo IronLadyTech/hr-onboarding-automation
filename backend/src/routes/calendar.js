@@ -496,12 +496,23 @@ router.post('/:id/reschedule', async (req, res) => {
     }
 
     // Parse datetime-local string as local time
-    // When you create a Date from "YYYY-MM-DDTHH:mm", JavaScript treats it as local time
-    const localDate = new Date(dateTime);
-    const newStartTime = localDate.toISOString(); // Convert to ISO string for storage (same as create endpoint)
-    const newEndTime = new Date(localDate);
-    newEndTime.setMinutes(newEndTime.getMinutes() + (parseInt(duration) || 60));
-    const newEndTimeISO = newEndTime.toISOString(); // Convert to ISO string for storage
+    // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone, treated as local time)
+    // We need to parse it correctly to avoid timezone conversion issues
+    // Split the dateTime string to get date and time components
+    const [datePart, timePart] = dateTime.split('T');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes] = timePart.split(':').map(Number);
+    
+    // Create a Date object in local timezone (this represents the exact time the user selected)
+    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    
+    // Convert to ISO string for storage (this will be in UTC, but represents the correct local time)
+    const newStartTime = localDate.toISOString();
+    
+    // Calculate end time
+    const endDate = new Date(localDate);
+    endDate.setMinutes(endDate.getMinutes() + (parseInt(duration) || 60));
+    const newEndTimeISO = endDate.toISOString();
 
     // Update in Google Calendar
     if (existing.googleEventId) {
