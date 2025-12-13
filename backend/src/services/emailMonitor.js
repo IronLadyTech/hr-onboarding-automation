@@ -227,14 +227,8 @@ const processMessage = async (messageId) => {
     
     const subjectLower = subject.toLowerCase();
     
-    // Method 1: Check subject for offer letter keywords (strict - must be related to offer letter)
-    // Only accept if subject contains "offer" AND ("letter" OR "reminder" OR "signed")
-    if (subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'))) {
-      isReplyToOfferEmail = true;
-      logger.info(`✅ Detected as offer email reply based on subject: "${subject}"`);
-    }
-    
-    // Method 2: Find the original OFFER_LETTER or OFFER_REMINDER email and check if this is a reply to it
+    // Method 1: Find the original OFFER_LETTER or OFFER_REMINDER email and check if this is a reply to it
+    // This is the PRIMARY method - we only accept replies that match the actual offer email subject
     if (!isReplyToOfferEmail) {
       // Find the most recent OFFER_LETTER or OFFER_REMINDER email sent to this candidate
       const offerEmails = await prisma.email.findMany({
@@ -269,21 +263,8 @@ const processMessage = async (messageId) => {
         }
       }
       
-      // Method 3: If still not matched, check if email has "Re:" and matches the original offer email subject
-      // This is a fallback for cases where subject doesn't match exactly but is still a reply
-      if (!isReplyToOfferEmail && subjectLower.includes('re:') && candidate.offerSentAt) {
-        // Check if this email came after the offer was sent (within reasonable time)
-        const offerSentTime = new Date(candidate.offerSentAt);
-        const timeDiff = emailDate.getTime() - offerSentTime.getTime();
-        const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-        
-        // Only accept if it's a reply (has "Re:") and came within 30 days of offer being sent
-        // AND the subject contains offer-related keywords
-        if (daysDiff >= 0 && daysDiff <= 30 && (subjectLower.includes('offer') || subjectLower.includes('letter'))) {
-          isReplyToOfferEmail = true;
-          logger.info(`✅ Detected as potential offer reply - has "Re:" prefix and offer keywords, came ${daysDiff.toFixed(1)} days after offer sent`);
-        }
-      }
+      // Method 2: REMOVED - We only accept emails that match the original offer email subject
+      // This ensures we only capture signed offer letters from replies to the actual offer letter email
     }
     
     // If not a reply to Step 1 or Step 2 email, skip processing
