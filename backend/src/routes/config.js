@@ -43,7 +43,70 @@ const getRelativeFilePath = (filePath) => {
   return relativePath.replace(/\\/g, '/'); // Normalize path separators
 };
 
-// Apply authentication to all routes
+// Get system settings (PUBLIC - no auth required for login page and theme)
+router.get('/settings', async (req, res) => {
+  try {
+    // Get company config from database
+    const configs = await req.prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location', 'company_logo_path', 'ui_primary_color', 'ui_secondary_color', 'ui_accent_color']
+        }
+      }
+    });
+    const configMap = {};
+    configs.forEach(c => { configMap[c.key] = c.value; });
+    
+    // Build logo URL if logo path exists
+    let logoUrl = null;
+    if (configMap.company_logo_path) {
+      // Use API_URL from env, or construct from request
+      let baseUrl = process.env.API_URL;
+      if (!baseUrl) {
+        // Always use HTTPS in production, HTTP only for localhost
+        const host = req.get('host') || 'localhost:5000';
+        const protocol = host.includes('localhost') ? 'http' : 'https';
+        baseUrl = `${protocol}://${host}`;
+      }
+      // Ensure baseUrl uses HTTPS (except localhost) and doesn't end with /api
+      baseUrl = baseUrl.replace(/\/api$/, '');
+      if (!baseUrl.includes('localhost') && baseUrl.startsWith('http://')) {
+        baseUrl = baseUrl.replace('http://', 'https://');
+      }
+      logoUrl = `${baseUrl}/api/uploads/${configMap.company_logo_path}`;
+    }
+    
+    const settings = {
+      companyName: configMap.company_name || process.env.COMPANY_NAME || 'Company',
+      hrEmail: configMap.hr_email || process.env.HR_EMAIL || 'hr@company.com',
+      hrName: configMap.hr_name || process.env.HR_NAME || 'HR Team',
+      hrPhone: configMap.hr_phone || process.env.HR_PHONE || '',
+      companyAddress: configMap.company_address || process.env.COMPANY_ADDRESS || '',
+      ceoName: configMap.ceo_name || process.env.CEO_NAME || 'CEO',
+      officeLocation: configMap.office_location || process.env.OFFICE_LOCATION || 'Office Address',
+      officeTimings: configMap.office_timings || process.env.OFFICE_TIMINGS || '9:30 AM - 6:30 PM',
+      companyLogoPath: configMap.company_logo_path || null,
+      companyLogoUrl: logoUrl,
+      uiPrimaryColor: configMap.ui_primary_color || '#4F46E5',
+      uiSecondaryColor: configMap.ui_secondary_color || '#7C3AED',
+      uiAccentColor: configMap.ui_accent_color || null,
+      workingHours: {
+        start: '09:00',
+        end: '18:00'
+      },
+      timezone: process.env.TIMEZONE || 'Asia/Kolkata',
+      automationEnabled: true,
+      emailTrackingEnabled: true
+    };
+
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error('Error fetching settings:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Apply authentication to all other routes
 router.use(authenticateToken);
 
 // Get all workflow configurations
@@ -382,69 +445,6 @@ router.delete('/departments/:name', async (req, res) => {
     });
   } catch (error) {
     logger.error('Error deleting department:', error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
-// Get system settings
-router.get('/settings', async (req, res) => {
-  try {
-    // Get company config from database
-    const configs = await req.prisma.workflowConfig.findMany({
-      where: {
-        key: {
-          in: ['company_name', 'hr_email', 'hr_name', 'hr_phone', 'company_address', 'office_timings', 'ceo_name', 'office_location', 'company_logo_path', 'ui_primary_color', 'ui_secondary_color', 'ui_accent_color']
-        }
-      }
-    });
-    const configMap = {};
-    configs.forEach(c => { configMap[c.key] = c.value; });
-    
-    // Build logo URL if logo path exists
-    let logoUrl = null;
-    if (configMap.company_logo_path) {
-      // Use API_URL from env, or construct from request
-      let baseUrl = process.env.API_URL;
-      if (!baseUrl) {
-        // Always use HTTPS in production, HTTP only for localhost
-        const host = req.get('host') || 'localhost:5000';
-        const protocol = host.includes('localhost') ? 'http' : 'https';
-        baseUrl = `${protocol}://${host}`;
-      }
-      // Ensure baseUrl uses HTTPS (except localhost) and doesn't end with /api
-      baseUrl = baseUrl.replace(/\/api$/, '');
-      if (!baseUrl.includes('localhost') && baseUrl.startsWith('http://')) {
-        baseUrl = baseUrl.replace('http://', 'https://');
-      }
-      logoUrl = `${baseUrl}/api/uploads/${configMap.company_logo_path}`;
-    }
-    
-    const settings = {
-      companyName: configMap.company_name || process.env.COMPANY_NAME || 'Company',
-      hrEmail: configMap.hr_email || process.env.HR_EMAIL || 'hr@company.com',
-      hrName: configMap.hr_name || process.env.HR_NAME || 'HR Team',
-      hrPhone: configMap.hr_phone || process.env.HR_PHONE || '',
-      companyAddress: configMap.company_address || process.env.COMPANY_ADDRESS || '',
-      ceoName: configMap.ceo_name || process.env.CEO_NAME || 'CEO',
-      officeLocation: configMap.office_location || process.env.OFFICE_LOCATION || 'Office Address',
-      officeTimings: configMap.office_timings || process.env.OFFICE_TIMINGS || '9:30 AM - 6:30 PM',
-      companyLogoPath: configMap.company_logo_path || null,
-      companyLogoUrl: logoUrl,
-      uiPrimaryColor: configMap.ui_primary_color || '#4F46E5',
-      uiSecondaryColor: configMap.ui_secondary_color || '#7C3AED',
-      uiAccentColor: configMap.ui_accent_color || null,
-      workingHours: {
-        start: '09:00',
-        end: '18:00'
-      },
-      timezone: process.env.TIMEZONE || 'Asia/Kolkata',
-      automationEnabled: true,
-      emailTrackingEnabled: true
-    };
-
-    res.json({ success: true, data: settings });
-  } catch (error) {
-    logger.error('Error fetching settings:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
