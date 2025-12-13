@@ -130,6 +130,11 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
         stepConfig.sendEmail = true;
         stepConfig.emailType = 'OFFER_LETTER';
       } else if (stepType === 'OFFER_REMINDER') {
+        // Check if candidate already has signed offer letter - if yes, skip sending reminder
+        if (candidate.signedOfferPath || candidate.offerSignedAt) {
+          logger.info(`⏭️ Skipping offer reminder for ${candidate.email} - signed offer letter already exists`);
+          return { success: true, skipped: true, reason: 'Signed offer letter already exists' };
+        }
         stepConfig.field = 'offerReminderSent';
         stepConfig.value = true;
         stepConfig.sendEmail = true;

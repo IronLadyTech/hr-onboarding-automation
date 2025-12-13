@@ -124,6 +124,7 @@ const checkOfferReminders = async () => {
       where: {
         offerSentAt: { lte: cutoffDate },
         offerSignedAt: null,
+        signedOfferPath: null, // Also check that signed offer letter is not uploaded
         offerReminderSent: { not: true },
         status: { in: ['OFFER_SENT', 'OFFER_VIEWED'] }
       }
@@ -834,11 +835,12 @@ const autoCompleteCalendarSteps = async () => {
   try {
     const now = new Date();
     
-    // Find calendar events that have passed their start time and are still SCHEDULED
+    // Find calendar events that have passed their start time and are still SCHEDULED or RESCHEDULED
     // IMPORTANT: Check for already sent emails to prevent duplicates
+    // Include RESCHEDULED status so rescheduled events can also trigger emails
     const pastEvents = await prisma.calendarEvent.findMany({
       where: {
-        status: 'SCHEDULED',
+        status: { in: ['SCHEDULED', 'RESCHEDULED'] },
         startTime: { lte: now }
       },
       include: {
@@ -948,7 +950,7 @@ const autoCompleteCalendarSteps = async () => {
           const updateResult = await prisma.calendarEvent.updateMany({
             where: { 
               id: event.id,
-              status: 'SCHEDULED' // Only update if still SCHEDULED (prevents race condition)
+              status: { in: ['SCHEDULED', 'RESCHEDULED'] } // Include RESCHEDULED status
             },
             data: { status: 'COMPLETED' }
           });

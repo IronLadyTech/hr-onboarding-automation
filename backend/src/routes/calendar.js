@@ -562,7 +562,7 @@ router.post('/:id/reschedule', async (req, res) => {
       data: {
         startTime: new Date(newStartTime), // Convert ISO string to Date for database
         endTime: new Date(newEndTimeISO), // Convert ISO string to Date for database
-        status: 'RESCHEDULED'
+        status: 'SCHEDULED' // Set back to SCHEDULED so auto-complete can trigger email when time passes
       }
     });
 
