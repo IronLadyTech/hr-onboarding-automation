@@ -435,12 +435,18 @@ const processMessage = async (messageId) => {
             });
           }
           
-          // Mark email as read
-          await gmail.users.messages.modify({
-            userId: 'me',
-            id: messageId,
-            requestBody: { removeLabelIds: ['UNREAD'] }
-          });
+          // Mark email as read only after successful processing
+          try {
+            await gmail.users.messages.modify({
+              userId: 'me',
+              id: messageId,
+              requestBody: { removeLabelIds: ['UNREAD'] }
+            });
+            logger.info(`✅ Marked email as read: ${messageId}`);
+          } catch (readError) {
+            logger.warn(`Could not mark email as read: ${readError.message}`);
+            // Don't fail the whole process if marking as read fails
+          }
           
           break; // Only need first valid attachment
         }
