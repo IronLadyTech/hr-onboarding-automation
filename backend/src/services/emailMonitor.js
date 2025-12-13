@@ -227,12 +227,9 @@ const processMessage = async (messageId) => {
     
     const subjectLower = subject.toLowerCase();
     
-    // Method 1: Check subject for offer letter/reminder keywords (more lenient)
-    // Accept if subject contains "offer" OR if it's a reply (has "Re:") from a candidate who was sent an offer
-    if (subjectLower.includes('offer') || 
-        (subjectLower.includes('re:') && candidate.offerSentAt) ||
-        subjectLower.includes('signed') ||
-        subjectLower.includes('accept')) {
+    // Method 1: Check subject for offer letter keywords (strict - must be related to offer letter)
+    // Only accept if subject contains "offer" AND ("letter" OR "reminder" OR "signed")
+    if (subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'))) {
       isReplyToOfferEmail = true;
       logger.info(`✅ Detected as offer email reply based on subject: "${subject}"`);
     }
@@ -272,33 +269,19 @@ const processMessage = async (messageId) => {
         }
       }
       
-      // Method 3: If still not matched, check if email has "Re:" and candidate has been sent an offer
-      // This is a fallback for cases where subject doesn't match exactly
-      if (!isReplyToOfferEmail && candidate.offerSentAt) {
+      // Method 3: If still not matched, check if email has "Re:" and matches the original offer email subject
+      // This is a fallback for cases where subject doesn't match exactly but is still a reply
+      if (!isReplyToOfferEmail && subjectLower.includes('re:') && candidate.offerSentAt) {
         // Check if this email came after the offer was sent (within reasonable time)
         const offerSentTime = new Date(candidate.offerSentAt);
         const timeDiff = emailDate.getTime() - offerSentTime.getTime();
         const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
         
-        // If email came within 30 days of offer being sent and has attachment, likely a reply
-        // Be more lenient: accept any email with attachment from candidate who was sent an offer
-        if (daysDiff >= 0 && daysDiff <= 30) {
+        // Only accept if it's a reply (has "Re:") and came within 30 days of offer being sent
+        // AND the subject contains offer-related keywords
+        if (daysDiff >= 0 && daysDiff <= 30 && (subjectLower.includes('offer') || subjectLower.includes('letter'))) {
           isReplyToOfferEmail = true;
-          logger.info(`✅ Detected as potential offer reply - came ${daysDiff.toFixed(1)} days after offer sent (has attachment)`);
-        }
-      }
-      
-      // Method 4: Last resort - if candidate was sent an offer and email has attachment, accept it
-      // This catches cases where subject doesn't match at all but it's likely a signed offer
-      if (!isReplyToOfferEmail && candidate.offerSentAt) {
-        const offerSentTime = new Date(candidate.offerSentAt);
-        const timeDiff = emailDate.getTime() - offerSentTime.getTime();
-        const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
-        
-        // Accept any email with attachment from candidate within 30 days of offer being sent
-        if (daysDiff >= 0 && daysDiff <= 30) {
-          isReplyToOfferEmail = true;
-          logger.info(`✅ Detected as potential offer reply (last resort) - email with attachment from candidate sent offer ${daysDiff.toFixed(1)} days ago`);
+          logger.info(`✅ Detected as potential offer reply - has "Re:" prefix and offer keywords, came ${daysDiff.toFixed(1)} days after offer sent`);
         }
       }
     }
