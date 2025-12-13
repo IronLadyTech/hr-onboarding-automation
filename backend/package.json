@@ -10,7 +10,9 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "node prisma/seed.js",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "check-users": "node scripts/check-users.js",
+    "reset-admin": "node scripts/reset-admin-password.js"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

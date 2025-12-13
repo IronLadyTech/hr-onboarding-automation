@@ -164,8 +164,14 @@ npm install
 # Push database schema
 npx prisma db push
 
-# Seed database (creates default users)
+# Check if users exist
+npm run check-users
+
+# If no users exist, seed database
 npm run db:seed
+
+# OR reset admin password (creates user if doesn't exist)
+npm run reset-admin
 
 # Restart server
 pm2 restart all
@@ -174,4 +180,23 @@ pm2 restart all
 After this, try logging in with:
 - Email: `admin@ironlady.com`
 - Password: `admin123`
+
+## Quick Diagnostic Commands
+
+**Check if users exist:**
+```bash
+cd ~/hr-onboarding-automation/backend
+npm run check-users
+```
+
+**Reset admin password (or create if doesn't exist):**
+```bash
+cd ~/hr-onboarding-automation/backend
+npm run reset-admin
+```
+
+This will:
+- Create admin user if it doesn't exist
+- Reset password to `admin123`
+- Ensure user is active
 
