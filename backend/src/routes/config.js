@@ -336,19 +336,32 @@ router.delete('/training-plans/:id', requireAdmin, async (req, res) => {
 // Get all departments
 router.get('/departments', async (req, res) => {
   try {
-    // Get unique departments from candidates
-    const departments = await req.prisma.candidate.findMany({
+    // Get departments from WorkflowConfig (stored as JSON array)
+    let storedDepartments = [];
+    try {
+      const config = await req.prisma.workflowConfig.findUnique({
+        where: { key: 'departments' }
+      });
+      if (config && config.value) {
+        storedDepartments = JSON.parse(config.value);
+      }
+    } catch (error) {
+      logger.warn('Could not parse stored departments:', error);
+    }
+
+    // Get unique departments from candidates (for backward compatibility)
+    const candidateDepartments = await req.prisma.candidate.findMany({
       select: { department: true },
       distinct: ['department']
     });
 
-    const departmentList = departments
+    const candidateDepartmentList = candidateDepartments
       .map(d => d.department)
       .filter(d => d && d.trim() !== '');
 
-    // Add default departments if not present
+    // Merge stored departments with candidate departments and defaults
     const defaults = ['Engineering', 'Sales', 'Marketing', 'Operations', 'HR', 'Finance'];
-    const allDepartments = [...new Set([...departmentList, ...defaults])].sort();
+    const allDepartments = [...new Set([...storedDepartments, ...candidateDepartmentList, ...defaults])].sort();
 
     res.json({ success: true, data: allDepartments });
   } catch (error) {
@@ -368,17 +381,45 @@ router.post('/departments', async (req, res) => {
 
     const departmentName = name.trim();
 
-    // Check if department already exists (by checking if any candidate uses it)
-    const existing = await req.prisma.candidate.findFirst({
-      where: { department: departmentName }
-    });
+    // Get existing departments from WorkflowConfig
+    let existingDepartments = [];
+    try {
+      const config = await req.prisma.workflowConfig.findUnique({
+        where: { key: 'departments' }
+      });
+      if (config && config.value) {
+        existingDepartments = JSON.parse(config.value);
+      }
+    } catch (error) {
+      logger.warn('Could not parse stored departments:', error);
+    }
 
-    if (existing) {
+    // Check if department already exists
+    if (existingDepartments.includes(departmentName)) {
       return res.status(400).json({ success: false, message: 'Department already exists' });
     }
 
-    // Since departments are stored as strings in candidates, we just return success
-    // The department will be available when a candidate is created with it
+    // Also check if any candidate uses it (for backward compatibility)
+    const candidateWithDept = await req.prisma.candidate.findFirst({
+      where: { department: departmentName }
+    });
+
+    if (candidateWithDept) {
+      return res.status(400).json({ success: false, message: 'Department already exists' });
+    }
+
+    // Add new department to the list
+    existingDepartments.push(departmentName);
+    existingDepartments.sort(); // Keep sorted
+
+    // Store in WorkflowConfig
+    await req.prisma.workflowConfig.upsert({
+      where: { key: 'departments' },
+      update: { value: JSON.stringify(existingDepartments) },
+      create: { key: 'departments', value: JSON.stringify(existingDepartments) }
+    });
+
+    logger.info(`Department created: ${departmentName}`);
     res.json({ success: true, data: { name: departmentName }, message: 'Department created successfully' });
   } catch (error) {
     logger.error('Error creating department:', error);
@@ -403,7 +444,24 @@ router.put('/departments/:oldName', async (req, res) => {
       return res.status(400).json({ success: false, message: 'New name must be different from old name' });
     }
 
-    // Check if new name already exists
+    // Check if new name already exists in stored departments
+    let storedDepartments = [];
+    try {
+      const config = await req.prisma.workflowConfig.findUnique({
+        where: { key: 'departments' }
+      });
+      if (config && config.value) {
+        storedDepartments = JSON.parse(config.value);
+      }
+    } catch (error) {
+      logger.warn('Could not parse stored departments:', error);
+    }
+
+    if (storedDepartments.includes(newDepartmentName)) {
+      return res.status(400).json({ success: false, message: 'Department with new name already exists' });
+    }
+
+    // Check if new name already exists in candidates
     const existing = await req.prisma.candidate.findFirst({
       where: { department: newDepartmentName }
     });
@@ -424,6 +482,19 @@ router.put('/departments/:oldName', async (req, res) => {
       data: { department: newDepartmentName }
     });
 
+    // Update stored departments list
+    const index = storedDepartments.indexOf(oldDepartmentName);
+    if (index !== -1) {
+      storedDepartments[index] = newDepartmentName;
+      storedDepartments.sort();
+      await req.prisma.workflowConfig.upsert({
+        where: { key: 'departments' },
+        update: { value: JSON.stringify(storedDepartments) },
+        create: { key: 'departments', value: JSON.stringify(storedDepartments) }
+      });
+    }
+
+    logger.info(`Department renamed: ${oldDepartmentName} -> ${newDepartmentName}`);
     res.json({ 
       success: true, 
       data: { oldName: oldDepartmentName, newName: newDepartmentName, updatedCandidates: updateResult.count },
@@ -465,6 +536,29 @@ router.delete('/departments/:name', async (req, res) => {
       });
     }
 
+    // Remove from stored departments list
+    let storedDepartments = [];
+    try {
+      const config = await req.prisma.workflowConfig.findUnique({
+        where: { key: 'departments' }
+      });
+      if (config && config.value) {
+        storedDepartments = JSON.parse(config.value);
+        const index = storedDepartments.indexOf(departmentName);
+        if (index !== -1) {
+          storedDepartments.splice(index, 1);
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'departments' },
+            update: { value: JSON.stringify(storedDepartments) },
+            create: { key: 'departments', value: JSON.stringify(storedDepartments) }
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn('Could not update stored departments:', error);
+    }
+
+    logger.info(`Department deleted: ${departmentName}`);
     res.json({ 
       success: true, 
       message: 'Department deleted successfully',
