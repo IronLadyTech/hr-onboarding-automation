@@ -17,7 +17,9 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
-  'http://localhost:5000'
+  'http://localhost:5000',
+  'https://hr-automation.iamironlady.com',
+  'https://www.hr-automation.iamironlady.com'
 ].filter(Boolean); // Remove undefined values
 
 app.use(cors({
@@ -32,7 +34,12 @@ app.use(cors({
       // Allow any Vercel preview/deployment URL
       if (origin.includes('.vercel.app')) {
         callback(null, true);
+      } else if (origin.includes('iamironlady.com')) {
+        // Allow any subdomain of iamironlady.com
+        callback(null, true);
       } else {
+        // Log the blocked origin for debugging
+        logger.warn(`CORS blocked origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));
       }
     }
