@@ -670,29 +670,27 @@ const Settings = () => {
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">👤 HR Configuration</h2>
-              {config.hr_email && (
-                <button
-                  onClick={() => {
-                    setShowEmailWizard(true);
-                    setWizardStep(1);
-                    setWizardCompleted({
-                      oauthTestUser: false,
-                      appPassword: false,
-                      emailSaved: false,
-                      smtpUpdated: false,
-                      gmailConfigured: false,
-                      testSent: false
-                    });
-                    setNewHrEmail('');
-                    setNewHrName('');
-                    setSmtpPassword('');
-                    setUpdateSmtpUser(true);
-                  }}
-                  className="btn btn-primary text-sm"
-                >
-                  🔄 Change HR Email (Quick Setup)
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setShowEmailWizard(true);
+                  setWizardStep(1);
+                  setWizardCompleted({
+                    oauthTestUser: false,
+                    appPassword: false,
+                    emailSaved: false,
+                    smtpUpdated: false,
+                    gmailConfigured: false,
+                    testSent: false
+                  });
+                  setNewHrEmail(config.hr_email || '');
+                  setNewHrName(config.hr_name || '');
+                  setSmtpPassword('');
+                  setUpdateSmtpUser(true);
+                }}
+                className="btn btn-primary text-sm"
+              >
+                {config.hr_email ? '🔄 Change HR Email (Quick Setup)' : '➕ Add HR Email (Quick Setup)'}
+              </button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>

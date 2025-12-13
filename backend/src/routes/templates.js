@@ -193,6 +193,265 @@ router.post('/:id/preview', async (req, res) => {
   }
 });
 
+// Initialize default templates
+router.post('/init/defaults', async (req, res) => {
+  try {
+    const defaultTemplates = [
+      {
+        name: 'Offer Letter Email',
+        type: 'OFFER_LETTER',
+        subject: 'Offer Letter - {{position}} at {{companyName}}',
+        body: `Dear {{candidateName}},
+
+We are pleased to extend an offer for the position of <strong>{{position}}</strong> at {{companyName}}.
+
+Please find attached your offer letter with complete details about your role, compensation, and benefits.
+
+<strong>Key Details:</strong>
+• Position: {{position}}
+• Department: {{department}}
+• Annual CTC: {{salary}}
+• Expected Joining Date: {{joiningDate}}
+
+Please review the offer letter carefully and reply to this email with the signed copy by <strong>{{offerDeadline}}</strong>.
+
+If you have any questions, please don't hesitate to reach out.
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}
+📞 {{hrPhone}}`,
+        placeholders: ['candidateName', 'position', 'companyName', 'department', 'salary', 'joiningDate', 'offerDeadline', 'hrName', 'hrPhone'],
+        isActive: true
+      },
+      {
+        name: 'Offer Reminder Email',
+        type: 'OFFER_REMINDER',
+        subject: 'Reminder: Pending Offer Letter - {{companyName}}',
+        body: `Dear {{candidateName}},
+
+This is a gentle reminder regarding the offer letter sent for the <strong>{{position}}</strong> position at {{companyName}}.
+
+We noticed that the offer letter is still pending your signature. Please review and reply with the signed copy at your earliest convenience.
+
+<strong>Original Offer Date:</strong> {{offerDate}}
+<strong>Deadline:</strong> {{offerDeadline}}
+
+If you have any questions or concerns, please feel free to reach out.
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'position', 'companyName', 'hrName', 'offerDate', 'offerDeadline'],
+        isActive: true
+      },
+      {
+        name: 'Welcome Email Day Minus 1',
+        type: 'WELCOME_DAY_MINUS_1',
+        subject: 'Looking Forward to Starting Your Journey at {{companyName}}! 🎉',
+        body: `Dear {{candidateName}},
+
+Welcome to the {{companyName}} family! We are thrilled to have you join us.
+
+Your journey with us begins <strong>tomorrow, {{joiningDate}}</strong>. Here's what you can expect on your first day:
+
+<strong>📍 Office Location:</strong>
+{{companyAddress}}
+
+<strong>⏰ Office Timings:</strong>
+{{companyTimings}}
+
+<strong>📋 Day 1 Schedule:</strong>
+• 9:30 AM - HR Induction Session
+• You'll receive calendar invites for all scheduled sessions
+
+<strong>📄 Documents to Bring:</strong>
+{{day1Documents}}
+
+<strong>📞 Contact:</strong>
+{{hrName}}: {{hrPhone}}
+
+We can't wait to see you tomorrow!
+
+Warm regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'companyName', 'joiningDate', 'companyAddress', 'companyTimings', 'day1Documents', 'hrName', 'hrPhone'],
+        isActive: true
+      },
+      {
+        name: 'HR Induction Invite',
+        type: 'HR_INDUCTION_INVITE',
+        subject: 'HR Induction Session - {{joiningDate}} | {{companyName}}',
+        body: `Dear {{candidateName}},
+
+Welcome aboard! Your HR Induction session has been scheduled.
+
+<strong>📅 Meeting Details:</strong>
+• Date: {{meetingDate}}
+• Time: {{meetingTime}}
+• Duration: 90 minutes
+• Link: {{meetingLink}}
+
+<strong>What we'll cover:</strong>
+• Company overview and culture
+• HR policies and procedures
+• Benefits and perks
+• Q&A session
+
+Please join on time. See you there!
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'meetingDate', 'meetingTime', 'meetingLink', 'hrName', 'companyName', 'joiningDate'],
+        isActive: true
+      },
+      {
+        name: 'Onboarding Form Request',
+        type: 'ONBOARDING_FORM',
+        subject: 'Action Required: Complete Your Onboarding Form | {{companyName}}',
+        body: `Dear {{candidateName}},
+
+As part of your onboarding process, please complete the HR onboarding form at your earliest convenience.
+
+<strong>📝 Form Link:</strong> {{formLink}}
+
+This form collects essential information needed for:
+• Employee records
+• Payroll setup
+• Benefits enrollment
+• System access
+
+<strong>⏰ Please complete this within 24 hours.</strong>
+
+If you have any questions, feel free to reach out.
+
+Thank you!
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'formLink', 'hrName', 'companyName'],
+        isActive: true
+      },
+      {
+        name: 'Form Completion Reminder',
+        type: 'FORM_REMINDER',
+        subject: '⚠️ Reminder: Onboarding Form Pending | {{companyName}}',
+        body: `Dear {{candidateName}},
+
+This is a friendly reminder to complete your HR onboarding form.
+
+<strong>📝 Form Link:</strong> {{formLink}}
+
+Your form is still pending and needs to be completed for smooth processing of your employee records and payroll.
+
+Please complete this as soon as possible.
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'formLink', 'hrName', 'companyName'],
+        isActive: true
+      },
+      {
+        name: 'CEO Induction Invite',
+        type: 'CEO_INDUCTION_INVITE',
+        subject: 'CEO Induction Session with {{ceoName}} | {{companyName}}',
+        body: `Dear {{candidateName}},
+
+You are invited to a special CEO Induction session with our CEO, <strong>{{ceoName}}</strong>.
+
+<strong>📅 Meeting Details:</strong>
+• Date: {{meetingDate}}
+• Time: {{meetingTime}}
+• Duration: 60 minutes
+• Link: {{meetingLink}}
+
+This is a wonderful opportunity to:
+• Learn about our company's vision and mission
+• Understand our culture and values
+• Hear directly from our leadership
+• Ask questions
+
+Looking forward to seeing you!
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'ceoName', 'meetingDate', 'meetingTime', 'meetingLink', 'hrName', 'companyName'],
+        isActive: true
+      },
+      {
+        name: 'Sales Induction Invite',
+        type: 'SALES_INDUCTION_INVITE',
+        subject: 'Sales Induction Session with {{salesHeadName}} | {{companyName}}',
+        body: `Dear {{candidateName}},
+
+Welcome to the team! Your Sales Induction session has been scheduled with <strong>{{salesHeadName}}</strong>.
+
+<strong>📅 Meeting Details:</strong>
+• Date: {{meetingDate}}
+• Time: {{meetingTime}}
+• Duration: 60 minutes
+• Link: {{meetingLink}}
+
+<strong>What we'll cover:</strong>
+• Sales processes and methodologies
+• Product knowledge
+• Customer engagement strategies
+• Team expectations
+
+Please join on time. See you there!
+
+Best regards,
+{{hrName}}
+HR Team, {{companyName}}`,
+        placeholders: ['candidateName', 'salesHeadName', 'meetingDate', 'meetingTime', 'meetingLink', 'hrName', 'companyName'],
+        isActive: true
+      }
+    ];
+
+    // Check which templates already exist
+    const existingTemplates = await req.prisma.emailTemplate.findMany({
+      select: { name: true }
+    });
+    const existingNames = new Set(existingTemplates.map(t => t.name));
+
+    // Create only templates that don't exist
+    const templatesToCreate = defaultTemplates.filter(t => !existingNames.has(t.name));
+    
+    if (templatesToCreate.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'All default templates already exist',
+        data: { created: 0, skipped: defaultTemplates.length }
+      });
+    }
+
+    // Create templates
+    const createdTemplates = await Promise.all(
+      templatesToCreate.map(template => 
+        req.prisma.emailTemplate.create({ data: template })
+      )
+    );
+
+    logger.info(`Initialized ${createdTemplates.length} default email templates`);
+    res.json({ 
+      success: true, 
+      message: `Successfully initialized ${createdTemplates.length} default templates`,
+      data: { 
+        created: createdTemplates.length, 
+        skipped: defaultTemplates.length - createdTemplates.length 
+      }
+    });
+  } catch (error) {
+    logger.error('Error initializing default templates:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
+  }
+});
+
 // Get available placeholders
 router.get('/meta/placeholders', async (req, res) => {
   try {
