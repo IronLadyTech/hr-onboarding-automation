@@ -498,9 +498,10 @@ router.post('/:id/reschedule', async (req, res) => {
     // Parse datetime-local string as local time
     // When you create a Date from "YYYY-MM-DDTHH:mm", JavaScript treats it as local time
     const localDate = new Date(dateTime);
-    const newStartTime = localDate;
+    const newStartTime = localDate.toISOString(); // Convert to ISO string for storage (same as create endpoint)
     const newEndTime = new Date(localDate);
     newEndTime.setMinutes(newEndTime.getMinutes() + (parseInt(duration) || 60));
+    const newEndTimeISO = newEndTime.toISOString(); // Convert to ISO string for storage
 
     // Update in Google Calendar
     if (existing.googleEventId) {
@@ -519,11 +520,11 @@ router.post('/:id/reschedule', async (req, res) => {
           eventId: existing.googleEventId,
           resource: {
             start: {
-              dateTime: newStartTime.toISOString(),
+              dateTime: newStartTime, // Already ISO string
               timeZone: 'Asia/Kolkata'
             },
             end: {
-              dateTime: newEndTime.toISOString(),
+              dateTime: newEndTimeISO, // Already ISO string
               timeZone: 'Asia/Kolkata'
             }
           },
@@ -537,8 +538,8 @@ router.post('/:id/reschedule', async (req, res) => {
     const event = await req.prisma.calendarEvent.update({
       where: { id: req.params.id },
       data: {
-        startTime: newStartTime,
-        endTime: newEndTime,
+        startTime: new Date(newStartTime), // Convert ISO string to Date for database
+        endTime: new Date(newEndTimeISO), // Convert ISO string to Date for database
         status: 'RESCHEDULED'
       }
     });
