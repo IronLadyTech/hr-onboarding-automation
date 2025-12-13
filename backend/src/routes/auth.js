@@ -19,19 +19,32 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
+    // Normalize email (lowercase, trim)
+    const normalizedEmail = email.toLowerCase().trim();
+
     const user = await req.prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
-    if (!user || !user.isActive) {
+    if (!user) {
+      logger.warn(`Login attempt with non-existent email: ${normalizedEmail}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
       });
     }
 
+    if (!user.isActive) {
+      logger.warn(`Login attempt with inactive user: ${normalizedEmail}`);
+      return res.status(401).json({
+        success: false,
+        message: 'Account is inactive. Please contact administrator.'
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      logger.warn(`Login attempt with incorrect password for: ${normalizedEmail}`);
       return res.status(401).json({
         success: false,
         message: 'Invalid credentials'
