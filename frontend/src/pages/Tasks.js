@@ -864,6 +864,7 @@ const Tasks = () => {
                       }}
                       className="input"
                       required
+                      title="Email template is required"
                     >
                       <option value="">-- Select an email template --</option>
                       {emailTemplates
