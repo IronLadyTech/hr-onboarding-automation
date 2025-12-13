@@ -160,7 +160,7 @@ const Layout = () => {
       </aside>
 
       {/* Main content - Full width on mobile, normal on desktop */}
-      <main className="w-full flex-1 overflow-auto min-h-screen lg:min-h-0">
+      <main className="w-full lg:flex-1 overflow-auto min-h-screen lg:min-h-0" style={{ width: '100%', maxWidth: '100%' }}>
         {/* Top bar */}
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center space-x-3">
