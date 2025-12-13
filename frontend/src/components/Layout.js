@@ -51,7 +51,7 @@ const Layout = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-100 lg:flex">
+    <div className="min-h-screen bg-gray-100 flex flex-col lg:flex-row">
       {/* Mobile Menu Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -60,12 +60,14 @@ const Layout = () => {
         />
       )}
 
-      {/* Sidebar - Hidden on mobile by default, visible on desktop */}
+      {/* Sidebar - Completely off-screen on mobile, visible on desktop */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         ${sidebarOpen ? 'w-64' : 'w-20'} 
         text-white transition-all duration-300 flex flex-col
+        pointer-events-none lg:pointer-events-auto
+        ${mobileMenuOpen ? 'pointer-events-auto' : ''}
       `} style={{ backgroundColor: 'var(--color-primary, #4F46E5)' }}>
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b" style={{ borderColor: 'var(--color-primary-dark, #4338CA)' }}>
@@ -158,7 +160,7 @@ const Layout = () => {
       </aside>
 
       {/* Main content - Full width on mobile, normal on desktop */}
-      <main className="w-full lg:flex-1 overflow-auto min-h-screen">
+      <main className="w-full flex-1 overflow-auto min-h-screen lg:min-h-0">
         {/* Top bar */}
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center space-x-3">
