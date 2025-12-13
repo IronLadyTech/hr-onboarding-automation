@@ -122,16 +122,6 @@ const createDepartmentTasks = async (prisma, candidate) => {
       }
     }
   } else {
-    // Validate that all step templates have email templates
-    const stepsWithoutTemplates = stepTemplates.filter(t => !t.emailTemplateId || !t.emailTemplate);
-    
-    if (stepsWithoutTemplates.length > 0) {
-      const stepNumbers = stepsWithoutTemplates.map(t => t.stepNumber).join(', ');
-      const errorMessage = `Cannot create candidate: ${stepsWithoutTemplates.length} step(s) in ${department} department are missing email templates (Step numbers: ${stepNumbers}). Please add email templates to all steps in the Steps page before creating candidates.`;
-      logger.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
     // Create tasks from department templates
     for (const template of stepTemplates) {
       try {
