@@ -227,19 +227,19 @@ router.post('/', (req, res, next) => {
     } = req.body;
 
     // If dateTime and duration are provided (from FormData), convert to startTime and endTime
-    // This handles the timezone correctly by treating the datetime-local value as local time
+    // This handles the timezone correctly by treating the datetime-local value as IST (Asia/Kolkata)
     if (dateTime && !startTime) {
-      // Parse the datetime-local string as local time
-      // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone, treated as local time)
-      // Split the dateTime string to get date and time components
+      // Parse the datetime-local string - treat it as Asia/Kolkata timezone
+      // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone info)
+      // The user's input is in their local timezone, but we treat it as IST for consistency
       const [datePart, timePart] = dateTime.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [hours, minutes] = timePart.split(':').map(Number);
       
-      // Create a Date object in local timezone (this represents the exact time the user selected)
-      const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+      // Create a Date object treating the input as IST (Asia/Kolkata, UTC+5:30)
+      // Format: "YYYY-MM-DDTHH:mm:00+05:30" for IST
+      const istDateString = `${datePart}T${timePart}:00+05:30`;
+      const localDate = new Date(istDateString);
       
-      // Convert to ISO string for storage (this will be in UTC, but represents the correct local time)
+      // Convert to ISO string for storage (this will be in UTC)
       startTime = localDate.toISOString();
       
       // Calculate endTime by adding duration
@@ -503,18 +503,21 @@ router.post('/:id/reschedule', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Event not found' });
     }
 
-    // Parse datetime-local string as local time
-    // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone, treated as local time)
-    // We need to parse it correctly to avoid timezone conversion issues
-    // Split the dateTime string to get date and time components
+    // Parse datetime-local string - treat it as Asia/Kolkata timezone
+    // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone info)
+    // The user's input is in their local timezone, but we need to store it correctly
+    // We'll treat it as Asia/Kolkata timezone (IST) since that's the app's timezone
     const [datePart, timePart] = dateTime.split('T');
     const [year, month, day] = datePart.split('-').map(Number);
     const [hours, minutes] = timePart.split(':').map(Number);
     
-    // Create a Date object in local timezone (this represents the exact time the user selected)
-    const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0);
+    // Create a Date object treating the input as IST (Asia/Kolkata, UTC+5:30)
+    // We do this by creating the date string with timezone offset
+    // Format: "YYYY-MM-DDTHH:mm:00+05:30" for IST
+    const istDateString = `${datePart}T${timePart}:00+05:30`;
+    const localDate = new Date(istDateString);
     
-    // Convert to ISO string for storage (this will be in UTC, but represents the correct local time)
+    // Convert to ISO string for storage (this will be in UTC)
     const newStartTime = localDate.toISOString();
     
     // Calculate end time
