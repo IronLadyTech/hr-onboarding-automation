@@ -328,6 +328,27 @@ router.post('/', (req, res, next) => {
       where: { id: candidateId }
     });
 
+    // If stepNumber is provided, validate that the step template has an email template
+    if (stepNumber && candidate) {
+      const stepTemplate = await req.prisma.departmentStepTemplate.findFirst({
+        where: {
+          department: candidate.department,
+          stepNumber: parseInt(stepNumber),
+          isActive: true
+        },
+        include: {
+          emailTemplate: true
+        }
+      });
+
+      if (stepTemplate && (!stepTemplate.emailTemplateId || !stepTemplate.emailTemplate)) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot schedule step ${stepNumber}: This step is missing an email template. Please add an email template to this step in the Steps page before scheduling.`
+        });
+      }
+    }
+
     // If this is Step 1 (OFFER_LETTER) with attachment, also save it to candidate.offerLetterPath
     // This ensures the offer letter shows in the candidate profile section
     if (type === 'OFFER_LETTER' && attachmentPath) {
