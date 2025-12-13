@@ -96,18 +96,33 @@ const checkForReplies = async (checkReadEmails = false) => {
     let totalProcessed = 0;
     for (const candidate of candidates) {
       try {
-        // Build query to search for emails from this specific candidate
-        const emailQuery = checkReadEmails
-          ? `from:${candidate.email} has:attachment newer_than:30d`
-          : `from:${candidate.email} is:unread has:attachment newer_than:30d`;
+        // First check unread emails, then check read emails if no unread found
+        // This ensures we don't miss emails that were already read
+        let emailQuery = `from:${candidate.email} has:attachment newer_than:30d`;
+        if (!checkReadEmails) {
+          // Try unread first
+          emailQuery = `from:${candidate.email} is:unread has:attachment newer_than:30d`;
+        }
         
-        const response = await gmail.users.messages.list({
+        let response = await gmail.users.messages.list({
           userId: 'me',
           q: emailQuery,
           maxResults: 10 // Only need a few emails per candidate
         });
 
-        const messages = response.data.messages || [];
+        let messages = response.data.messages || [];
+        
+        // If no unread emails found and we're not checking read emails, also check read emails
+        if (messages.length === 0 && !checkReadEmails) {
+          logger.info(`No unread emails found for ${candidate.email}, checking read emails...`);
+          emailQuery = `from:${candidate.email} has:attachment newer_than:30d`;
+          response = await gmail.users.messages.list({
+            userId: 'me',
+            q: emailQuery,
+            maxResults: 10
+          });
+          messages = response.data.messages || [];
+        }
         
         if (messages.length > 0) {
           logger.info(`📧 Found ${messages.length} email(s) with attachments from ${candidate.email}`);
@@ -212,8 +227,12 @@ const processMessage = async (messageId) => {
     
     const subjectLower = subject.toLowerCase();
     
-    // Method 1: Check subject for offer letter/reminder keywords
-    if (subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'))) {
+    // Method 1: Check subject for offer letter/reminder keywords (more lenient)
+    // Accept if subject contains "offer" OR if it's a reply (has "Re:") from a candidate who was sent an offer
+    if (subjectLower.includes('offer') || 
+        (subjectLower.includes('re:') && candidate.offerSentAt) ||
+        subjectLower.includes('signed') ||
+        subjectLower.includes('accept')) {
       isReplyToOfferEmail = true;
       logger.info(`✅ Detected as offer email reply based on subject: "${subject}"`);
     }
@@ -255,16 +274,31 @@ const processMessage = async (messageId) => {
       
       // Method 3: If still not matched, check if email has "Re:" and candidate has been sent an offer
       // This is a fallback for cases where subject doesn't match exactly
-      if (!isReplyToOfferEmail && subjectLower.includes('re:') && candidate.offerSentAt) {
+      if (!isReplyToOfferEmail && candidate.offerSentAt) {
         // Check if this email came after the offer was sent (within reasonable time)
         const offerSentTime = new Date(candidate.offerSentAt);
         const timeDiff = emailDate.getTime() - offerSentTime.getTime();
         const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
         
         // If email came within 30 days of offer being sent and has attachment, likely a reply
+        // Be more lenient: accept any email with attachment from candidate who was sent an offer
         if (daysDiff >= 0 && daysDiff <= 30) {
           isReplyToOfferEmail = true;
-          logger.info(`✅ Detected as potential offer reply - has "Re:" prefix, came ${daysDiff.toFixed(1)} days after offer sent`);
+          logger.info(`✅ Detected as potential offer reply - came ${daysDiff.toFixed(1)} days after offer sent (has attachment)`);
+        }
+      }
+      
+      // Method 4: Last resort - if candidate was sent an offer and email has attachment, accept it
+      // This catches cases where subject doesn't match at all but it's likely a signed offer
+      if (!isReplyToOfferEmail && candidate.offerSentAt) {
+        const offerSentTime = new Date(candidate.offerSentAt);
+        const timeDiff = emailDate.getTime() - offerSentTime.getTime();
+        const daysDiff = timeDiff / (1000 * 60 * 60 * 24);
+        
+        // Accept any email with attachment from candidate within 30 days of offer being sent
+        if (daysDiff >= 0 && daysDiff <= 30) {
+          isReplyToOfferEmail = true;
+          logger.info(`✅ Detected as potential offer reply (last resort) - email with attachment from candidate sent offer ${daysDiff.toFixed(1)} days ago`);
         }
       }
     }
