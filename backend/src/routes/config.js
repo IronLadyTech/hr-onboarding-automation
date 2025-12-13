@@ -849,9 +849,9 @@ router.post('/department-steps', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Department, stepNumber, title, and type are required' });
     }
 
-    // Validate: Email template is required
-    if (!emailTemplateId) {
-      return res.status(400).json({ success: false, message: 'Email template is required for every step' });
+    // Validate: Email template is required (check for null, undefined, or empty string)
+    if (!emailTemplateId || emailTemplateId.trim() === '') {
+      return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
     }
 
     // Check if step already exists
@@ -877,7 +877,7 @@ router.post('/department-steps', async (req, res) => {
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
           priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId || null
+          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
         },
         include: {
           emailTemplate: true
@@ -911,7 +911,7 @@ router.post('/department-steps', async (req, res) => {
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
           priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId || null
+          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
         },
         include: {
           emailTemplate: true
@@ -1028,6 +1028,39 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Steps already exist for this department. Delete existing steps first.' });
     }
 
+    // Get all email templates to match by type
+    const emailTemplates = await req.prisma.emailTemplate.findMany({
+      where: { isActive: true }
+    });
+
+    // Map step types to email template types
+    const typeToEmailTypeMap = {
+      'OFFER_LETTER': 'OFFER_LETTER',
+      'OFFER_REMINDER': 'OFFER_REMINDER',
+      'WELCOME_EMAIL': 'WELCOME_DAY_MINUS_1',
+      'HR_INDUCTION': 'HR_INDUCTION_INVITE',
+      'WHATSAPP_ADDITION': 'WHATSAPP_TASK',
+      'ONBOARDING_FORM': 'ONBOARDING_FORM',
+      'FORM_REMINDER': 'FORM_REMINDER',
+      'CEO_INDUCTION': 'CEO_INDUCTION_INVITE',
+      'SALES_INDUCTION': 'SALES_INDUCTION_INVITE',
+      'DEPARTMENT_INDUCTION': 'HR_INDUCTION_INVITE', // Fallback to HR_INDUCTION_INVITE
+      'TRAINING_PLAN': 'TRAINING_PLAN',
+      'CHECKIN_CALL': 'CHECKIN_INVITE'
+    };
+
+    // Helper function to find template by type
+    const findTemplateByType = (stepType) => {
+      const emailType = typeToEmailTypeMap[stepType] || 'CUSTOM';
+      // First try exact match
+      let template = emailTemplates.find(t => t.type === emailType);
+      // If not found, try first active template
+      if (!template && emailTemplates.length > 0) {
+        template = emailTemplates[0];
+      }
+      return template;
+    };
+
     const defaultSteps = [
       { stepNumber: 1, title: 'Offer Letter Email', description: 'Upload and send offer letter with tracking', type: 'OFFER_LETTER', icon: '📄', isAuto: false, dueDateOffset: 0, priority: 'HIGH' },
       { stepNumber: 2, title: 'Offer Reminder (Auto)', description: 'Auto-sends if not signed in 3 days', type: 'OFFER_REMINDER', icon: '⏰', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM' },
@@ -1042,8 +1075,20 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
       { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled 7 days after joining', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM' }
     ];
 
+    // Validate that we have templates for all steps
+    const stepsWithTemplates = defaultSteps.map(step => {
+      const template = findTemplateByType(step.type);
+      if (!template) {
+        throw new Error(`No email template found for step type: ${step.type}. Please create email templates first in the Templates page.`);
+      }
+      return {
+        ...step,
+        emailTemplateId: template.id
+      };
+    });
+
     const created = await Promise.all(
-      defaultSteps.map(step =>
+      stepsWithTemplates.map(step =>
         req.prisma.departmentStepTemplate.create({
           data: {
             department,
