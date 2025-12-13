@@ -932,9 +932,22 @@ router.put('/department-steps/:id', async (req, res) => {
     const { id } = req.params;
     const { title, description, type, icon, isAuto, dueDateOffset, priority, stepNumber, emailTemplateId } = req.body;
 
+    // Get existing step to check current emailTemplateId
+    const existingStep = await req.prisma.departmentStepTemplate.findUnique({
+      where: { id }
+    });
+
+    if (!existingStep) {
+      return res.status(404).json({ success: false, message: 'Step not found' });
+    }
+
     // Validate: Email template is required
-    if (emailTemplateId !== undefined && !emailTemplateId) {
-      return res.status(400).json({ success: false, message: 'Email template is required for every step' });
+    // If emailTemplateId is provided in the update, it must not be empty
+    // If not provided, we keep the existing one (so we don't require it in every update)
+    const finalEmailTemplateId = emailTemplateId !== undefined ? emailTemplateId : existingStep.emailTemplateId;
+    
+    if (!finalEmailTemplateId) {
+      return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
     }
 
     const step = await req.prisma.departmentStepTemplate.update({
@@ -948,7 +961,7 @@ router.put('/department-steps/:id', async (req, res) => {
         ...(dueDateOffset !== undefined && { dueDateOffset: parseInt(dueDateOffset) }),
         ...(priority && { priority }),
         ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
-        ...(emailTemplateId !== undefined && { emailTemplateId: emailTemplateId || null })
+        ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId })
       },
       include: {
         emailTemplate: true
