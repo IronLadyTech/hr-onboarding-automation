@@ -19,7 +19,10 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
   'https://hr-automation.iamironlady.com',
-  'https://www.hr-automation.iamironlady.com'
+  'https://www.hr-automation.iamironlady.com',
+  'https://hr-onboarding-automation.vercel.app',
+  'https://hr-onboarding-automation-git-main.vercel.app',
+  'https://hr-onboarding-automation-*.vercel.app' // Pattern for preview deployments
 ].filter(Boolean); // Remove undefined values
 
 app.use(cors({
@@ -33,9 +36,11 @@ app.use(cors({
     } else {
       // Allow any Vercel preview/deployment URL
       if (origin.includes('.vercel.app')) {
+        logger.info(`CORS allowing Vercel origin: ${origin}`);
         callback(null, true);
       } else if (origin.includes('iamironlady.com')) {
         // Allow any subdomain of iamironlady.com
+        logger.info(`CORS allowing iamironlady.com origin: ${origin}`);
         callback(null, true);
       } else {
         // Log the blocked origin for debugging
@@ -44,7 +49,11 @@ app.use(cors({
       }
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400 // 24 hours
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
