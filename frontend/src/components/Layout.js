@@ -60,7 +60,7 @@ const Layout = () => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - Hidden on mobile by default, visible on desktop */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-50
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
@@ -157,8 +157,8 @@ const Layout = () => {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto lg:ml-0">
+      {/* Main content - Full width on mobile, normal on desktop */}
+      <main className="flex-1 overflow-auto w-full lg:flex-1">
         {/* Top bar */}
         <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center space-x-3">
