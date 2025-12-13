@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { taskApi, candidateApi, configApi } from '../services/api';
+import { taskApi, candidateApi, configApi, templateApi } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Tasks = () => {
@@ -24,6 +24,7 @@ const Tasks = () => {
   const [departmentSteps, setDepartmentSteps] = useState([]);
   const [showStepModal, setShowStepModal] = useState(false);
   const [editingStep, setEditingStep] = useState(null);
+  const [emailTemplates, setEmailTemplates] = useState([]);
   const [stepForm, setStepForm] = useState({
     stepNumber: '',
     title: '',
@@ -32,13 +33,24 @@ const Tasks = () => {
     icon: '📋',
     isAuto: false,
     dueDateOffset: 0,
-    priority: 'MEDIUM'
+    priority: 'MEDIUM',
+    emailTemplateId: ''
   });
 
   useEffect(() => {
     fetchDepartments();
     fetchCandidates();
+    fetchEmailTemplates();
   }, []);
+
+  const fetchEmailTemplates = async () => {
+    try {
+      const response = await templateApi.getAll();
+      setEmailTemplates(response.data.data || []);
+    } catch (error) {
+      console.error('Failed to fetch email templates:', error);
+    }
+  };
 
   useEffect(() => {
     fetchData();
@@ -211,7 +223,8 @@ const Tasks = () => {
       icon: '📋',
       isAuto: false,
       dueDateOffset: 0,
-      priority: 'MEDIUM'
+      priority: 'MEDIUM',
+      emailTemplateId: ''
     });
     setShowStepModal(true);
   };
@@ -226,13 +239,21 @@ const Tasks = () => {
       icon: step.icon || '📋',
       isAuto: step.isAuto || false,
       dueDateOffset: step.dueDateOffset !== null ? step.dueDateOffset : 0,
-      priority: step.priority || 'MEDIUM'
+      priority: step.priority || 'MEDIUM',
+      emailTemplateId: step.emailTemplateId || ''
     });
     setShowStepModal(true);
   };
 
   const handleSaveStep = async (e) => {
     e.preventDefault();
+    
+    // Validate: Email template is required
+    if (!stepForm.emailTemplateId) {
+      toast.error('Please select an email template for this step. Every step must have an email template.');
+      return;
+    }
+    
     try {
       if (editingStep) {
         await configApi.updateDepartmentStep(editingStep.id, {
@@ -820,6 +841,48 @@ const Tasks = () => {
                     />
                     <span className="text-sm font-medium text-gray-700">Auto-scheduled</span>
                   </label>
+                </div>
+
+                {/* Email Template Selection - REQUIRED */}
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Email Template *</h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Select an email template to use when this step is completed. Every step must use an existing template.
+                  </p>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email Template *
+                    </label>
+                    <select
+                      value={stepForm.emailTemplateId || ''}
+                      onChange={(e) => {
+                        setStepForm({ 
+                          ...stepForm, 
+                          emailTemplateId: e.target.value || ''
+                        });
+                      }}
+                      className="input"
+                      required
+                    >
+                      <option value="">-- Select an email template --</option>
+                      {emailTemplates
+                        .filter(t => t.isActive)
+                        .map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} ({template.type}{template.customEmailType ? ` - ${template.customEmailType}` : ''})
+                          </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <strong>Required:</strong> Every step must have an email template. Create templates in the Templates page if needed.
+                    </p>
+                    {emailTemplates.filter(t => t.isActive).length === 0 && (
+                      <p className="text-xs text-red-600 mt-1">
+                        ⚠️ No active templates found. Please create templates in the Templates page first.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
