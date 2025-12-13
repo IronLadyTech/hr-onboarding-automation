@@ -1884,28 +1884,28 @@ const Settings = () => {
 
       {/* HR Email Change Wizard Modal */}
       {showEmailWizard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2">
-          <div className="bg-white rounded-lg p-3 sm:p-6 w-full max-w-3xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-3 sm:mb-6">
-              <h2 className="text-base sm:text-2xl font-bold pr-2">🔄 Change HR Email - Quick Setup Wizard</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">🔄 Change HR Email - Quick Setup Wizard</h2>
               <button
                 onClick={() => {
                   setShowEmailWizard(false);
                   setWizardStep(1);
                 }}
-                className="text-gray-500 hover:text-gray-700 text-xl sm:text-3xl flex-shrink-0"
+                className="text-gray-500 hover:text-gray-700 text-2xl"
               >
                 ×
               </button>
             </div>
 
             {/* Progress Steps */}
-            <div className="mb-3 sm:mb-6">
-              <div className="flex items-center justify-between mb-1 sm:mb-2">
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
                 {[1, 2, 3, 4].map((step) => (
                   <div key={step} className="flex items-center flex-1">
                     <div
-                      className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-bold text-xs sm:text-base ${
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
                         wizardStep >= step
                           ? 'bg-indigo-600 text-white'
                           : 'bg-gray-200 text-gray-500'
@@ -1915,7 +1915,7 @@ const Settings = () => {
                     </div>
                     {step < 4 && (
                       <div
-                        className={`flex-1 h-0.5 sm:h-1 mx-0.5 sm:mx-2 ${
+                        className={`flex-1 h-1 mx-2 ${
                           wizardStep > step ? 'bg-indigo-600' : 'bg-gray-200'
                         }`}
                       />
@@ -1923,7 +1923,7 @@ const Settings = () => {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between text-[9px] sm:text-xs text-gray-600">
+              <div className="flex justify-between text-xs text-gray-600">
                 <span>OAuth</span>
                 <span>App Pass</span>
                 <span>Save Email</span>
@@ -1932,16 +1932,16 @@ const Settings = () => {
             </div>
 
             {/* Step Content */}
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-4">
               {/* Step 1: Add to OAuth Test Users */}
               {wizardStep === 1 && (
-                <div className="space-y-3 sm:space-y-4">
-                  <h3 className="text-sm sm:text-lg font-semibold">Step 1: Add New Email to OAuth Test Users</h3>
-                  <div className="p-2.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 1: Add New Email to OAuth Test Users</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
                       To use Google OAuth features (Gmail API, Calendar API), you need to add the new email as a test user.
                     </p>
-                    <ol className="list-decimal list-inside space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 mb-2 sm:mb-4">
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Sign in to Google Cloud Console with <strong>ironladytech@gmail.com</strong></li>
                       <li>Click the button below to open OAuth consent screen</li>
                       <li>Go to <strong>"Audience"</strong> section (or "Test users" tab)</li>
@@ -1950,12 +1950,12 @@ const Settings = () => {
                       <li>Click "Add"</li>
                       <li>Come back here and mark as completed</li>
                     </ol>
-                    <div className="flex gap-1.5 sm:gap-2">
+                    <div className="flex gap-2">
                       <a
                         href="https://console.cloud.google.com/apis/credentials/consent"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary text-xs sm:text-base py-1.5 sm:py-2.5 flex-1 text-center"
+                        className="btn btn-primary"
                       >
                         🔗 Open Google Cloud Console (Sign in as ironladytech@gmail.com)
                       </a>
@@ -1964,7 +1964,7 @@ const Settings = () => {
                           setWizardCompleted(prev => ({ ...prev, oauthTestUser: true }));
                           setWizardStep(2);
                         }}
-                        className="btn btn-secondary text-xs sm:text-base py-1.5 sm:py-2.5 whitespace-nowrap"
+                        className="btn btn-secondary"
                       >
                         ✓ I've Added It
                       </button>
@@ -1975,18 +1975,18 @@ const Settings = () => {
 
               {/* Step 2: Generate App Password */}
               {wizardStep === 2 && (
-                <div className="space-y-2.5 sm:space-y-4">
-                  <h3 className="text-sm sm:text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
-                  <div className="p-2.5 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-2.5 sm:mb-4">
-                    <p className="text-xs sm:text-sm text-yellow-800 mb-1 sm:mb-2">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
+                    <p className="text-sm text-yellow-800 mb-2">
                       ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email. Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
                     </p>
                   </div>
-                  <div className="p-2.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
                       <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
                     </p>
-                    <ol className="list-decimal list-inside space-y-1 sm:space-y-2 text-xs sm:text-sm text-gray-700 mb-2.5 sm:mb-4">
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Click the button below to open Gmail App Passwords</li>
                       <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
                       <li>Select "Mail" and "Other (Custom name)"</li>
@@ -1995,28 +1995,28 @@ const Settings = () => {
                       <li>Copy the 16-character password (remove spaces)</li>
                       <li>Paste it in the field below (or skip if not needed)</li>
                     </ol>
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-3">
                       <a
                         href="https://myaccount.google.com/apppasswords"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary block text-center text-xs sm:text-base py-1.5 sm:py-2.5"
+                        className="btn btn-primary block text-center"
                       >
                         🔗 Open Gmail App Passwords
                       </a>
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Paste App Password Here * (16 characters, remove spaces)
                         </label>
                         <input
                           type="password"
                           value={smtpPassword}
                           onChange={(e) => setSmtpPassword(e.target.value)}
-                          className="input w-full text-xs sm:text-base py-1.5 sm:py-2"
+                          className="input w-full"
                           placeholder="abcdefghijklmnop (16 characters, no spaces)"
                           required
                         />
-                        <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5 sm:mt-1">
+                        <p className="text-xs text-gray-600 mt-1">
                           This App Password will be used to authenticate SMTP for <strong>{newHrEmail || 'your new HR email'}</strong>
                         </p>
                       </div>
@@ -2029,7 +2029,7 @@ const Settings = () => {
                           setWizardCompleted(prev => ({ ...prev, appPassword: true }));
                           setWizardStep(3);
                         }}
-                        className="btn btn-primary w-full text-xs sm:text-base py-1.5 sm:py-2.5"
+                        className="btn btn-primary w-full"
                         disabled={!smtpPassword || smtpPassword.length < 16}
                       >
                         ✓ Continue with App Password
@@ -2041,41 +2041,41 @@ const Settings = () => {
 
               {/* Step 3: Enter New Email */}
               {wizardStep === 3 && (
-                <div className="space-y-2.5 sm:space-y-4">
-                  <h3 className="text-sm sm:text-lg font-semibold">Step 3: Enter New HR Email</h3>
-                  <div className="space-y-2 sm:space-y-3">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 3: Enter New HR Email</h3>
+                  <div className="space-y-3">
                     <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         New HR Email *
                       </label>
                       <input
                         type="email"
                         value={newHrEmail}
                         onChange={(e) => setNewHrEmail(e.target.value)}
-                        className="input w-full text-xs sm:text-base py-1.5 sm:py-2"
+                        className="input w-full"
                         placeholder="omprakashg2026@gmail.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
                         HR Name (Optional)
                       </label>
                       <input
                         type="text"
                         value={newHrName}
                         onChange={(e) => setNewHrName(e.target.value)}
-                        className="input w-full text-xs sm:text-base py-1.5 sm:py-2"
+                        className="input w-full"
                         placeholder="HR Team"
                       />
                     </div>
-                    <div className="p-2 sm:p-3 bg-gray-50 border border-gray-200 rounded-md">
-                      <p className="text-xs sm:text-sm text-gray-700">
+                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
+                      <p className="text-sm text-gray-700">
                         <strong>Current Email:</strong> {config.hr_email || 'Not set'}
                       </p>
-                      <p className="text-xs sm:text-sm text-gray-700">
+                      <p className="text-sm text-gray-700">
                         <strong>New Email:</strong> {newHrEmail || 'Enter above'}
                       </p>
-                      <p className="text-[10px] sm:text-xs text-gray-600 mt-1 sm:mt-2">
+                      <p className="text-xs text-gray-600 mt-2">
                         <strong>OAuth Account:</strong> ironladytech@gmail.com (stays the same)
                       </p>
                     </div>
@@ -2119,7 +2119,7 @@ const Settings = () => {
                         }
                       }}
                       disabled={savingHREmail || !newHrEmail}
-                      className="btn btn-primary w-full text-xs sm:text-base py-1.5 sm:py-2.5"
+                      className="btn btn-primary w-full"
                     >
                       {savingHREmail ? 'Saving...' : '💾 Save HR Email & Configure'}
                     </button>
@@ -2129,22 +2129,22 @@ const Settings = () => {
 
               {/* Step 4: Test Email */}
               {wizardStep === 4 && (
-                <div className="space-y-2.5 sm:space-y-4">
-                  <h3 className="text-sm sm:text-lg font-semibold">Step 4: Test Email Configuration</h3>
-                  <div className="p-2.5 sm:p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-xs sm:text-sm text-gray-700 mb-2 sm:mb-3">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 4: Test Email Configuration</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
                       Send a test email to verify everything is working correctly.
                     </p>
-                    <div className="space-y-2 sm:space-y-3">
+                    <div className="space-y-3">
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Your Email Address (to receive test)
                         </label>
                         <input
                           type="email"
                           value={testEmailAddress}
                           onChange={(e) => setTestEmailAddress(e.target.value)}
-                          className="input w-full text-xs sm:text-base py-1.5 sm:py-2"
+                          className="input w-full"
                           placeholder="your-email@example.com"
                         />
                       </div>
@@ -2166,13 +2166,13 @@ const Settings = () => {
                           }
                         }}
                         disabled={testingEmail || !testEmailAddress}
-                        className="btn btn-primary w-full text-xs sm:text-base py-1.5 sm:py-2.5"
+                        className="btn btn-primary w-full"
                       >
                         {testingEmail ? 'Sending...' : '📧 Send Test Email'}
                       </button>
                       {wizardCompleted.testSent && (
-                        <div className="p-2 sm:p-3 bg-green-50 border border-green-200 rounded-md">
-                          <p className="text-xs sm:text-sm text-green-800">
+                        <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+                          <p className="text-sm text-green-800">
                             ✅ Test email sent! Check your inbox and verify the "From" address shows: <strong>{newHrEmail || config.hr_email}</strong>
                           </p>
                         </div>
@@ -2184,7 +2184,7 @@ const Settings = () => {
                           setHrEmailChanged(true);
                           toast.success('HR email change completed! All future emails will use the new address.');
                         }}
-                        className="btn btn-success w-full text-xs sm:text-base py-1.5 sm:py-2.5"
+                        className="btn btn-success w-full"
                       >
                         ✅ Complete Setup
                       </button>

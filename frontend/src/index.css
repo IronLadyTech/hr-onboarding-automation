@@ -115,13 +115,21 @@ input, select, textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 16px;
+  padding: 10px 16px;
   border-radius: 8px;
   font-size: 14px;
   font-weight: 500;
   transition: all 0.2s;
   cursor: pointer;
   border: none;
+  min-height: 44px; /* Touch-friendly minimum size */
+}
+
+@media (min-width: 640px) {
+  .btn {
+    padding: 8px 16px;
+    min-height: auto;
+  }
 }
 
 .btn-primary {
@@ -165,7 +173,13 @@ input, select, textarea {
   background: white;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  padding: 24px;
+  padding: 16px;
+}
+
+@media (min-width: 1024px) {
+  .card {
+    padding: 24px;
+  }
 }
 
 /* Input styles */
