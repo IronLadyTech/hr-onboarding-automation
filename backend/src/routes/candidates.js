@@ -1411,15 +1411,31 @@ router.post('/batch/schedule', (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Event type and date/time are required' });
     }
 
-    // Handle timezone properly - datetime-local sends in local timezone, convert to UTC
-    // Parse the datetime string and create Date object (handles local timezone correctly)
-    const startTime = new Date(dateTime);
-    // Ensure we're working with the correct timezone
-    if (isNaN(startTime.getTime())) {
+    // Handle timezone properly - datetime-local sends in local timezone, convert to IST then UTC
+    // Parse the datetime-local string - treat it as Asia/Kolkata timezone (IST)
+    // datetime-local format: "YYYY-MM-DDTHH:mm" (no timezone info)
+    // The user's input is in their local timezone, but we treat it as IST for consistency
+    const [datePart, timePart] = dateTime.split('T');
+    
+    if (!datePart || !timePart) {
       return res.status(400).json({ success: false, message: 'Invalid date/time format' });
     }
     
-    const endTime = new Date(startTime);
+    // Create a Date object treating the input as IST (Asia/Kolkata, UTC+5:30)
+    // Format: "YYYY-MM-DDTHH:mm:00+05:30" for IST
+    const istDateString = `${datePart}T${timePart}:00+05:30`;
+    const localDate = new Date(istDateString);
+    
+    // Ensure we're working with a valid date
+    if (isNaN(localDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date/time format' });
+    }
+    
+    // Convert to ISO string for storage (this will be in UTC)
+    const startTime = localDate;
+    
+    // Calculate endTime by adding duration
+    const endTime = new Date(localDate);
     endTime.setMinutes(endTime.getMinutes() + (duration || 60));
 
     // Handle file attachments
