@@ -1162,53 +1162,87 @@ const Settings = () => {
                 <p className="text-xs mt-2">Example: Name: "Google Meet Link", Key: "googleMeetLink", Value: "https://meet.google.com/..."</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {customPlaceholders.map((placeholder) => (
-                  <div
-                    key={placeholder.id}
-                    className={`p-4 border rounded-lg ${placeholder.isActive ? 'bg-white' : 'bg-gray-50 opacity-60'}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h3 className="font-medium">{placeholder.name}</h3>
-                          {!placeholder.isActive && (
-                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          <code className="bg-gray-100 px-1 rounded">{`{{${placeholder.placeholderKey}}}`}</code>
-                        </p>
-                        {placeholder.description && (
-                          <p className="text-xs text-gray-500 mt-1">{placeholder.description}</p>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2 break-all">
-                          Value: {placeholder.value.length > 100 ? `${placeholder.value.substring(0, 100)}...` : placeholder.value}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2 ml-4">
-                        <button
-                          onClick={() => handleTogglePlaceholderActive(placeholder)}
-                          className={`text-xs px-2 py-1 rounded ${placeholder.isActive ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}
-                        >
-                          {placeholder.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => handleEditPlaceholder(placeholder)}
-                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeletePlaceholder(placeholder.id)}
-                          className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Placeholder Key</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {customPlaceholders
+                      .sort((a, b) => (a.order || 0) - (b.order || 0))
+                      .map((placeholder) => (
+                        <tr key={placeholder.id} className={placeholder.isActive ? '' : 'opacity-60 bg-gray-50'}>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">{placeholder.name}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <code className="text-sm bg-gray-100 px-2 py-1 rounded text-indigo-600">
+                              {`{{${placeholder.placeholderKey}}}`}
+                            </code>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-500 max-w-xs truncate" title={placeholder.value}>
+                              {placeholder.value.length > 50 ? `${placeholder.value.substring(0, 50)}...` : placeholder.value}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-500">
+                              {placeholder.description || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs rounded-full ${
+                              placeholder.isActive 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {placeholder.isActive ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                            {placeholder.order || 0}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleTogglePlaceholderActive(placeholder)}
+                                className={`text-xs px-2 py-1 rounded ${
+                                  placeholder.isActive 
+                                    ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' 
+                                    : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                }`}
+                                title={placeholder.isActive ? 'Deactivate' : 'Activate'}
+                              >
+                                {placeholder.isActive ? '⏸️' : '▶️'}
+                              </button>
+                              <button
+                                onClick={() => handleEditPlaceholder(placeholder)}
+                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                title="Edit"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDeletePlaceholder(placeholder.id)}
+                                className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                                title="Delete"
+                              >
+                                🗑️
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

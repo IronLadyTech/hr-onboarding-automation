@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { templateApi } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -18,10 +18,29 @@ const Templates = () => {
     placeholders: [],
     customEmailType: ''
   });
+  const [availablePlaceholders, setAvailablePlaceholders] = useState([]);
+  const [loadingPlaceholders, setLoadingPlaceholders] = useState(false);
+  const bodyTextareaRef = useRef(null);
 
   useEffect(() => {
     fetchTemplates();
+    fetchPlaceholders();
   }, []);
+
+  const fetchPlaceholders = async () => {
+    setLoadingPlaceholders(true);
+    try {
+      const response = await templateApi.getPlaceholders();
+      if (response.data?.success) {
+        setAvailablePlaceholders(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch placeholders:', error);
+      // Don't show error toast, just log it
+    } finally {
+      setLoadingPlaceholders(false);
+    }
+  };
 
   const fetchTemplates = async () => {
     try {
@@ -273,12 +292,50 @@ const Templates = () => {
                       Email Body
                     </label>
                     {isEditing ? (
-                      <textarea
-                        value={editData.body}
-                        onChange={(e) => setEditData({ ...editData, body: e.target.value })}
-                        className="input font-mono text-sm"
-                        rows={15}
-                      />
+                      <div>
+                        <textarea
+                          ref={bodyTextareaRef}
+                          value={editData.body}
+                          onChange={(e) => setEditData({ ...editData, body: e.target.value })}
+                          className="input font-mono text-sm"
+                          rows={15}
+                        />
+                        {availablePlaceholders.length > 0 && (
+                          <div className="mt-2 p-3 bg-gray-50 rounded border">
+                            <p className="text-xs font-medium text-gray-700 mb-2">Click to insert placeholders:</p>
+                            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                              {availablePlaceholders.map((placeholder) => (
+                                <code
+                                  key={placeholder.key}
+                                  className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-indigo-600 cursor-pointer hover:bg-indigo-50"
+                                  title={placeholder.description}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    const textarea = bodyTextareaRef.current;
+                                    if (textarea) {
+                                      const start = textarea.selectionStart || editData.body.length;
+                                      const end = textarea.selectionEnd || editData.body.length;
+                                      const text = editData.body;
+                                      const newText = text.substring(0, start) + placeholder.key + text.substring(end);
+                                      setEditData({ ...editData, body: newText });
+                                      // Set cursor position after inserted placeholder
+                                      setTimeout(() => {
+                                        textarea.focus();
+                                        textarea.setSelectionRange(start + placeholder.key.length, start + placeholder.key.length);
+                                      }, 0);
+                                    } else {
+                                      // Fallback: just append to the end
+                                      setEditData({ ...editData, body: editData.body + placeholder.key });
+                                    }
+                                  }}
+                                >
+                                  {placeholder.key}
+                                </code>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <pre className="text-gray-900 bg-gray-50 p-3 rounded text-sm whitespace-pre-wrap font-sans">
                         {selectedTemplate.body}
@@ -286,23 +343,54 @@ const Templates = () => {
                     )}
                   </div>
 
-                  {selectedTemplate.placeholders && selectedTemplate.placeholders.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Available Placeholders
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedTemplate.placeholders.map((placeholder) => (
-                          <code 
-                            key={placeholder}
-                            className="px-2 py-1 bg-gray-100 rounded text-sm text-indigo-600"
-                          >
-                            {`{{${placeholder}}}`}
-                          </code>
-                        ))}
+                  {/* Available Placeholders Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Available Placeholders
+                      {loadingPlaceholders && <span className="text-xs text-gray-500 ml-2">(Loading...)</span>}
+                    </label>
+                    {availablePlaceholders.length > 0 ? (
+                      <div className="space-y-3">
+                        {/* Group by category */}
+                        {['Standard', 'Company', 'Dynamic', 'Custom', 'Custom Placeholder'].map((category) => {
+                          const categoryPlaceholders = availablePlaceholders.filter(p => p.category === category);
+                          if (categoryPlaceholders.length === 0) return null;
+                          
+                          return (
+                            <div key={category} className="border rounded-lg p-3 bg-gray-50">
+                              <h4 className="text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wide">
+                                {category} ({categoryPlaceholders.length})
+                              </h4>
+                              <div className="flex flex-wrap gap-2">
+                                {categoryPlaceholders.map((placeholder) => (
+                                  <div
+                                    key={placeholder.key}
+                                    className="group relative"
+                                    title={placeholder.description}
+                                  >
+                                    <code className="px-2 py-1 bg-white border border-gray-200 rounded text-sm text-indigo-600 hover:bg-indigo-50 cursor-pointer">
+                                      {placeholder.key}
+                                    </code>
+                                    {placeholder.description && (
+                                      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-10">
+                                        <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap shadow-lg">
+                                          {placeholder.description}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded">
+                        {loadingPlaceholders ? 'Loading placeholders...' : 'No placeholders available'}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -408,9 +496,37 @@ const Templates = () => {
                     placeholder="Enter email body. Use {{placeholder}} for dynamic content."
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Available placeholders: {'{{firstName}}'}, {'{{lastName}}'}, {'{{position}}'}, {'{{companyName}}'}, etc.
-                  </p>
+                  {availablePlaceholders.length > 0 && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded border">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Available Placeholders:</p>
+                      <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                        {availablePlaceholders.map((placeholder) => (
+                          <code
+                            key={placeholder.key}
+                            className="px-1.5 py-0.5 bg-white border border-gray-200 rounded text-xs text-indigo-600 cursor-pointer hover:bg-indigo-50"
+                            title={placeholder.description}
+                            onClick={() => {
+                              const textarea = document.querySelector('textarea[placeholder*="Enter email body"]');
+                              if (textarea) {
+                                const start = textarea.selectionStart;
+                                const end = textarea.selectionEnd;
+                                const text = newTemplate.body;
+                                const newText = text.substring(0, start) + placeholder.key + text.substring(end);
+                                setNewTemplate({ ...newTemplate, body: newText });
+                                // Set cursor position after inserted placeholder
+                                setTimeout(() => {
+                                  textarea.focus();
+                                  textarea.setSelectionRange(start + placeholder.key.length, start + placeholder.key.length);
+                                }, 0);
+                              }
+                            }}
+                          >
+                            {placeholder.key}
+                          </code>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
