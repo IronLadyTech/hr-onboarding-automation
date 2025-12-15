@@ -178,19 +178,15 @@ const Steps = () => {
     
     try {
       setLoading(true);
-      // Swap step numbers
-      await configApi.updateDepartmentStep(step.id, {
-        ...step,
-        stepNumber: targetStep.stepNumber
-      });
-      await configApi.updateDepartmentStep(targetStep.id, {
-        ...targetStep,
-        stepNumber: step.stepNumber
-      });
+      // Use the dedicated reorder endpoint to swap step numbers
+      await configApi.reorderDepartmentSteps(step.id, targetStep.id);
       toast.success('Step moved successfully!');
-      fetchDepartmentSteps();
+      // Refresh to get updated step numbers
+      await fetchDepartmentSteps();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to move step');
+      // Refresh to get correct state in case of error
+      fetchDepartmentSteps();
     } finally {
       setLoading(false);
     }

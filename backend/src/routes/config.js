@@ -975,6 +975,51 @@ router.put('/department-steps/:id', async (req, res) => {
   }
 });
 
+// Reorder steps (swap two steps)
+router.post('/department-steps/reorder', async (req, res) => {
+  try {
+    const { stepId1, stepId2 } = req.body;
+
+    if (!stepId1 || !stepId2) {
+      return res.status(400).json({ success: false, message: 'Both step IDs are required' });
+    }
+
+    // Get both steps
+    const step1 = await req.prisma.departmentStepTemplate.findUnique({
+      where: { id: stepId1 }
+    });
+    const step2 = await req.prisma.departmentStepTemplate.findUnique({
+      where: { id: stepId2 }
+    });
+
+    if (!step1 || !step2) {
+      return res.status(404).json({ success: false, message: 'One or both steps not found' });
+    }
+
+    if (step1.department !== step2.department) {
+      return res.status(400).json({ success: false, message: 'Steps must be from the same department' });
+    }
+
+    // Swap step numbers using a transaction
+    await req.prisma.$transaction([
+      req.prisma.departmentStepTemplate.update({
+        where: { id: stepId1 },
+        data: { stepNumber: step2.stepNumber }
+      }),
+      req.prisma.departmentStepTemplate.update({
+        where: { id: stepId2 },
+        data: { stepNumber: step1.stepNumber }
+      })
+    ]);
+
+    logger.info(`✅ Steps reordered: ${step1.stepNumber} <-> ${step2.stepNumber} in ${step1.department}`);
+    res.json({ success: true, message: 'Steps reordered successfully' });
+  } catch (error) {
+    logger.error('Error reordering steps:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Delete step template
 router.delete('/department-steps/:id', async (req, res) => {
   try {

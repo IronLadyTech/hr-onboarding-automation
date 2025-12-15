@@ -264,6 +264,7 @@ export const configApi = {
   createDepartmentStep: (data) => api.post('/config/department-steps', data),
   updateDepartmentStep: (id, data) => api.put(`/config/department-steps/${id}`, data),
   deleteDepartmentStep: (id) => api.delete(`/config/department-steps/${id}`),
+  reorderDepartmentSteps: (stepId1, stepId2) => api.post('/config/department-steps/reorder', { stepId1, stepId2 }),
   initDefaultSteps: (department) => api.post(`/config/department-steps/init-defaults/${department}`)
 };
 
