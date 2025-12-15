@@ -1388,7 +1388,7 @@ router.post('/batch/schedule', (req, res, next) => {
 }, async (req, res) => {
   try {
     // Parse FormData fields
-    let candidateIds, eventType, dateTime, duration = 60;
+    let candidateIds, eventType, stepNumber, dateTime, duration = 60;
     
     if (req.body.candidateIds) {
       candidateIds = typeof req.body.candidateIds === 'string' 
@@ -1399,6 +1399,7 @@ router.post('/batch/schedule', (req, res, next) => {
     }
     
     eventType = req.body.eventType;
+    stepNumber = req.body.stepNumber ? parseInt(req.body.stepNumber) : null;
     dateTime = req.body.dateTime;
     duration = req.body.duration ? parseInt(req.body.duration) : 60;
 
@@ -1526,18 +1527,32 @@ router.post('/batch/schedule', (req, res, next) => {
     };
 
     let eventConfig = eventTypeMap[eventType];
+    let finalStepNumber = stepNumber;
 
     // If not found in default map, try to fetch from department step templates
-    if (!eventConfig && department) {
+    // Also get stepNumber if not provided
+    if (department) {
       try {
+        // If stepNumber is provided, use it to find the step template
+        // Otherwise, find by eventType
         const stepTemplate = await req.prisma.departmentStepTemplate.findFirst({
-          where: {
-            department: department,
-            type: eventType
-          }
+          where: stepNumber 
+            ? {
+                department: department,
+                stepNumber: stepNumber
+              }
+            : {
+                department: department,
+                type: eventType
+              }
         });
 
         if (stepTemplate) {
+          // Set stepNumber from template if not provided
+          if (!finalStepNumber) {
+            finalStepNumber = stepTemplate.stepNumber;
+          }
+          
           // Replace placeholders in title for batch session
           let batchTitle = stepTemplate.title
             .replace(/{{firstName}}/g, '')
@@ -1640,9 +1655,20 @@ router.post('/batch/schedule', (req, res, next) => {
           attendees: attendeeEmails,
           googleEventId: googleEvent?.id,
           attachmentPath: attachmentPaths.length > 0 ? attachmentPaths[0] : null, // First attachment for backward compatibility
-          attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null // All attachments
+          attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // All attachments
+          stepNumber: finalStepNumber // CRITICAL: Set stepNumber so candidate profile can find the event
         }
       });
+
+      // If this is Step 1 (OFFER_LETTER) with attachment, also save it to candidate.offerLetterPath
+      // This ensures the offer letter shows in the candidate profile section (same as individual scheduling)
+      if (eventConfig.type === 'OFFER_LETTER' && attachmentPaths.length > 0) {
+        await req.prisma.candidate.update({
+          where: { id: candidate.id },
+          data: { offerLetterPath: attachmentPaths[0] }
+        });
+        logger.info(`✅ Saved offer letter attachment to candidate profile: ${attachmentPaths[0]}`);
+      }
 
       // Update candidate status if updateField is specified
       if (eventConfig.updateField) {

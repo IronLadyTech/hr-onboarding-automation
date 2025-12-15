@@ -15,6 +15,7 @@ const Calendar = () => {
   const [showBatchScheduleModal, setShowBatchScheduleModal] = useState(false);
   const [batchScheduleData, setBatchScheduleData] = useState({
     eventType: '',
+    stepNumber: null,
     dateTime: '',
     duration: 60
   });
@@ -186,10 +187,14 @@ const Calendar = () => {
 
     setBatchLoading(true);
     try {
+      // Parse eventType and stepNumber from the selected value
+      const [eventType, stepNumber] = batchScheduleData.eventType.split('|');
+      
       // Create FormData to handle file attachments
       const formData = new FormData();
       formData.append('candidateIds', JSON.stringify(selectedCandidates));
-      formData.append('eventType', batchScheduleData.eventType);
+      formData.append('eventType', eventType);
+      formData.append('stepNumber', stepNumber);
       formData.append('dateTime', batchScheduleData.dateTime);
       formData.append('duration', batchScheduleData.duration.toString());
       
@@ -203,7 +208,7 @@ const Calendar = () => {
       toast.success(`Successfully scheduled ${batchScheduleData.eventType} for ${selectedCandidates.length} candidate(s)`);
       setShowBatchScheduleModal(false);
       setSelectedCandidates([]);
-      setBatchScheduleData({ eventType: '', dateTime: '', duration: 60 });
+      setBatchScheduleData({ eventType: '', stepNumber: null, dateTime: '', duration: 60 });
       setBatchAttachments([]);
       fetchData();
     } catch (error) {
@@ -540,7 +545,7 @@ const Calendar = () => {
                       : 'Select event type'}
                 </option>
                 {departmentSteps.map((step) => (
-                  <option key={step.id} value={step.type}>
+                  <option key={step.id} value={`${step.type}|${step.stepNumber}`}>
                     Step {step.stepNumber}: {step.title} {step.isAuto && '(Auto)'}
                   </option>
                 ))}
@@ -622,7 +627,7 @@ const Calendar = () => {
               <button
                 onClick={() => {
                   setShowBatchScheduleModal(false);
-                  setBatchScheduleData({ eventType: '', dateTime: '', duration: 60 });
+                  setBatchScheduleData({ eventType: '', stepNumber: null, dateTime: '', duration: 60 });
                   setBatchAttachments([]);
                 }}
                 className="btn btn-secondary"
