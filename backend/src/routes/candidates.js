@@ -1345,10 +1345,62 @@ router.get('/:id/workflow', async (req, res) => {
 
 // ============ BATCH OPERATIONS ============
 
+// Configure multer for batch schedule attachments
+const batchScheduleStorage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const dir = path.join(__dirname, `../../uploads/calendar-attachments`);
+    await fs.mkdir(dir, { recursive: true }).catch(() => {});
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const uploadBatchAttachments = multer({
+  storage: batchScheduleStorage,
+  limits: { fileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, Word documents, and images are allowed'));
+    }
+  }
+}).array('attachments', 10);
+
 // Batch schedule calendar events
-router.post('/batch/schedule', async (req, res) => {
+router.post('/batch/schedule', (req, res, next) => {
+  // Check if files are being uploaded
+  if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+    uploadBatchAttachments(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+}, async (req, res) => {
   try {
-    const { candidateIds, eventType, dateTime, duration = 60 } = req.body;
+    // Parse FormData fields
+    let candidateIds, eventType, dateTime, duration = 60;
+    
+    if (req.body.candidateIds) {
+      candidateIds = typeof req.body.candidateIds === 'string' 
+        ? JSON.parse(req.body.candidateIds) 
+        : req.body.candidateIds;
+    } else {
+      candidateIds = req.body.candidateIds;
+    }
+    
+    eventType = req.body.eventType;
+    dateTime = req.body.dateTime;
+    duration = req.body.duration ? parseInt(req.body.duration) : 60;
 
     if (!candidateIds || !Array.isArray(candidateIds) || candidateIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Please select at least one candidate' });
@@ -1358,9 +1410,26 @@ router.post('/batch/schedule', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Event type and date/time are required' });
     }
 
+    // Handle timezone properly - datetime-local sends in local timezone, convert to UTC
+    // Parse the datetime string and create Date object (handles local timezone correctly)
     const startTime = new Date(dateTime);
+    // Ensure we're working with the correct timezone
+    if (isNaN(startTime.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date/time format' });
+    }
+    
     const endTime = new Date(startTime);
     endTime.setMinutes(endTime.getMinutes() + (duration || 60));
+
+    // Handle file attachments
+    const attachmentPaths = [];
+    if (req.files && req.files.length > 0) {
+      const uploadsDir = path.join(__dirname, '../../uploads');
+      req.files.forEach(file => {
+        const relativePath = path.relative(uploadsDir, file.path).replace(/\\/g, '/');
+        attachmentPaths.push(relativePath);
+      });
+    }
 
     // Fetch all candidates
     const candidates = await req.prisma.candidate.findMany({
@@ -1569,7 +1638,9 @@ router.post('/batch/schedule', async (req, res) => {
           endTime,
           meetingLink: googleEvent?.hangoutLink || googleEvent?.htmlLink,
           attendees: attendeeEmails,
-          googleEventId: googleEvent?.id
+          googleEventId: googleEvent?.id,
+          attachmentPath: attachmentPaths.length > 0 ? attachmentPaths[0] : null, // First attachment for backward compatibility
+          attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null // All attachments
         }
       });
 
@@ -1617,6 +1688,100 @@ router.post('/batch/schedule', async (req, res) => {
       success: false, 
       message: error.message || 'Server error',
       error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// ============ STEP MANAGEMENT ============
+
+// Undo scheduled step - cancel event and revert to unscheduled state
+router.post('/:id/undo-scheduled-step', async (req, res) => {
+  try {
+    const { stepNumber } = req.body;
+
+    if (!stepNumber) {
+      return res.status(400).json({ success: false, message: 'Step number is required' });
+    }
+
+    const candidate = await req.prisma.candidate.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!candidate) {
+      return res.status(404).json({ success: false, message: 'Candidate not found' });
+    }
+
+    // Find the scheduled event for this step
+    const event = await req.prisma.calendarEvent.findFirst({
+      where: {
+        candidateId: candidate.id,
+        stepNumber: parseInt(stepNumber),
+        status: { in: ['SCHEDULED', 'RESCHEDULED'] }
+      }
+    });
+
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'No scheduled event found for this step' });
+    }
+
+    // Cancel in Google Calendar
+    if (event.googleEventId) {
+      try {
+        await calendarService.deleteEvent(event.googleEventId);
+      } catch (gcalError) {
+        logger.warn('Google Calendar event deletion failed:', gcalError);
+        // Continue even if Google Calendar deletion fails
+      }
+    }
+
+    // Delete the calendar event (revert to unscheduled state)
+    await req.prisma.calendarEvent.delete({
+      where: { id: event.id }
+    });
+
+    // Revert candidate status fields if they were set by this event
+    const updateData = {};
+    const fieldRevertMap = {
+      'HR_INDUCTION': { hrInductionScheduled: false },
+      'CEO_INDUCTION': { ceoInductionScheduled: false },
+      'SALES_INDUCTION': { salesInductionScheduled: false },
+      'CHECKIN_CALL': { checkinScheduled: false },
+      'TRAINING_PLAN': { trainingPlanSent: false },
+      'WHATSAPP_TASK': { whatsappTaskCreated: false }
+    };
+
+    if (fieldRevertMap[event.type]) {
+      Object.assign(updateData, fieldRevertMap[event.type]);
+    }
+
+    // Update candidate if needed
+    if (Object.keys(updateData).length > 0) {
+      await req.prisma.candidate.update({
+        where: { id: candidate.id },
+        data: updateData
+      });
+    }
+
+    // Log activity
+    if (req.user && req.user.id) {
+      try {
+        await logActivity(req.prisma, candidate.id, req.user.id, 'STEP_UNSCHEDULED', 
+          `Step ${stepNumber} (${event.type}) unscheduled - event cancelled`);
+      } catch (logError) {
+        logger.warn('Failed to log activity:', logError);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: 'Step unscheduled successfully',
+      data: { stepNumber, eventType: event.type }
+    });
+  } catch (error) {
+    logger.error('Error undoing scheduled step:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Server error' 
     });
   }
 });

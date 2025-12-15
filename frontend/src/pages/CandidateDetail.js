@@ -1285,6 +1285,29 @@ const CandidateDetail = () => {
                           >
                             Scheduled
                           </button>
+                          {/* Undo scheduled step button */}
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm('Are you sure you want to unschedule this step? The calendar event will be cancelled.')) {
+                                return;
+                              }
+                              setActionLoading(`undoStep${step.step}`);
+                              try {
+                                await candidateApi.undoScheduledStep(candidate.id, step.step);
+                                toast.success('Step unscheduled successfully');
+                                fetchCandidate();
+                              } catch (error) {
+                                toast.error(error.response?.data?.message || 'Failed to unschedule step');
+                              } finally {
+                                setActionLoading('');
+                              }
+                            }}
+                            className="btn btn-danger text-sm"
+                            disabled={actionLoading === `undoStep${step.step}`}
+                            title="Undo scheduled step"
+                          >
+                            {actionLoading === `undoStep${step.step}` ? 'Undoing...' : 'Undo'}
+                          </button>
                           {/* Send button next to Scheduled - available for all steps including Step 1 */}
                           {!step.actions && (
                             <button

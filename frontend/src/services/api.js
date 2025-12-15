@@ -123,10 +123,22 @@ export const candidateApi = {
   markJoined: (id) => api.post(`/candidates/${id}/mark-joined`),
   
   // Batch operations
-  batchSchedule: (data) => api.post('/candidates/batch/schedule', data),
+  batchSchedule: (data) => {
+    // If FormData, don't set Content-Type header (browser will set it with boundary)
+    if (data instanceof FormData) {
+      return api.post('/candidates/batch/schedule', data, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+    }
+    return api.post('/candidates/batch/schedule', data);
+  },
   
   // Complete step
   completeStep: (id, stepNumber) => api.post(`/candidates/${id}/complete-step`, { stepNumber }),
+  // Undo scheduled step
+  undoScheduledStep: (id, stepNumber) => api.post(`/candidates/${id}/undo-scheduled-step`, { stepNumber }),
   
   // Initialize department tasks
   initDepartmentTasks: (data) => api.post('/candidates/init-department-tasks', data)

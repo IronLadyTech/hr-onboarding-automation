@@ -18,6 +18,7 @@ const Calendar = () => {
     dateTime: '',
     duration: 60
   });
+  const [batchAttachments, setBatchAttachments] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');
@@ -105,12 +106,15 @@ const Calendar = () => {
   };
 
   const handleCancel = async (id) => {
+    if (!window.confirm('Are you sure you want to cancel this event? The step will be reverted to unscheduled state.')) {
+      return;
+    }
     try {
       await calendarApi.cancel(id, { reason: 'Cancelled by user' });
-      toast.success('Event cancelled');
+      toast.success('Event cancelled and step reverted to unscheduled state');
       fetchData();
     } catch (error) {
-      toast.error('Failed to cancel event');
+      toast.error(error.response?.data?.message || 'Failed to cancel event');
     }
   };
 
@@ -182,15 +186,25 @@ const Calendar = () => {
 
     setBatchLoading(true);
     try {
-      // Batch mode only - schedule all at once
-      await candidateApi.batchSchedule({
-        candidateIds: selectedCandidates,
-        ...batchScheduleData
+      // Create FormData to handle file attachments
+      const formData = new FormData();
+      formData.append('candidateIds', JSON.stringify(selectedCandidates));
+      formData.append('eventType', batchScheduleData.eventType);
+      formData.append('dateTime', batchScheduleData.dateTime);
+      formData.append('duration', batchScheduleData.duration.toString());
+      
+      // Append all attachments
+      batchAttachments.forEach((file) => {
+        formData.append('attachments', file);
       });
+
+      // Batch mode only - schedule all at once
+      await candidateApi.batchSchedule(formData);
       toast.success(`Successfully scheduled ${batchScheduleData.eventType} for ${selectedCandidates.length} candidate(s)`);
       setShowBatchScheduleModal(false);
       setSelectedCandidates([]);
       setBatchScheduleData({ eventType: '', dateTime: '', duration: 60 });
+      setBatchAttachments([]);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to schedule events');
@@ -565,11 +579,51 @@ const Calendar = () => {
               </select>
             </div>
 
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Attachments (Optional)
+              </label>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files);
+                  setBatchAttachments(files);
+                }}
+                className="input w-full"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              />
+              {batchAttachments.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {batchAttachments.map((file, index) => (
+                    <div key={index} className="text-xs text-gray-600 flex items-center justify-between bg-gray-50 p-2 rounded">
+                      <span>{file.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newFiles = [...batchAttachments];
+                          newFiles.splice(index, 1);
+                          setBatchAttachments(newFiles);
+                        }}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Attach files that will be included in the email sent to candidates
+              </p>
+            </div>
+
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => {
                   setShowBatchScheduleModal(false);
                   setBatchScheduleData({ eventType: '', dateTime: '', duration: 60 });
+                  setBatchAttachments([]);
                 }}
                 className="btn btn-secondary"
                 disabled={batchLoading}

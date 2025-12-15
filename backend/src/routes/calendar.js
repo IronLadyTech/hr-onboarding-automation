@@ -591,13 +591,14 @@ router.post('/:id/reschedule', async (req, res) => {
   }
 });
 
-// Cancel event
+// Cancel event - reverts step to unscheduled state
 router.post('/:id/cancel', async (req, res) => {
   try {
     const { reason } = req.body;
 
     const existing = await req.prisma.calendarEvent.findUnique({
-      where: { id: req.params.id }
+      where: { id: req.params.id },
+      include: { candidate: true }
     });
 
     if (!existing) {
@@ -610,20 +611,40 @@ router.post('/:id/cancel', async (req, res) => {
         await calendarService.deleteEvent(existing.googleEventId);
       } catch (gcalError) {
         logger.warn('Google Calendar event deletion failed:', gcalError);
+        // Continue even if Google Calendar deletion fails
       }
     }
 
-    const event = await req.prisma.calendarEvent.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'CANCELLED',
-        metadata: {
-          ...existing.metadata,
-          cancelledAt: new Date().toISOString(),
-          cancellationReason: reason
-        }
-      }
+    // Delete the calendar event (revert to unscheduled state)
+    await req.prisma.calendarEvent.delete({
+      where: { id: req.params.id }
     });
+
+    // Revert candidate status fields if they were set by this event
+    const candidate = existing.candidate;
+    const updateData = {};
+    
+    // Map event types to candidate fields that should be reverted
+    const fieldRevertMap = {
+      'HR_INDUCTION': { hrInductionScheduled: false },
+      'CEO_INDUCTION': { ceoInductionScheduled: false },
+      'SALES_INDUCTION': { salesInductionScheduled: false },
+      'CHECKIN_CALL': { checkinScheduled: false },
+      'TRAINING_PLAN': { trainingPlanSent: false },
+      'WHATSAPP_TASK': { whatsappTaskCreated: false }
+    };
+
+    if (fieldRevertMap[existing.type]) {
+      Object.assign(updateData, fieldRevertMap[existing.type]);
+    }
+
+    // Update candidate if needed
+    if (Object.keys(updateData).length > 0) {
+      await req.prisma.candidate.update({
+        where: { id: existing.candidateId },
+        data: updateData
+      });
+    }
 
     // Log activity
     if (req.user && req.user.id) {
@@ -633,8 +654,8 @@ router.post('/:id/cancel', async (req, res) => {
             candidateId: existing.candidateId,
             userId: req.user.id,
             action: 'EVENT_CANCELLED',
-            description: `Event cancelled: ${existing.title}`,
-            metadata: { eventId: event.id, reason }
+            description: `Event cancelled and step reverted to unscheduled: ${existing.title}`,
+            metadata: { eventId: existing.id, reason, eventType: existing.type }
           }
         });
       } catch (logError) {
@@ -643,10 +664,14 @@ router.post('/:id/cancel', async (req, res) => {
       }
     }
 
-    res.json({ success: true, data: event });
+    res.json({ 
+      success: true, 
+      message: 'Event cancelled and step reverted to unscheduled state',
+      data: { cancelled: true }
+    });
   } catch (error) {
     logger.error('Error cancelling event:', error);
-    res.status(500).json({ success: false, message: error.message });
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
