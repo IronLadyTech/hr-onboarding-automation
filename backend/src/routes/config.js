@@ -1000,15 +1000,25 @@ router.post('/department-steps/reorder', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Steps must be from the same department' });
     }
 
-    // Swap step numbers using a transaction
+    // Swap step numbers using a transaction with temporary step number to avoid unique constraint violation
+    // Strategy: Use a temporary negative number to avoid conflicts
+    const tempStepNumber = -999999; // Temporary number that won't conflict
+    
     await req.prisma.$transaction([
+      // Step 1: Move step1 to temporary number
       req.prisma.departmentStepTemplate.update({
         where: { id: stepId1 },
-        data: { stepNumber: step2.stepNumber }
+        data: { stepNumber: tempStepNumber }
       }),
+      // Step 2: Move step2 to step1's original number
       req.prisma.departmentStepTemplate.update({
         where: { id: stepId2 },
         data: { stepNumber: step1.stepNumber }
+      }),
+      // Step 3: Move step1 to step2's original number
+      req.prisma.departmentStepTemplate.update({
+        where: { id: stepId1 },
+        data: { stepNumber: step2.stepNumber }
       })
     ]);
 
