@@ -1564,10 +1564,10 @@ router.post('/batch/schedule', (req, res, next) => {
         });
 
         if (stepTemplate) {
-          // Set stepNumber from template if not provided
-          if (!finalStepNumber) {
-            finalStepNumber = stepTemplate.stepNumber;
-          }
+          // Always use stepNumber from template (most reliable)
+          // This ensures we use the correct stepNumber even if frontend sends wrong one
+          finalStepNumber = stepTemplate.stepNumber;
+          logger.info(`✅ Found step template: stepNumber=${stepTemplate.stepNumber}, type=${stepTemplate.type}, department=${department}`);
           
           // Replace placeholders in title for batch session
           let batchTitle = stepTemplate.title
@@ -1656,6 +1656,11 @@ router.post('/batch/schedule', (req, res, next) => {
       // Continue without Google Calendar event
     }
 
+    // Ensure we have a valid stepNumber
+    if (!finalStepNumber) {
+      logger.warn(`⚠️ No stepNumber found for eventType: ${eventType}, department: ${department}. Event will be created without stepNumber.`);
+    }
+
     // Create calendar events for each candidate
     const events = [];
     for (const candidate of candidates) {
@@ -1672,9 +1677,11 @@ router.post('/batch/schedule', (req, res, next) => {
           googleEventId: googleEvent?.id,
           attachmentPath: attachmentPaths.length > 0 ? attachmentPaths[0] : null, // First attachment for backward compatibility
           attachmentPaths: attachmentPaths.length > 0 ? attachmentPaths : null, // All attachments
-          stepNumber: finalStepNumber // CRITICAL: Set stepNumber so candidate profile can find the event
+          stepNumber: finalStepNumber ? parseInt(finalStepNumber) : null // CRITICAL: Set stepNumber so candidate profile can find the event (ensure it's an integer)
         }
       });
+      
+      logger.info(`✅ Created calendar event for candidate ${candidate.id}: type=${eventConfig.type}, stepNumber=${finalStepNumber}, eventId=${event.id}`);
 
       // If this is Step 1 (OFFER_LETTER) with attachment, also save it to candidate.offerLetterPath
       // This ensures the offer letter shows in the candidate profile section (same as individual scheduling)

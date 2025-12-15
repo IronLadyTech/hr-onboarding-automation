@@ -572,10 +572,14 @@ const CandidateDetail = () => {
     }
     
     // If stepNumber is provided, match by both type and stepNumber
-    if (stepNumber !== null) {
+    if (stepNumber !== null && stepNumber !== undefined) {
+      // Ensure both are numbers for comparison
+      const searchStepNumber = typeof stepNumber === 'number' ? stepNumber : parseInt(stepNumber);
       return candidate.calendarEvents.find(e => 
         e.type === searchEventType && 
-        e.stepNumber === stepNumber && 
+        e.stepNumber !== null &&
+        e.stepNumber !== undefined &&
+        (typeof e.stepNumber === 'number' ? e.stepNumber : parseInt(e.stepNumber)) === searchStepNumber &&
         e.status !== 'CANCELLED'
       );
     }
@@ -1035,7 +1039,11 @@ const CandidateDetail = () => {
     // Build steps from department templates
     return departmentSteps.map((stepTemplate) => {
       // Use stepNumber to uniquely identify the event for this specific step
-      const event = getScheduledEventByType(stepTemplate.type, stepTemplate.stepNumber);
+      // Ensure stepNumber is a number for comparison
+      const stepNum = typeof stepTemplate.stepNumber === 'number' 
+        ? stepTemplate.stepNumber 
+        : parseInt(stepTemplate.stepNumber);
+      const event = getScheduledEventByType(stepTemplate.type, stepNum);
       const status = getStepStatus(stepTemplate);
       const description = getStepDescription(stepTemplate);
       const title = replacePlaceholders(stepTemplate.title);
