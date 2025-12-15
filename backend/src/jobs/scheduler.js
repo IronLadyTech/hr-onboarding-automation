@@ -909,11 +909,19 @@ const autoCompleteCalendarSteps = async () => {
           }
           
           // Priority 2: If not found by stepNumber, try to find by event type (fallback for old events)
+          // Map event type back to step type (CUSTOM -> MANUAL, WHATSAPP_TASK -> WHATSAPP_ADDITION)
           if (!stepTemplate) {
+            let searchType = event.type;
+            if (event.type === 'CUSTOM') {
+              searchType = 'MANUAL'; // CUSTOM events come from MANUAL steps
+            } else if (event.type === 'WHATSAPP_TASK') {
+              searchType = 'WHATSAPP_ADDITION'; // WHATSAPP_TASK events come from WHATSAPP_ADDITION steps
+            }
+            
             stepTemplate = await prisma.departmentStepTemplate.findFirst({
               where: {
                 department: candidate.department,
-                type: event.type === 'DEPARTMENT_INDUCTION' ? 'DEPARTMENT_INDUCTION' : event.type
+                type: searchType
               },
               orderBy: { stepNumber: 'asc' },
               include: {

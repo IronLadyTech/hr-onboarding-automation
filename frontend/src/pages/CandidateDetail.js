@@ -562,16 +562,25 @@ const CandidateDetail = () => {
   // This ensures each step has its own unique event, even if they share the same type
   const getScheduledEventByType = (eventType, stepNumber = null) => {
     if (!candidate?.calendarEvents) return null;
+    
+    // Map step type to event type (MANUAL -> CUSTOM, WHATSAPP_ADDITION -> WHATSAPP_TASK)
+    let searchEventType = eventType;
+    if (eventType === 'MANUAL') {
+      searchEventType = 'CUSTOM';
+    } else if (eventType === 'WHATSAPP_ADDITION') {
+      searchEventType = 'WHATSAPP_TASK';
+    }
+    
     // If stepNumber is provided, match by both type and stepNumber
     if (stepNumber !== null) {
       return candidate.calendarEvents.find(e => 
-        e.type === eventType && 
+        e.type === searchEventType && 
         e.stepNumber === stepNumber && 
         e.status !== 'CANCELLED'
       );
     }
     // Fallback: match by type only (for backward compatibility)
-    return candidate.calendarEvents.find(e => e.type === eventType && e.status !== 'CANCELLED');
+    return candidate.calendarEvents.find(e => e.type === searchEventType && e.status !== 'CANCELLED');
   };
 
   // Helper to get scheduled event for a step (uses stepNumber for unique identification)
