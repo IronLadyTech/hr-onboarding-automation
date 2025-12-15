@@ -222,3 +222,37 @@ input, select, textarea {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Mobile-only styles (max-width: 639px) - does not affect tablet view */
+@media (max-width: 639px) {
+  /* Table styles for mobile */
+  th, td {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  /* Badge styles for mobile */
+  .badge {
+    padding: 2px 8px;
+    font-size: 11px;
+  }
+
+  /* Input styles for mobile */
+  .input {
+    padding: 12px 14px;
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+
+  /* Card styles for mobile */
+  .card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  /* Button styles for mobile - keep touch-friendly size */
+  .btn {
+    padding: 12px 16px;
+    font-size: 15px;
+    min-height: 44px;
+  }
+}
