@@ -149,12 +149,12 @@ const Layout = () => {
       {/* Main content - Maintains same ratio with sidebar on all screen sizes */}
       <main className="flex-1 overflow-auto min-h-screen" style={{ width: '100%', maxWidth: '100%' }}>
         {/* Top bar */}
-        <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4 lg:px-6">
+        <header className="h-16 bg-white shadow-sm flex items-center justify-between px-4">
           <div className="flex items-center space-x-3">
-            <h1 className="text-lg lg:text-xl font-semibold text-gray-800">HR Onboarding</h1>
+            <h1 className="text-lg font-semibold text-gray-800">HR Onboarding</h1>
           </div>
-          <div className="flex items-center space-x-2 lg:space-x-4">
-            <span className="text-xs lg:text-sm text-gray-600 hidden sm:inline">
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-gray-600 hidden sm:inline">
               {new Date().toLocaleDateString('en-IN', { 
                 weekday: 'long', 
                 year: 'numeric', 
@@ -162,7 +162,7 @@ const Layout = () => {
                 day: 'numeric' 
               })}
             </span>
-            <span className="text-xs lg:text-sm text-gray-600 sm:hidden">
+            <span className="text-xs text-gray-600 sm:hidden">
               {new Date().toLocaleDateString('en-IN', { 
                 day: 'numeric',
                 month: 'short'
@@ -172,7 +172,7 @@ const Layout = () => {
         </header>
 
         {/* Page content */}
-        <div className="p-4 lg:p-6">
+        <div className="p-4">
           <Outlet />
         </div>
       </main>

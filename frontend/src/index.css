@@ -120,7 +120,7 @@ input, select, textarea {
   color: #374151;
 }
 
-/* Button styles */
+/* Button styles - Same on all screen sizes */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -133,13 +133,6 @@ input, select, textarea {
   cursor: pointer;
   border: none;
   min-height: 44px; /* Touch-friendly minimum size */
-}
-
-@media (min-width: 640px) {
-  .btn {
-    padding: 8px 16px;
-    min-height: auto;
-  }
 }
 
 .btn-primary {
@@ -178,18 +171,12 @@ input, select, textarea {
   background-color: #059669;
 }
 
-/* Card styles */
+/* Card styles - Same on all screen sizes */
 .card {
   background: white;
   border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 16px;
-}
-
-@media (min-width: 1024px) {
-  .card {
-    padding: 24px;
-  }
 }
 
 /* Input styles */
@@ -223,117 +210,113 @@ input, select, textarea {
   100% { transform: rotate(360deg); }
 }
 
-/* Mobile-only styles (max-width: 639px) - does not affect tablet view */
-@media (max-width: 639px) {
-  /* Ensure layout container uses flex on mobile */
-  .min-h-screen.flex {
-    flex-direction: row;
-    width: 100%;
-    overflow-x: hidden;
-  }
+/* Consistent styles for all screen sizes - mobile and desktop same */
+/* Ensure layout container uses flex on all screens */
+.min-h-screen.flex {
+  flex-direction: row;
+  width: 100%;
+  overflow-x: hidden;
+}
 
-  /* Sidebar scaling for mobile - maintains same ratio proportionally */
-  /* w-64 = 256px, w-20 = 80px on desktop */
-  /* On mobile, scale to maintain ~25% ratio: ~80px when closed, ~200px when open */
-  aside {
-    min-width: 0;
-    flex-shrink: 0;
-  }
+/* Sidebar - same on all screen sizes */
+aside {
+  min-width: 0;
+  flex-shrink: 0;
+}
 
-  /* Scale sidebar width on mobile to maintain ratio */
-  aside.w-64 {
-    width: 200px !important;
-  }
+/* Scale sidebar width to maintain same ratio on all screens */
+aside.w-64 {
+  width: 200px !important;
+}
 
-  aside.w-20 {
-    width: 60px !important;
-  }
+aside.w-20 {
+  width: 60px !important;
+}
 
-  /* Ensure main content doesn't overflow */
-  main {
-    min-width: 0;
-    flex: 1;
-    overflow-x: hidden;
-  }
+/* Ensure main content doesn't overflow */
+main {
+  min-width: 0;
+  flex: 1;
+  overflow-x: hidden;
+}
 
-  /* Scale down sidebar content on mobile */
-  aside .text-xl {
-    font-size: 16px;
-  }
+/* Sidebar content - same sizing on all screens */
+aside .text-xl {
+  font-size: 16px;
+}
 
-  aside .font-bold.text-xl {
-    font-size: 14px;
-  }
+aside .font-bold.text-xl {
+  font-size: 14px;
+}
 
-  aside .text-sm {
-    font-size: 11px;
-  }
+aside .text-sm {
+  font-size: 11px;
+}
 
-  aside .text-xs {
-    font-size: 10px;
-  }
+aside .text-xs {
+  font-size: 10px;
+}
 
-  aside .h-8 {
-    height: 20px;
-  }
+aside .h-8 {
+  height: 20px;
+}
 
-  aside .w-10 {
-    width: 32px;
-    height: 32px;
-  }
+aside .w-10 {
+  width: 32px;
+  height: 32px;
+}
 
-  /* Adjust sidebar padding on mobile */
-  aside .px-4 {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
+/* Sidebar padding - same on all screens */
+aside .px-4 {
+  padding-left: 8px;
+  padding-right: 8px;
+}
 
-  aside .py-3 {
-    padding-top: 8px;
-    padding-bottom: 8px;
-  }
+aside .py-3 {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
 
-  aside .mx-2 {
-    margin-left: 4px;
-    margin-right: 4px;
-  }
+aside .mx-2 {
+  margin-left: 4px;
+  margin-right: 4px;
+}
 
-  aside .ml-3 {
-    margin-left: 8px;
-  }
+aside .ml-3 {
+  margin-left: 8px;
+}
 
-  aside .space-x-2 > * + * {
-    margin-left: 4px;
-  }
+aside .space-x-2 > * + * {
+  margin-left: 4px;
+}
 
-  /* Table styles for mobile */
-  th, td {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
+/* Table styles - same on all screens */
+th, td {
+  padding: 8px 12px;
+  font-size: 13px;
+}
 
-  /* Badge styles for mobile */
-  .badge {
-    padding: 2px 8px;
-    font-size: 11px;
-  }
+/* Badge styles - same on all screens */
+.badge {
+  padding: 2px 8px;
+  font-size: 11px;
+}
 
-  /* Input styles for mobile */
-  .input {
-    padding: 12px 14px;
-    font-size: 16px; /* Prevents zoom on iOS */
-  }
+/* Input styles - same on all screens */
+.input {
+  padding: 12px 14px;
+  font-size: 16px; /* Prevents zoom on iOS */
+}
 
-  /* Card styles for mobile */
-  .card {
-    padding: 12px;
-    border-radius: 8px;
-  }
+/* Card styles - same on all screens */
+.card {
+  padding: 12px;
+  border-radius: 8px;
+}
 
-  /* Button styles for mobile - keep touch-friendly size */
-  .btn {
-    padding: 12px 16px;
-    font-size: 15px;
-    min-height: 44px;
-  }
+/* Button styles - same on all screens */
+.btn {
+  padding: 12px 16px;
+  font-size: 15px;
+  min-height: 44px;
 }
