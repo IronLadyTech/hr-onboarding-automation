@@ -1609,7 +1609,7 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
 // Update HR email and optionally configure Google Cloud
 router.post('/update-hr-email', requireAdmin, async (req, res) => {
   try {
-    const { hrEmail, hrName, updateSmtpUser, smtpPassword } = req.body;
+    const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure } = req.body;
     
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
@@ -1639,7 +1639,7 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
 
     logger.info(`✅ HR email updated from ${oldHrEmail || 'none'} to ${hrEmail}`);
 
-    // Store SMTP credentials in database (dynamic, no restart needed)
+    // Store SMTP credentials and settings in database (dynamic, no restart needed)
     let smtpUpdated = false;
     if (updateSmtpUser && smtpPassword) {
       try {
@@ -1655,9 +1655,37 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
           update: { value: smtpPassword },
           create: { key: 'smtp_pass', value: smtpPassword }
         });
+
+        // Store SMTP host, port, and secure settings if provided
+        if (smtpHost) {
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'smtp_host' },
+            update: { value: smtpHost },
+            create: { key: 'smtp_host', value: smtpHost }
+          });
+          logger.info(`✅ SMTP Host stored: ${smtpHost}`);
+        }
+
+        if (smtpPort) {
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'smtp_port' },
+            update: { value: smtpPort.toString() },
+            create: { key: 'smtp_port', value: smtpPort.toString() }
+          });
+          logger.info(`✅ SMTP Port stored: ${smtpPort}`);
+        }
+
+        if (smtpSecure !== undefined) {
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'smtp_secure' },
+            update: { value: smtpSecure.toString() },
+            create: { key: 'smtp_secure', value: smtpSecure.toString() }
+          });
+          logger.info(`✅ SMTP Secure stored: ${smtpSecure}`);
+        }
         
         smtpUpdated = true;
-        logger.info(`✅ SMTP credentials stored in database for ${hrEmail} (no restart needed)`);
+        logger.info(`✅ SMTP credentials and settings stored in database for ${hrEmail} (no restart needed)`);
       } catch (smtpError) {
         logger.error('Error storing SMTP credentials:', smtpError);
         // Don't fail the request, just log the error

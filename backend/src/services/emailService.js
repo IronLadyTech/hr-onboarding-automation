@@ -7,14 +7,17 @@ const logger = require('../utils/logger');
 const createTransporter = async (prisma = null) => {
   let smtpUser = process.env.SMTP_USER;
   let smtpPass = process.env.SMTP_PASS;
+  let smtpHost = process.env.SMTP_HOST;
+  let smtpPort = process.env.SMTP_PORT;
+  let smtpSecure = process.env.SMTP_SECURE === 'true';
   
-  // If prisma is provided, try to get SMTP credentials from database (dynamic)
+  // If prisma is provided, try to get SMTP credentials and settings from database (dynamic)
   if (prisma) {
     try {
       const smtpConfigs = await prisma.workflowConfig.findMany({
         where: {
           key: {
-            in: ['smtp_user', 'smtp_pass']
+            in: ['smtp_user', 'smtp_pass', 'smtp_host', 'smtp_port', 'smtp_secure']
           }
         }
       });
@@ -27,15 +30,24 @@ const createTransporter = async (prisma = null) => {
       if (smtpConfigMap.smtp_pass) {
         smtpPass = smtpConfigMap.smtp_pass;
       }
+      if (smtpConfigMap.smtp_host) {
+        smtpHost = smtpConfigMap.smtp_host;
+      }
+      if (smtpConfigMap.smtp_port) {
+        smtpPort = smtpConfigMap.smtp_port;
+      }
+      if (smtpConfigMap.smtp_secure !== undefined) {
+        smtpSecure = smtpConfigMap.smtp_secure === 'true';
+      }
     } catch (error) {
       logger.warn('Could not fetch SMTP credentials from database, using env vars:', error.message);
     }
   }
   
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true',
+    host: smtpHost,
+    port: parseInt(smtpPort) || 587,
+    secure: smtpSecure,
     auth: {
       user: smtpUser,
       pass: smtpPass

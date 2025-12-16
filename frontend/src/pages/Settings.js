@@ -71,6 +71,10 @@ const Settings = () => {
   const [updateSmtpUser, setUpdateSmtpUser] = useState(false);
   const [newHrEmail, setNewHrEmail] = useState('');
   const [newHrName, setNewHrName] = useState('');
+  const [emailProvider, setEmailProvider] = useState('gmail'); // 'gmail', 'godaddy', 'other'
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState('587');
+  const [smtpSecure, setSmtpSecure] = useState(false);
   
   // HR Email Change Wizard state
   const [showEmailWizard, setShowEmailWizard] = useState(false);
@@ -686,6 +690,10 @@ const Settings = () => {
                   setNewHrName(config.hr_name || '');
                   setSmtpPassword('');
                   setUpdateSmtpUser(true);
+                  setEmailProvider('gmail');
+                  setSmtpHost('smtp.gmail.com');
+                  setSmtpPort('587');
+                  setSmtpSecure(false);
                 }}
                 className="btn btn-primary text-sm"
               >
@@ -2005,68 +2013,181 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 2: Generate App Password */}
+              {/* Step 2: SMTP Configuration */}
               {wizardStep === 2 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
-                    <p className="text-sm text-yellow-800 mb-2">
-                      ⚠️ <strong>Important:</strong> To send emails FROM your personal email address, you need SMTP credentials from that email. Generate an App Password for <strong>{newHrEmail || 'your new HR email'}</strong> and enter it below.
-                    </p>
-                  </div>
+                  
+                  {/* Email Provider Selection */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
-                      <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
-                    </p>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
-                      <li>Click the button below to open Gmail App Passwords</li>
-                      <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
-                      <li>Select "Mail" and "Other (Custom name)"</li>
-                      <li>Enter name: "HR Onboarding System"</li>
-                      <li>Click "Generate"</li>
-                      <li>Copy the 16-character password (remove spaces)</li>
-                      <li>Paste it in the field below (or skip if not needed)</li>
-                    </ol>
-                    <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Select Your Email Provider *
+                    </label>
+                    <select
+                      value={emailProvider}
+                      onChange={(e) => {
+                        const provider = e.target.value;
+                        setEmailProvider(provider);
+                        // Auto-fill SMTP settings based on provider
+                        if (provider === 'gmail') {
+                          setSmtpHost('smtp.gmail.com');
+                          setSmtpPort('587');
+                          setSmtpSecure(false);
+                        } else if (provider === 'godaddy') {
+                          setSmtpHost('smtp.secureserver.net');
+                          setSmtpPort('587');
+                          setSmtpSecure(false);
+                        } else {
+                          // Reset for custom
+                          setSmtpHost('');
+                          setSmtpPort('587');
+                          setSmtpSecure(false);
+                        }
+                      }}
+                      className="input w-full"
+                    >
+                      <option value="gmail">Gmail</option>
+                      <option value="godaddy">GoDaddy Email</option>
+                      <option value="other">Other Provider (Custom SMTP)</option>
+                    </select>
+                  </div>
+
+                  {/* Gmail Instructions */}
+                  {emailProvider === 'gmail' && (
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                      <p className="text-sm text-gray-700 mb-3">
+                        <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
+                      </p>
+                      <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                        <li>Click the button below to open Gmail App Passwords</li>
+                        <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
+                        <li>Select "Mail" and "Other (Custom name)"</li>
+                        <li>Enter name: "HR Onboarding System"</li>
+                        <li>Click "Generate"</li>
+                        <li>Copy the 16-character password (remove spaces)</li>
+                        <li>Paste it in the password field below</li>
+                      </ol>
                       <a
                         href="https://myaccount.google.com/apppasswords"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="btn btn-primary block text-center"
+                        className="btn btn-primary block text-center mb-3"
                       >
                         🔗 Open Gmail App Passwords
                       </a>
+                    </div>
+                  )}
+
+                  {/* GoDaddy Instructions */}
+                  {emailProvider === 'godaddy' && (
+                    <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-gray-700 mb-3">
+                        <strong>GoDaddy Email Configuration:</strong>
+                      </p>
+                      <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 mb-4">
+                        <li>SMTP settings are pre-filled below (smtp.secureserver.net:587)</li>
+                        <li>Use your GoDaddy email password (or app password if required)</li>
+                        <li>If port 587 doesn't work, try port 465 with SSL enabled</li>
+                        <li>You can find your exact SMTP settings in GoDaddy Email & Office Dashboard</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Custom Provider Instructions */}
+                  {emailProvider === 'other' && (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800 mb-3">
+                        <strong>Custom SMTP Provider:</strong>
+                      </p>
+                      <ul className="list-disc list-inside space-y-2 text-sm text-yellow-800 mb-4">
+                        <li>Enter your SMTP server details below</li>
+                        <li>Common ports: 587 (TLS), 465 (SSL), 25 (unsecured)</li>
+                        <li>Enable SSL/TLS if your provider requires it</li>
+                        <li>Contact your email provider for exact SMTP settings</li>
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* SMTP Configuration Fields */}
+                  <div className="space-y-3 p-4 bg-gray-50 border border-gray-200 rounded-md">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        SMTP Host *
+                      </label>
+                      <input
+                        type="text"
+                        value={smtpHost}
+                        onChange={(e) => setSmtpHost(e.target.value)}
+                        className="input w-full"
+                        placeholder="smtp.gmail.com or smtp.secureserver.net"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Paste App Password Here * (16 characters, remove spaces)
+                          SMTP Port *
                         </label>
                         <input
-                          type="password"
-                          value={smtpPassword}
-                          onChange={(e) => setSmtpPassword(e.target.value)}
+                          type="number"
+                          value={smtpPort}
+                          onChange={(e) => setSmtpPort(e.target.value)}
                           className="input w-full"
-                          placeholder="abcdefghijklmnop (16 characters, no spaces)"
+                          placeholder="587"
                           required
                         />
-                        <p className="text-xs text-gray-600 mt-1">
-                          This App Password will be used to authenticate SMTP for <strong>{newHrEmail || 'your new HR email'}</strong>
-                        </p>
                       </div>
-                      <button
-                        onClick={() => {
-                          if (!smtpPassword || smtpPassword.length < 16) {
-                            toast.error('Please enter a valid 16-character App Password');
-                            return;
-                          }
-                          setWizardCompleted(prev => ({ ...prev, appPassword: true }));
-                          setWizardStep(3);
-                        }}
-                        className="btn btn-primary w-full"
-                        disabled={!smtpPassword || smtpPassword.length < 16}
-                      >
-                        ✓ Continue with App Password
-                      </button>
+                      <div className="flex items-end">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={smtpSecure}
+                            onChange={(e) => setSmtpSecure(e.target.checked)}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-700">Use SSL/TLS</span>
+                        </label>
+                      </div>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Email Password / App Password *
+                      </label>
+                      <input
+                        type="password"
+                        value={smtpPassword}
+                        onChange={(e) => setSmtpPassword(e.target.value)}
+                        className="input w-full"
+                        placeholder={emailProvider === 'gmail' ? '16-character app password' : 'Your email password'}
+                        required
+                      />
+                      <p className="text-xs text-gray-600 mt-1">
+                        {emailProvider === 'gmail' 
+                          ? 'Gmail requires a 16-character App Password (not your regular password)'
+                          : 'Enter your email account password or app-specific password'}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (!smtpHost || !smtpPort || !smtpPassword) {
+                          toast.error('Please fill in all SMTP configuration fields');
+                          return;
+                        }
+                        if (emailProvider === 'gmail' && smtpPassword.length < 16) {
+                          toast.error('Gmail requires a 16-character App Password');
+                          return;
+                        }
+                        setWizardCompleted(prev => ({ ...prev, appPassword: true }));
+                        setWizardStep(3);
+                      }}
+                      className="btn btn-primary w-full"
+                      disabled={!smtpHost || !smtpPort || !smtpPassword}
+                    >
+                      ✓ Continue with SMTP Configuration
+                    </button>
                   </div>
                 </div>
               )}
@@ -2127,7 +2248,10 @@ const Settings = () => {
                             hrEmail: newHrEmail,
                             hrName: newHrName || config.hr_name,
                             updateSmtpUser: true, // Always update SMTP when password is provided
-                            smtpPassword: smtpPassword
+                            smtpPassword: smtpPassword,
+                            smtpHost: smtpHost,
+                            smtpPort: parseInt(smtpPort),
+                            smtpSecure: smtpSecure
                           });
                           if (response.data?.success) {
                             updateConfig('hr_email', newHrEmail);

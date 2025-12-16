@@ -651,21 +651,24 @@ const sendPendingEmails = async () => {
     const hrName = config.hr_name || process.env.HR_NAME || 'HR Team';
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
     
-    // Get SMTP credentials from database if available, else use env
+    // Get SMTP credentials and settings from database if available, else use env
     let smtpUser = config.smtp_user || process.env.SMTP_USER;
     let smtpPass = config.smtp_pass || process.env.SMTP_PASS;
+    let smtpHost = config.smtp_host || process.env.SMTP_HOST;
+    let smtpPort = config.smtp_port || process.env.SMTP_PORT || '587';
+    let smtpSecure = config.smtp_secure !== undefined ? (config.smtp_secure === 'true') : (process.env.SMTP_SECURE === 'true');
 
     // Validate SMTP configuration
-    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
+    if (!smtpHost || !smtpUser || !smtpPass) {
       logger.error('SMTP configuration is missing. Cannot send pending emails. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file or update HR email with SMTP credentials.');
       return;
     }
 
     // Create dynamic transporter with current credentials
     const dynamicTransporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
+      host: smtpHost,
+      port: parseInt(smtpPort) || 587,
+      secure: smtpSecure,
       auth: {
         user: smtpUser,
         pass: smtpPass
@@ -728,6 +731,7 @@ const sendPendingEmails = async () => {
 // HELPER FUNCTIONS
 // ============================================================
 const getConfig = async () => {
+  // Get all config including SMTP settings
   const configs = await prisma.workflowConfig.findMany();
   const map = {};
   configs.forEach(c => { map[c.key] = c.value; });
