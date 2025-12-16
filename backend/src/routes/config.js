@@ -1609,7 +1609,7 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
 // Update HR email and optionally configure Google Cloud
 router.post('/update-hr-email', requireAdmin, async (req, res) => {
   try {
-    const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure } = req.body;
+    const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername } = req.body;
     
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
@@ -1643,11 +1643,12 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
     let smtpUpdated = false;
     if (updateSmtpUser && smtpPassword) {
       try {
-        // Store SMTP credentials in WorkflowConfig (dynamic, no restart needed)
+        // Store SMTP username (use provided username or default to email address)
+        const smtpUserValue = smtpUsername || hrEmail;
         await req.prisma.workflowConfig.upsert({
           where: { key: 'smtp_user' },
-          update: { value: hrEmail },
-          create: { key: 'smtp_user', value: hrEmail }
+          update: { value: smtpUserValue },
+          create: { key: 'smtp_user', value: smtpUserValue }
         });
         
         await req.prisma.workflowConfig.upsert({

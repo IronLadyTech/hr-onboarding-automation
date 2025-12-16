@@ -694,6 +694,7 @@ const Settings = () => {
                   setSmtpHost('smtp.gmail.com');
                   setSmtpPort('587');
                   setSmtpSecure(false);
+                  setSmtpUsername('');
                 }}
                 className="btn btn-primary text-sm"
               >
@@ -1973,20 +1974,28 @@ const Settings = () => {
 
             {/* Step Content */}
             <div className="space-y-4">
-              {/* Step 1: Add to OAuth Test Users */}
+              {/* Step 1: Add to OAuth Test Users (Optional - Only for Google Calendar) */}
               {wizardStep === 1 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 1: Add New Email to OAuth Test Users</h3>
+                  <h3 className="text-lg font-semibold">Step 1: Google Calendar Integration (Optional)</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
-                      To use Google OAuth features (Gmail API, Calendar API), you need to add the new email as a test user.
+                      <strong>This step is only needed if you want Google Calendar integration</strong> (to create calendar invites automatically). If you're only using email (SMTP), you can skip this step.
+                    </p>
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
+                      <p className="text-sm text-yellow-800">
+                        <strong>For GoDaddy/Other Email Providers:</strong> You can skip this step if you don't need Google Calendar features. Email sending will work fine with just SMTP configuration.
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-700 mb-3">
+                      To use Google Calendar API features, you need to add the email as a test user in Google Cloud Console.
                     </p>
                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
                       <li>Sign in to Google Cloud Console with <strong>ironladytech@gmail.com</strong></li>
                       <li>Click the button below to open OAuth consent screen</li>
                       <li>Go to <strong>"Audience"</strong> section (or "Test users" tab)</li>
                       <li>Click <strong>"Add users"</strong> button</li>
-                      <li>Add: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
+                      <li>Add: <strong>{newHrEmail || 'your-new-email@domain.com'}</strong></li>
                       <li>Click "Add"</li>
                       <li>Come back here and mark as completed</li>
                     </ol>
@@ -2007,6 +2016,15 @@ const Settings = () => {
                         className="btn btn-secondary"
                       >
                         ✓ I've Added It
+                      </button>
+                      <button
+                        onClick={() => {
+                          setWizardCompleted(prev => ({ ...prev, oauthTestUser: false }));
+                          setWizardStep(2);
+                        }}
+                        className="btn btn-secondary"
+                      >
+                        ⏭️ Skip (Email Only)
                       </button>
                     </div>
                   </div>
@@ -2091,7 +2109,9 @@ const Settings = () => {
                       </p>
                       <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 mb-4">
                         <li>SMTP settings are pre-filled below (smtp.secureserver.net:587)</li>
-                        <li>Use your GoDaddy email account password</li>
+                        <li><strong>SMTP Username:</strong> Enter the specific email address you want to send FROM (e.g., hr@yourcompany.com)</li>
+                        <li><strong>SMTP Password:</strong> Enter the password for that specific email address (NOT your GoDaddy account password)</li>
+                        <li>If you have multiple emails in your GoDaddy account, use the email and password for the one you want to send from</li>
                         <li>If port 587 doesn't work, try port 465 with SSL enabled</li>
                         <li>You can find your exact SMTP settings in GoDaddy Email & Office Dashboard</li>
                       </ul>
@@ -2158,43 +2178,64 @@ const Settings = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        SMTP Password / App Password *
+                        SMTP Username (Email Address) *
+                      </label>
+                      <input
+                        type="email"
+                        value={smtpUsername || ''}
+                        onChange={(e) => setSmtpUsername(e.target.value)}
+                        className="input w-full"
+                        placeholder="hr@yourcompany.com"
+                        required
+                      />
+                      <p className="text-xs text-gray-600 mt-1">
+                        <strong>Important:</strong> Enter the specific email address you want to send emails FROM. This should be the full email address (e.g., hr@yourcompany.com, iamt@yourcompany.com). This is the email that will appear as the sender.
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        SMTP Password *
                       </label>
                       <input
                         type="password"
                         value={smtpPassword}
                         onChange={(e) => setSmtpPassword(e.target.value)}
                         className="input w-full"
-                        placeholder={emailProvider === 'gmail' ? '16-character app password' : 'Your email account password'}
+                        placeholder={emailProvider === 'gmail' ? '16-character app password' : 'Password for the email address above'}
                         required
                       />
                       <p className="text-xs text-gray-600 mt-1">
                         {emailProvider === 'gmail' 
                           ? 'Gmail requires a 16-character App Password (not your regular password). Generate it from Gmail App Passwords.'
                           : emailProvider === 'godaddy'
-                          ? 'Enter your GoDaddy email account password'
-                          : 'Enter your email account password or app-specific password'}
+                          ? 'Enter the password for the specific email address you entered above (e.g., password for hr@yourcompany.com). This is NOT your GoDaddy account password.'
+                          : 'Enter the password for the email address you entered above'}
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        if (!smtpHost || !smtpPort || !smtpPassword) {
-                          toast.error('Please fill in all SMTP configuration fields');
-                          return;
-                        }
-                        if (emailProvider === 'gmail' && smtpPassword.length < 16) {
-                          toast.error('Gmail requires a 16-character App Password');
-                          return;
-                        }
-                        setWizardCompleted(prev => ({ ...prev, appPassword: true }));
-                        setWizardStep(3);
-                      }}
-                      className="btn btn-primary w-full"
-                      disabled={!smtpHost || !smtpPort || !smtpPassword}
-                    >
-                      ✓ Continue with SMTP Configuration
-                    </button>
+                      <button
+                        onClick={() => {
+                          if (!smtpHost || !smtpPort || !smtpUsername || !smtpPassword) {
+                            toast.error('Please fill in all SMTP configuration fields including email address');
+                            return;
+                          }
+                          if (emailProvider === 'gmail' && smtpPassword.length < 16) {
+                            toast.error('Gmail requires a 16-character App Password');
+                            return;
+                          }
+                          if (!smtpUsername.includes('@')) {
+                            toast.error('Please enter a valid email address for SMTP Username');
+                            return;
+                          }
+                          setWizardCompleted(prev => ({ ...prev, appPassword: true }));
+                          setWizardStep(3);
+                        }}
+                        className="btn btn-primary w-full"
+                        disabled={!smtpHost || !smtpPort || !smtpUsername || !smtpPassword}
+                      >
+                        ✓ Continue with SMTP Configuration
+                      </button>
                   </div>
                 </div>
               )}
@@ -2258,7 +2299,8 @@ const Settings = () => {
                             smtpPassword: smtpPassword,
                             smtpHost: smtpHost,
                             smtpPort: parseInt(smtpPort),
-                            smtpSecure: smtpSecure
+                            smtpSecure: smtpSecure,
+                            smtpUsername: smtpUsername || newHrEmail // Use provided username or default to email
                           });
                           if (response.data?.success) {
                             updateConfig('hr_email', newHrEmail);
