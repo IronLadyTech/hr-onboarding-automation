@@ -2058,7 +2058,7 @@ const Settings = () => {
                           setSmtpPort('587');
                           setSmtpSecure(false);
                         } else if (provider === 'godaddy') {
-                          setSmtpHost('smtp.secureserver.net');
+                          setSmtpHost('smtpout.secureserver.net');
                           setSmtpPort('587');
                           setSmtpSecure(false);
                         } else {
@@ -2107,13 +2107,21 @@ const Settings = () => {
                       <p className="text-sm text-gray-700 mb-3">
                         <strong>GoDaddy Email Configuration:</strong>
                       </p>
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-md mb-3">
+                        <p className="text-sm font-semibold text-blue-900 mb-2">📧 Important:</p>
+                        <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+                          <li>Your email is hosted on GoDaddy (e.g., hr@iamt.edu)</li>
+                          <li>Use the <strong>email mailbox password</strong> (the one you use to log in to GoDaddy Webmail)</li>
+                          <li><strong>NOT</strong> your GoDaddy account customer ID password</li>
+                        </ul>
+                      </div>
                       <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 mb-4">
-                        <li>SMTP settings are pre-filled below (smtp.secureserver.net:587)</li>
-                        <li><strong>SMTP Username:</strong> Enter the specific email address you want to send FROM (e.g., hr@yourcompany.com)</li>
-                        <li><strong>SMTP Password:</strong> Enter the password for that specific email address (NOT your GoDaddy account password)</li>
-                        <li>If you have multiple emails in your GoDaddy account, use the email and password for the one you want to send from</li>
-                        <li>If port 587 doesn't work, try port 465 with SSL enabled</li>
-                        <li>You can find your exact SMTP settings in GoDaddy Email & Office Dashboard</li>
+                        <li>SMTP settings are pre-filled below (smtpout.secureserver.net:587)</li>
+                        <li><strong>SMTP Username:</strong> Enter the full email address (e.g., hr@iamt.edu, yourname@iamt.edu)</li>
+                        <li><strong>SMTP Password:</strong> Enter the password you use to log in to GoDaddy Webmail for that email</li>
+                        <li>If you have multiple emails, use the email and password for the one you want to send from</li>
+                        <li>If port 587 doesn't work, try: <code className="bg-gray-100 px-1 rounded">smtp.secureserver.net</code> or port 465 with SSL enabled</li>
+                        <li>You can verify credentials by logging into <a href="https://webmail.secureserver.net" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">GoDaddy Webmail</a> with the same credentials</li>
                       </ul>
                     </div>
                   )}
