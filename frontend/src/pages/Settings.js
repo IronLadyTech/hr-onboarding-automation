@@ -2018,6 +2018,12 @@ const Settings = () => {
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
                   
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
+                    <p className="text-sm text-gray-700">
+                      <strong>Note:</strong> Configure your SMTP server settings below. The email address will be entered in the next step.
+                    </p>
+                  </div>
+                  
                   {/* Email Provider Selection */}
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2056,16 +2062,15 @@ const Settings = () => {
                   {emailProvider === 'gmail' && (
                     <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                       <p className="text-sm text-gray-700 mb-3">
-                        <strong>Generate App Password for {newHrEmail || 'your new HR email'}:</strong>
+                        <strong>Gmail Configuration:</strong>
                       </p>
                       <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
-                        <li>Click the button below to open Gmail App Passwords</li>
-                        <li>Sign in with: <strong>{newHrEmail || 'your-new-email@gmail.com'}</strong></li>
+                        <li>You'll need to generate a 16-character App Password</li>
+                        <li>Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Gmail App Passwords</a></li>
                         <li>Select "Mail" and "Other (Custom name)"</li>
                         <li>Enter name: "HR Onboarding System"</li>
-                        <li>Click "Generate"</li>
-                        <li>Copy the 16-character password (remove spaces)</li>
-                        <li>Paste it in the password field below</li>
+                        <li>Click "Generate" and copy the 16-character password</li>
+                        <li>Paste it in the password field below (not your regular Gmail password)</li>
                       </ol>
                       <a
                         href="https://myaccount.google.com/apppasswords"
@@ -2086,7 +2091,7 @@ const Settings = () => {
                       </p>
                       <ul className="list-disc list-inside space-y-2 text-sm text-gray-700 mb-4">
                         <li>SMTP settings are pre-filled below (smtp.secureserver.net:587)</li>
-                        <li>Use your GoDaddy email password (or app password if required)</li>
+                        <li>Use your GoDaddy email account password</li>
                         <li>If port 587 doesn't work, try port 465 with SSL enabled</li>
                         <li>You can find your exact SMTP settings in GoDaddy Email & Office Dashboard</li>
                       </ul>
@@ -2153,19 +2158,21 @@ const Settings = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Email Password / App Password *
+                        SMTP Password / App Password *
                       </label>
                       <input
                         type="password"
                         value={smtpPassword}
                         onChange={(e) => setSmtpPassword(e.target.value)}
                         className="input w-full"
-                        placeholder={emailProvider === 'gmail' ? '16-character app password' : 'Your email password'}
+                        placeholder={emailProvider === 'gmail' ? '16-character app password' : 'Your email account password'}
                         required
                       />
                       <p className="text-xs text-gray-600 mt-1">
                         {emailProvider === 'gmail' 
-                          ? 'Gmail requires a 16-character App Password (not your regular password)'
+                          ? 'Gmail requires a 16-character App Password (not your regular password). Generate it from Gmail App Passwords.'
+                          : emailProvider === 'godaddy'
+                          ? 'Enter your GoDaddy email account password'
                           : 'Enter your email account password or app-specific password'}
                       </p>
                     </div>
