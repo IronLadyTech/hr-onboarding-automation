@@ -2194,7 +2194,7 @@ const Settings = () => {
                         value={smtpUsername || ''}
                         onChange={(e) => setSmtpUsername(e.target.value)}
                         className="input w-full"
-                        placeholder="hr@yourcompany.com"
+                        placeholder="apoorva@iamironlady.com or hr@iamt.edu"
                         required
                       />
                       <p className="text-xs text-gray-600 mt-1">
