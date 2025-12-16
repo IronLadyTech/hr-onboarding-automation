@@ -16,7 +16,8 @@ const Steps = () => {
     description: '',
     type: 'MANUAL',
     icon: '📋',
-    emailTemplateId: ''
+    emailTemplateId: '',
+    scheduledTime: ''
   });
 
   useEffect(() => {
@@ -97,7 +98,8 @@ const Steps = () => {
       description: '',
       type: 'MANUAL',
       icon: '📋',
-      emailTemplateId: ''
+      emailTemplateId: '',
+      scheduledTime: ''
     });
     setShowStepModal(true);
   };
@@ -110,7 +112,8 @@ const Steps = () => {
       description: step.description || '',
       type: step.type,
       icon: step.icon || '📋',
-      emailTemplateId: step.emailTemplateId || ''
+      emailTemplateId: step.emailTemplateId || '',
+      scheduledTime: step.scheduledTime || ''
     });
     setShowStepModal(true);
   };
@@ -409,6 +412,22 @@ const Steps = () => {
                     placeholder="📋"
                     maxLength={2}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Default Scheduled Time (HH:mm)
+                  </label>
+                  <input
+                    type="time"
+                    value={stepForm.scheduledTime || ''}
+                    onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
+                    className="input"
+                    placeholder="14:00"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Default time for this step (e.g., 14:00 for 2:00 PM). Leave empty for manual scheduling. This time will be used when scheduling calendar events automatically.
+                  </p>
                 </div>
 
                 {/* Email Template Selection - REQUIRED */}

@@ -843,7 +843,7 @@ router.get('/department-steps/:department', async (req, res) => {
 // Create or update step template
 router.post('/department-steps', async (req, res) => {
   try {
-    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId } = req.body;
+    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId, scheduledTime } = req.body;
 
     if (!department || !stepNumber || !title || !type) {
       return res.status(400).json({ success: false, message: 'Department, stepNumber, title, and type are required' });
@@ -877,7 +877,8 @@ router.post('/department-steps', async (req, res) => {
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
           priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
+          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
+          scheduledTime: scheduledTime || null
         },
         include: {
           emailTemplate: true
@@ -911,7 +912,8 @@ router.post('/department-steps', async (req, res) => {
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
           priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
+          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
+          scheduledTime: scheduledTime || null
         },
         include: {
           emailTemplate: true
@@ -950,6 +952,8 @@ router.put('/department-steps/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
     }
 
+    const { scheduledTime } = req.body;
+    
     const step = await req.prisma.departmentStepTemplate.update({
       where: { id },
       data: {
@@ -961,7 +965,8 @@ router.put('/department-steps/:id', async (req, res) => {
         ...(dueDateOffset !== undefined && { dueDateOffset: parseInt(dueDateOffset) }),
         ...(priority && { priority }),
         ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
-        ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId })
+        ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
+        ...(scheduledTime !== undefined && { scheduledTime: scheduledTime || null })
       },
       include: {
         emailTemplate: true
@@ -1117,17 +1122,17 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
     };
 
     const defaultSteps = [
-      { stepNumber: 1, title: 'Offer Letter Email', description: 'Upload and send offer letter with tracking', type: 'OFFER_LETTER', icon: '📄', isAuto: false, dueDateOffset: 0, priority: 'HIGH' },
-      { stepNumber: 2, title: 'Offer Reminder (Auto)', description: 'Auto-sends if not signed in 3 days', type: 'OFFER_REMINDER', icon: '⏰', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM' },
-      { stepNumber: 3, title: 'Day -1 Welcome Email (Auto)', description: 'Sent automatically one day before joining', type: 'WELCOME_EMAIL', icon: '👋', isAuto: true, dueDateOffset: -1, priority: 'MEDIUM' },
-      { stepNumber: 4, title: 'HR Induction (9:30 AM) (Auto)', description: 'Calendar invite on joining day', type: 'HR_INDUCTION', icon: '🏢', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
-      { stepNumber: 5, title: 'WhatsApp Group Addition (Auto)', description: 'Send WhatsApp group URLs via email', type: 'WHATSAPP_ADDITION', icon: '💬', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
-      { stepNumber: 6, title: 'Onboarding Form Email (Auto)', description: 'Sent within 1 hour of joining', type: 'ONBOARDING_FORM', icon: '📝', isAuto: true, dueDateOffset: 0, priority: 'HIGH' },
-      { stepNumber: 7, title: 'Form Reminder (Auto)', description: 'Auto-sends if not completed in 24h', type: 'FORM_REMINDER', icon: '🔔', isAuto: true, dueDateOffset: 1, priority: 'MEDIUM' },
-      { stepNumber: 8, title: 'CEO Induction', description: 'HR confirms time with CEO, then system sends invite', type: 'CEO_INDUCTION', icon: '👔', isAuto: false, dueDateOffset: 2, priority: 'MEDIUM' },
-      { stepNumber: 9, title: `${department} Induction`, description: `HR confirms time with ${department} team, then system sends invite`, type: department === 'Sales' ? 'SALES_INDUCTION' : 'DEPARTMENT_INDUCTION', icon: '💼', isAuto: false, dueDateOffset: 3, priority: 'MEDIUM' },
-      { stepNumber: 10, title: 'Training Plan Email (Auto)', description: 'Auto-sends on Day 3 with structured training', type: 'TRAINING_PLAN', icon: '📚', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM' },
-      { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled 7 days after joining', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM' }
+      { stepNumber: 1, title: 'Offer Letter Email', description: 'Upload and send offer letter with tracking', type: 'OFFER_LETTER', icon: '📄', isAuto: false, dueDateOffset: 0, priority: 'HIGH', scheduledTime: null },
+      { stepNumber: 2, title: 'Offer Reminder (Auto)', description: 'Auto-sends next day at 2:00 PM if not signed', type: 'OFFER_REMINDER', icon: '⏰', isAuto: true, dueDateOffset: 1, priority: 'MEDIUM', scheduledTime: '14:00' },
+      { stepNumber: 3, title: 'Day -1 Welcome Email (Auto)', description: 'Sent automatically at 11:00 AM one day before joining', type: 'WELCOME_EMAIL', icon: '👋', isAuto: true, dueDateOffset: -1, priority: 'MEDIUM', scheduledTime: '11:00' },
+      { stepNumber: 4, title: 'HR Induction (Auto)', description: 'Calendar invite at 8:30 AM on joining day', type: 'HR_INDUCTION', icon: '🏢', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '08:30' },
+      { stepNumber: 5, title: 'WhatsApp Group Addition (Auto)', description: 'Send WhatsApp group URLs via email at 9:30 AM on joining day', type: 'WHATSAPP_ADDITION', icon: '💬', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '09:30' },
+      { stepNumber: 6, title: 'Onboarding Form Email (Auto)', description: 'Sent at 1:00 PM on joining day', type: 'ONBOARDING_FORM', icon: '📝', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '13:00' },
+      { stepNumber: 7, title: 'Form Reminder (Auto)', description: 'Auto-sends next day after DOJ at 9:00 AM if not completed', type: 'FORM_REMINDER', icon: '🔔', isAuto: true, dueDateOffset: 1, priority: 'MEDIUM', scheduledTime: '09:00' },
+      { stepNumber: 8, title: 'CEO Induction', description: 'HR confirms time with CEO, then system sends invite', type: 'CEO_INDUCTION', icon: '👔', isAuto: false, dueDateOffset: 2, priority: 'MEDIUM', scheduledTime: null },
+      { stepNumber: 9, title: `${department} Induction`, description: `HR confirms time with ${department} team, then system sends invite at 10:15 AM on DOJ`, type: department === 'Sales' ? 'SALES_INDUCTION' : 'DEPARTMENT_INDUCTION', icon: '💼', isAuto: false, dueDateOffset: 0, priority: 'MEDIUM', scheduledTime: '10:15' },
+      { stepNumber: 10, title: 'Training Plan Email (Auto)', description: 'Auto-sends on Day 3 with structured training', type: 'TRAINING_PLAN', icon: '📚', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM', scheduledTime: null },
+      { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled exactly one week later at 10:00 AM', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM', scheduledTime: '10:00' }
     ];
 
     // Validate that we have templates for all steps
