@@ -1796,7 +1796,7 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     const configs = await req.prisma.workflowConfig.findMany({
       where: {
         key: {
-          in: ['hr_email', 'hr_name', 'company_name', 'smtp_user', 'smtp_pass']
+          in: ['hr_email', 'hr_name', 'company_name', 'smtp_user', 'smtp_pass', 'smtp_host', 'smtp_port', 'smtp_secure']
         }
       }
     });
@@ -1807,41 +1807,43 @@ router.post('/test-hr-email', requireAdmin, async (req, res) => {
     const hrName = configMap.hr_name || process.env.HR_NAME || 'HR Team';
     const companyName = configMap.company_name || process.env.COMPANY_NAME || 'Company';
     
-    // Get SMTP credentials from database if available, else use env (existing credentials)
-    // If user didn't provide new SMTP credentials, we'll use the existing ones from .env
+    // Get SMTP credentials and settings from database if available, else use env
     let smtpUser = configMap.smtp_user || process.env.SMTP_USER;
     let smtpPass = configMap.smtp_pass || process.env.SMTP_PASS;
+    let smtpHost = configMap.smtp_host || process.env.SMTP_HOST;
+    let smtpPort = configMap.smtp_port || process.env.SMTP_PORT || '587';
+    let smtpSecure = configMap.smtp_secure !== undefined ? (configMap.smtp_secure === 'true') : (process.env.SMTP_SECURE === 'true');
     
     if (!hrEmail) {
       return res.status(400).json({ success: false, message: 'HR email is not configured. Please set it in Settings first.' });
     }
 
     // Validate SMTP configuration
-    // Note: We use existing SMTP credentials from .env if new ones aren't provided
-    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
+    if (!smtpHost || !smtpUser || !smtpPass) {
       return res.status(400).json({ 
         success: false, 
-        message: 'SMTP configuration is missing. The system needs SMTP credentials to send emails. Please either:\n1. Provide an App Password in Step 2 of the wizard, OR\n2. Ensure SMTP_HOST, SMTP_USER, and SMTP_PASS are set in the backend .env file.' 
+        message: 'SMTP configuration is missing. The system needs SMTP credentials to send emails. Please either:\n1. Provide SMTP settings in Step 2 of the wizard, OR\n2. Ensure SMTP_HOST, SMTP_USER, and SMTP_PASS are set in the backend .env file.' 
       });
     }
     
-    logger.info(`📧 Test email - Using SMTP user: ${smtpUser} (${configMap.smtp_user ? 'from database (new)' : 'from env (existing)'})`);
+    logger.info(`📧 Test email - Using SMTP host: ${smtpHost} (${configMap.smtp_host ? 'from database' : 'from env'})`);
+    logger.info(`📧 Test email - Using SMTP port: ${smtpPort} (${configMap.smtp_port ? 'from database' : 'from env'})`);
+    logger.info(`📧 Test email - Using SMTP secure: ${smtpSecure} (${configMap.smtp_secure !== undefined ? 'from database' : 'from env'})`);
+    logger.info(`📧 Test email - Using SMTP user: ${smtpUser} (${configMap.smtp_user ? 'from database' : 'from env'})`);
     logger.info(`📧 Test email - From address will be: ${hrEmail}`);
 
     const nodemailer = require('nodemailer');
     
     // Create transporter with dynamic credentials (from database or env)
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT) || 587,
-      secure: process.env.SMTP_SECURE === 'true',
+      host: smtpHost,
+      port: parseInt(smtpPort) || 587,
+      secure: smtpSecure,
       auth: {
         user: smtpUser,
         pass: smtpPass
       }
     });
-    
-    logger.info(`📧 Test email - Using SMTP user: ${smtpUser} (${configMap.smtp_user ? 'from database' : 'from env'})`);
 
     // Format "from" address
     const fromAddress = hrName && hrEmail ? `${hrName} <${hrEmail}>` : hrEmail;
