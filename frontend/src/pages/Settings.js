@@ -75,6 +75,7 @@ const Settings = () => {
   const [smtpHost, setSmtpHost] = useState('');
   const [smtpPort, setSmtpPort] = useState('587');
   const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpUsername, setSmtpUsername] = useState('');
   
   // HR Email Change Wizard state
   const [showEmailWizard, setShowEmailWizard] = useState(false);
