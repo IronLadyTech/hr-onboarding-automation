@@ -2099,6 +2099,9 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
       logger.warn('⚠️ Gmail API error:', gmailError.message);
     }
 
+    // Check if refresh token was updated
+    const tokenUpdated = googleRefreshToken && googleRefreshToken.trim() ? true : false;
+    
     res.json({ 
       success: true, 
       message: `HR email updated successfully to ${hrEmail}`,
@@ -2108,6 +2111,7 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         smtpUpdated,
         gmailConfigured,
         gmailConfigMessage,
+        refreshTokenUpdated: tokenUpdated,
         requiresRestart: smtpUpdated
       }
     });
