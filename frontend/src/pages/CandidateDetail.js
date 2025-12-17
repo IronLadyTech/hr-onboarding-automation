@@ -211,6 +211,12 @@ const CandidateDetail = () => {
       
       // Get offer letter date - use actual sent date (offerSentAt) if available, otherwise use scheduled date
       // IMPORTANT: Step 2 should schedule from when Step 1 was actually sent/completed, not when it's scheduled
+      // Only schedule Step 2 if Step 1 has been sent (offerSentAt exists)
+      if (!candidate.offerSentAt) {
+        console.log('Step 1 not yet sent - Step 2 will be scheduled when Step 1 is completed');
+        return; // Don't schedule Step 2 until Step 1 is actually sent
+      }
+      
       const offerLetterDate = candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED')?.startTime || new Date();
       
       // Calculate date using step template's dueDateOffset and scheduledTime
@@ -219,9 +225,13 @@ const CandidateDetail = () => {
       const offset = offerReminderStep.dueDateOffset !== undefined ? offerReminderStep.dueDateOffset : 1; // Default to 1 day
       reminderDate.setDate(reminderDate.getDate() + offset);
       
-      // Use step template's scheduledTime (should be '14:00' for 2:00 PM)
-      if (offerReminderStep.scheduledTime) {
-        const [hours, minutes] = offerReminderStep.scheduledTime.split(':');
+      // Use step template's scheduledTimeOfferLetter (for offer letter-based scheduling)
+      const scheduledTime = offerReminderStep.schedulingMethod === 'offerLetter' 
+        ? (offerReminderStep.scheduledTimeOfferLetter || offerReminderStep.scheduledTime)
+        : (offerReminderStep.scheduledTimeDoj || offerReminderStep.scheduledTime);
+      
+      if (scheduledTime) {
+        const [hours, minutes] = scheduledTime.split(':');
         reminderDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
       } else {
         reminderDate.setHours(14, 0, 0, 0); // Fallback to 2:00 PM
