@@ -1888,6 +1888,7 @@ const CandidateDetail = () => {
                             const [hours, minutes] = stepTemplate.scheduledTime.split(':');
                             scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
                           } else {
+                            // Fallback to 9:00 AM only if template doesn't have scheduledTime (shouldn't happen)
                             scheduledDate.setHours(9, 0, 0, 0);
                           }
                           
@@ -2172,9 +2173,9 @@ const CandidateDetail = () => {
               {scheduleMode === 'exact' && (
                 <>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Exact Date & Time *</label>
-                  <input 
-                    type="datetime-local" 
-                    value={scheduleDateTime}
+              <input 
+                type="datetime-local" 
+                value={scheduleDateTime}
                     onChange={(e) => {
                       setScheduleDateTime(e.target.value);
                       
@@ -2194,9 +2195,9 @@ const CandidateDetail = () => {
                       const minutes = String(exactDate.getMinutes()).padStart(2, '0');
                       setScheduleOffsetTime(`${hours}:${minutes}`);
                     }}
-                    className="input w-full"
-                    required
-                  />
+                className="input w-full"
+                required
+              />
                 </>
               )}
               
