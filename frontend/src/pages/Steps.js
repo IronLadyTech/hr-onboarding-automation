@@ -337,9 +337,32 @@ const Steps = () => {
                       {step.description && (
                         <p className="text-sm text-gray-600 mt-1">{step.description}</p>
                       )}
-                      {step.scheduledTime && (
+                      {step.scheduledTime && step.dueDateOffset !== undefined && (
+                        <div className="mt-2 bg-blue-50 p-2 rounded-md border border-blue-200">
+                          <div className="flex items-center space-x-2 flex-wrap mb-1">
+                            <span className="text-xs font-semibold text-gray-700">Default Scheduled Time:</span>
+                            <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md font-medium">
+                              ⏰ {formatTime(step.scheduledTime)}
+                            </span>
+                            <span className="text-xs text-gray-600">
+                              (Day {step.dueDateOffset > 0 ? '+' : ''}{step.dueDateOffset} from candidate's DOJ)
+                            </span>
+                            <button
+                              onClick={() => handleEditStep(step)}
+                              className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                              title="Click Edit to change scheduled time"
+                            >
+                              (Edit)
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">
+                            <strong>How it works:</strong> For each candidate, this step will be scheduled at <strong>{formatTime(step.scheduledTime)}</strong> on the date that is <strong>{step.dueDateOffset === 0 ? 'the same as' : step.dueDateOffset > 0 ? step.dueDateOffset + ' days after' : Math.abs(step.dueDateOffset) + ' days before'}</strong> their Date of Joining (DOJ).
+                          </p>
+                        </div>
+                      )}
+                      {step.scheduledTime && step.dueDateOffset === undefined && (
                         <div className="mt-2 flex items-center space-x-2">
-                          <span className="text-xs font-semibold text-gray-700">Scheduled Time:</span>
+                          <span className="text-xs font-semibold text-gray-700">Default Scheduled Time:</span>
                           <span className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-md font-medium border border-blue-200">
                             ⏰ {formatTime(step.scheduledTime)}
                           </span>
@@ -354,7 +377,7 @@ const Steps = () => {
                       )}
                       {!step.scheduledTime && step.isAuto && (
                         <div className="mt-2">
-                          <span className="text-xs text-gray-500 italic">No scheduled time set</span>
+                          <span className="text-xs text-gray-500 italic">No scheduled time set - will use default time when scheduling</span>
                         </div>
                       )}
                     </div>
