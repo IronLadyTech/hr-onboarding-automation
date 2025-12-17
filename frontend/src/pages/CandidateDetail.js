@@ -1525,18 +1525,20 @@ const CandidateDetail = () => {
                               }
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
-                              // Set schedule mode based on step type and available dates
+                              // Set schedule mode and initialize offset/time based on step type and available dates
+                              const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
                               if (step.stepType === 'OFFER_REMINDER' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) {
                                 setScheduleMode('offerLetter');
-                              } else if (candidate.expectedJoiningDate) {
-                                const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
-                                if (stepTemplate) {
-                                  setScheduleMode('doj');
-                                } else {
-                                  setScheduleMode('exact');
-                                }
+                                setScheduleOffsetDays(stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
+                                setScheduleOffsetTime(stepTemplate?.scheduledTime || '14:00');
+                              } else if (candidate.expectedJoiningDate && stepTemplate) {
+                                setScheduleMode('doj');
+                                setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
+                                setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
                               } else {
                                 setScheduleMode('exact');
+                                setScheduleOffsetDays(0);
+                                setScheduleOffsetTime('09:00');
                               }
                               setShowScheduleModal(scheduleAction);
                             }}
@@ -2067,30 +2069,25 @@ const CandidateDetail = () => {
                 );
               })()}
               
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Exact Date & Time *</label>
               <input 
                 type="datetime-local" 
                 value={scheduleDateTime}
                 onChange={(e) => {
-                  if (scheduleMode === 'exact') {
-                    setScheduleDateTime(e.target.value);
-                  }
-                  // In DOJ or offerLetter mode, allow manual override but switch to exact mode
+                  // Always allow editing - if in DOJ or offerLetter mode, switch to exact mode
                   if (scheduleMode === 'doj' || scheduleMode === 'offerLetter') {
                     setScheduleMode('exact');
-                    setScheduleDateTime(e.target.value);
                   }
+                  setScheduleDateTime(e.target.value);
                 }}
                 className="input w-full"
                 required
-                disabled={(scheduleMode === 'doj' && candidate.expectedJoiningDate) || (scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')))}
-                title={scheduleMode === 'doj' ? 'Switch to "Exact Date & Time" to manually edit' : scheduleMode === 'offerLetter' ? 'Switch to "Exact Date & Time" to manually edit' : ''}
               />
-              {(scheduleMode === 'doj' && candidate.expectedJoiningDate) || (scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) ? (
+              {(scheduleMode === 'doj' || scheduleMode === 'offerLetter') && (
                 <p className="text-xs text-gray-500 mt-1">
-                  Time is calculated automatically. Switch to "Exact Date & Time" to manually edit.
+                  This field is auto-updated based on your offset and time settings above. You can switch to "Exact Date & Time" mode to manually edit.
                 </p>
-              ) : null}
+              )}
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
