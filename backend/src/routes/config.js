@@ -1974,32 +1974,56 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         const path = require('path');
         const envPath = path.join(__dirname, '../../.env');
         
+        logger.info(`📝 Attempting to update Google Refresh Token in .env file: ${envPath}`);
+        
         // Read current .env file
         let envContent = '';
         if (fs.existsSync(envPath)) {
           envContent = fs.readFileSync(envPath, 'utf8');
+          logger.info(`📝 Read .env file (${envContent.length} characters)`);
+        } else {
+          logger.warn(`⚠️  .env file not found at ${envPath}, will create new one`);
         }
         
         // Update or add GOOGLE_REFRESH_TOKEN
-        const tokenLine = `GOOGLE_REFRESH_TOKEN=${googleRefreshToken.trim()}`;
-        if (envContent.includes('GOOGLE_REFRESH_TOKEN=')) {
-          // Replace existing token
-          envContent = envContent.replace(/GOOGLE_REFRESH_TOKEN=.*/g, tokenLine);
+        const trimmedToken = googleRefreshToken.trim();
+        const tokenLine = `GOOGLE_REFRESH_TOKEN=${trimmedToken}`;
+        
+        // Check if GOOGLE_REFRESH_TOKEN exists (handle various formats)
+        const tokenRegex = /^GOOGLE_REFRESH_TOKEN\s*=\s*.*$/gm;
+        if (tokenRegex.test(envContent)) {
+          // Replace existing token (handles spaces, quotes, etc.)
+          envContent = envContent.replace(tokenRegex, tokenLine);
+          logger.info('📝 Replaced existing GOOGLE_REFRESH_TOKEN in .env file');
         } else {
           // Add new token at the end
-          envContent += (envContent.endsWith('\n') ? '' : '\n') + tokenLine + '\n';
+          const separator = envContent && !envContent.endsWith('\n') ? '\n' : '';
+          envContent += separator + tokenLine + '\n';
+          logger.info('📝 Added new GOOGLE_REFRESH_TOKEN to .env file');
         }
         
         // Write back to .env file
         fs.writeFileSync(envPath, envContent, 'utf8');
-        logger.info('✅ Google Refresh Token updated in .env file');
+        logger.info('✅ Google Refresh Token successfully updated in .env file');
+        
+        // Verify the write
+        const verifyContent = fs.readFileSync(envPath, 'utf8');
+        if (verifyContent.includes(`GOOGLE_REFRESH_TOKEN=${trimmedToken}`)) {
+          logger.info('✅ Verified: Token is present in .env file');
+        } else {
+          logger.warn('⚠️  Warning: Token verification failed - token may not have been written correctly');
+        }
         
         // Reload environment variables (for current process)
-        process.env.GOOGLE_REFRESH_TOKEN = googleRefreshToken.trim();
+        process.env.GOOGLE_REFRESH_TOKEN = trimmedToken;
+        logger.info('✅ Google Refresh Token reloaded in current process');
       } catch (error) {
-        logger.error('Error updating Google Refresh Token in .env:', error);
+        logger.error('❌ Error updating Google Refresh Token in .env:', error.message);
+        logger.error('Full error:', error);
         // Don't fail the request, just log the error
       }
+    } else {
+      logger.debug('📝 No Google Refresh Token provided, skipping .env update');
     }
 
     // Try to configure Gmail "Send As" using Gmail API if OAuth is configured
