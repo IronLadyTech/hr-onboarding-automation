@@ -747,6 +747,9 @@ const processMessage = async (messageId) => {
     
     const subjectLower = subject.toLowerCase();
     const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
+    
+    // Check if subject contains "offer letter" keywords (case-insensitive)
+    const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('document'));
     const hasReplyHeaders = !!(inReplyTo || references);
     const isReply = isReplySubject || hasReplyHeaders;
     
@@ -799,8 +802,9 @@ const processMessage = async (messageId) => {
     }
     
     // Method 2: If no match yet, check subject matching (for cases where headers aren't set properly)
-    if (!isReplyToOfferEmail && isReplySubject) {
-      logger.info(`No header match found, checking subject matching...`);
+    // IMPORTANT: Only process if subject contains "offer letter" keywords
+    if (!isReplyToOfferEmail && isReplySubject && hasOfferKeywords) {
+      logger.info(`No header match found, checking subject matching with offer keywords...`);
       
       for (const offerEmail of offerEmails) {
         const offerSubjectLower = offerEmail.subject.toLowerCase();
@@ -808,17 +812,18 @@ const processMessage = async (messageId) => {
         const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
         
         // Check if reply subject matches or contains the original email subject
-        const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
+        // AND both must contain "offer" and "letter" keywords
+        const subjectsMatch = (cleanReplySubject.includes(cleanOfferSubject) || 
                              cleanOfferSubject.includes(cleanReplySubject) ||
                              // Check if both contain key offer-related words
-                             (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer')) ||
-                             (cleanReplySubject.includes('letter') && cleanOfferSubject.includes('letter')) ||
-                             (cleanReplySubject.includes('reminder') && cleanOfferSubject.includes('reminder'));
+                             (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer') && 
+                              (cleanReplySubject.includes('letter') || cleanReplySubject.includes('document')))) &&
+                             hasOfferKeywords; // Ensure reply subject has "offer letter" keywords
         
         if (subjectsMatch) {
           isReplyToOfferEmail = true;
           originalEmailType = offerEmail.type;
-          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
+          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches with offer keywords. Original: "${offerEmail.subject}", Reply: "${subject}"`);
           break;
         }
       }

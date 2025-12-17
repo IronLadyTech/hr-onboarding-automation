@@ -209,9 +209,9 @@ const CandidateDetail = () => {
       const existingEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_REMINDER');
       if (existingEvent) return;
       
-      // Get offer letter date (from scheduled event or sent date)
-      const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
-      const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt || new Date();
+      // Get offer letter date - use actual sent date (offerSentAt) if available, otherwise use scheduled date
+      // IMPORTANT: Step 2 should schedule from when Step 1 was actually sent/completed, not when it's scheduled
+      const offerLetterDate = candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED')?.startTime || new Date();
       
       // Calculate date using step template's dueDateOffset and scheduledTime
       const offerDate = new Date(offerLetterDate);
