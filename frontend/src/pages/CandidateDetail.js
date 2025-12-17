@@ -1712,12 +1712,20 @@ const CandidateDetail = () => {
                               setScheduleAttachmentPreview(null);
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
-                              // Set schedule mode based on whether we have DOJ and step template
+                              // Set schedule mode and initialize offset/time based on step type and available dates
                               // stepTemplate is already declared above, so we reuse it
-                              if (candidate.expectedJoiningDate && stepTemplate) {
+                              if (step.stepType === 'OFFER_REMINDER' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) {
+                                setScheduleMode('offerLetter');
+                                setScheduleOffsetDays(stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
+                                setScheduleOffsetTime(stepTemplate?.scheduledTime || '14:00');
+                              } else if (candidate.expectedJoiningDate && stepTemplate) {
                                 setScheduleMode('doj');
+                                setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
+                                setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
                               } else {
                                 setScheduleMode('exact');
+                                setScheduleOffsetDays(0);
+                                setScheduleOffsetTime('09:00');
                               }
                               setShowScheduleModal(scheduleAction);
                             }}
