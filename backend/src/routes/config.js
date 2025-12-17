@@ -902,6 +902,13 @@ router.post('/department-steps', async (req, res) => {
           emailTemplate: true
         }
       });
+      
+      // Ensure scheduledTime is explicitly included in response (even if null)
+      step = {
+        ...step,
+        scheduledTime: step.scheduledTime ?? null,
+        schedulingMethod: step.schedulingMethod ?? 'doj'
+      };
     } else {
       // Create new step - need to shift other steps if inserting in middle
       const stepsAfter = await req.prisma.departmentStepTemplate.findMany({
@@ -938,6 +945,13 @@ router.post('/department-steps', async (req, res) => {
           emailTemplate: true
         }
       });
+      
+      // Ensure scheduledTime is explicitly included in response (even if null)
+      step = {
+        ...step,
+        scheduledTime: step.scheduledTime ?? null,
+        schedulingMethod: step.schedulingMethod ?? 'doj'
+      };
     }
 
     res.json({ success: true, data: step });
@@ -1019,7 +1033,14 @@ router.put('/department-steps/:id', async (req, res) => {
       dueDateOffset: step.dueDateOffset
     });
 
-    res.json({ success: true, data: step });
+    // Ensure scheduledTime is explicitly included in response (even if null)
+    const responseData = {
+      ...step,
+      scheduledTime: step.scheduledTime ?? null, // Explicitly set to null if undefined
+      schedulingMethod: step.schedulingMethod ?? 'doj' // Default to 'doj' if undefined
+    };
+
+    res.json({ success: true, data: responseData });
   } catch (error) {
     logger.error('Error updating department step:', error);
     res.status(500).json({ success: false, message: error.message });

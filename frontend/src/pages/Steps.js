@@ -133,8 +133,24 @@ const Steps = () => {
       id: step.id,
       scheduledTime: step.scheduledTime,
       dueDateOffset: step.dueDateOffset,
-      type: step.type
+      type: step.type,
+      schedulingMethod: step.schedulingMethod
     });
+    
+    // Ensure scheduledTime is properly formatted for time input (HH:mm format)
+    let formattedScheduledTime = '';
+    if (step.scheduledTime && step.scheduledTime.trim() !== '') {
+      // If it's already in HH:mm format, use it directly
+      // Otherwise, try to parse it
+      const timeMatch = step.scheduledTime.match(/^(\d{1,2}):(\d{2})/);
+      if (timeMatch) {
+        const hours = timeMatch[1].padStart(2, '0');
+        const minutes = timeMatch[2];
+        formattedScheduledTime = `${hours}:${minutes}`;
+      } else {
+        formattedScheduledTime = step.scheduledTime;
+      }
+    }
     
     setStepForm({
       stepNumber: step.stepNumber,
@@ -143,9 +159,9 @@ const Steps = () => {
       type: step.type,
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
-      // CRITICAL: Use step.scheduledTime if it exists (even if it's an empty string, check for null/undefined)
-      scheduledTime: (step.scheduledTime !== null && step.scheduledTime !== undefined) ? step.scheduledTime : '',
-      dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0,
+      // CRITICAL: Use formatted scheduledTime, ensuring it's in HH:mm format for time input
+      scheduledTime: formattedScheduledTime,
+      dueDateOffset: step.dueDateOffset !== undefined && step.dueDateOffset !== null ? step.dueDateOffset : 0,
       schedulingMethod: step.schedulingMethod || schedulingMethod
     });
     setShowStepModal(true);
@@ -197,12 +213,21 @@ const Steps = () => {
       // Debug: Log what we got back
       console.log('Step saved, response:', {
         scheduledTime: response.data?.data?.scheduledTime,
-        dueDateOffset: response.data?.data?.dueDateOffset
+        dueDateOffset: response.data?.data?.dueDateOffset,
+        schedulingMethod: response.data?.data?.schedulingMethod
       });
+      
+      // Update the step in the local state immediately with the response data
+      if (editingStep && response.data?.data) {
+        const updatedStep = response.data.data;
+        setDepartmentSteps(prevSteps => 
+          prevSteps.map(s => s.id === updatedStep.id ? updatedStep : s)
+        );
+      }
       
       setShowStepModal(false);
       setEditingStep(null);
-      // Refresh the steps list to get updated values
+      // Refresh the steps list to get updated values (this ensures consistency)
       await fetchDepartmentSteps();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save step');
@@ -597,10 +622,11 @@ const Steps = () => {
                         </label>
                         <input
                           type="time"
-                          value={stepForm.scheduledTime ? stepForm.scheduledTime : ''}
+                          value={stepForm.scheduledTime || ''}
                           onChange={(e) => {
-                            console.log('Time changed to:', e.target.value);
-                            setStepForm({ ...stepForm, scheduledTime: e.target.value });
+                            const newTime = e.target.value;
+                            console.log('Time changed to:', newTime);
+                            setStepForm({ ...stepForm, scheduledTime: newTime });
                           }}
                           className="input"
                           placeholder={stepForm.schedulingMethod === 'offerLetter' ? '14:00' : '09:00'}
