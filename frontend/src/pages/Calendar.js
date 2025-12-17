@@ -19,6 +19,9 @@ const Calendar = () => {
     dateTime: '',
     duration: 60
   });
+  const [batchScheduleMode, setBatchScheduleMode] = useState('exact'); // 'exact', 'doj', or 'offerLetter'
+  const [batchScheduleOffsetDays, setBatchScheduleOffsetDays] = useState(0);
+  const [batchScheduleOffsetTime, setBatchScheduleOffsetTime] = useState('09:00');
   const [batchAttachments, setBatchAttachments] = useState([]);
   const [batchLoading, setBatchLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
@@ -629,6 +632,9 @@ const Calendar = () => {
                   setShowBatchScheduleModal(false);
                   setBatchScheduleData({ eventType: '', stepNumber: null, dateTime: '', duration: 60 });
                   setBatchAttachments([]);
+                  setBatchScheduleMode('exact');
+                  setBatchScheduleOffsetDays(0);
+                  setBatchScheduleOffsetTime('09:00');
                 }}
                 className="btn btn-secondary"
                 disabled={batchLoading}
