@@ -1259,6 +1259,17 @@ const CandidateDetail = () => {
                         </div>
                         <p className="text-sm text-gray-500">{step.description}</p>
                         {step.date && <p className="text-xs text-gray-400 mt-1">Done: {new Date(step.date).toLocaleString('en-IN')}</p>}
+                        {step.calculatedScheduledTime && !step.scheduledEvent && (
+                          <div className="mt-2 flex items-center space-x-2 flex-wrap">
+                            <span className="text-xs font-semibold text-gray-600">Will be scheduled:</span>
+                            <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-md font-medium border border-green-200">
+                              ⏰ {step.calculatedScheduledTime.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at {step.calculatedScheduledTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              (Based on DOJ: {candidate.expectedJoiningDate ? new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN') : 'Not set'})
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
