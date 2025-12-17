@@ -2531,6 +2531,7 @@ const Settings = () => {
                             smtpSecure: smtpSecure,
                             smtpUsername: smtpUsername || newHrEmail, // Use provided username or default to email
                             emailProvider: emailProvider, // Send email provider for default host determination
+                            googleRefreshToken: emailFlow === 'gmail' ? googleRefreshToken : null, // Send refresh token for Gmail flow
                             // IMAP settings (for both Gmail and GoDaddy flows)
                             imapEnabled: imapEnabled,
                             imapHost: imapEnabled ? imapHost : null,

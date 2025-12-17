@@ -1801,7 +1801,7 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
 router.post('/update-hr-email', requireAdmin, async (req, res) => {
   try {
     const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername, 
-            imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure, emailProvider } = req.body;
+            imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure, emailProvider, googleRefreshToken } = req.body;
     
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
@@ -1980,7 +1980,7 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
           process.env.GOOGLE_REDIRECT_URI
         );
         oauth2Client.setCredentials({
-          refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+          refresh_token: refreshToken
         });
 
         const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
