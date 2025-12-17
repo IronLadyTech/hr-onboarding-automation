@@ -43,14 +43,52 @@ const initEmailMonitor = async (prismaClient) => {
   logger.info('📧 INITIALIZING EMAIL MONITOR');
   logger.info('📧 ========================================');
   
-  // Try IMAP first (for GoDaddy/professional emails), then fallback to Gmail API
+  // Check which email provider/monitoring method was selected
+  let emailProvider = null;
+  try {
+    const providerConfig = await prisma.workflowConfig.findUnique({
+      where: { key: 'email_provider' }
+    });
+    emailProvider = providerConfig?.value || null;
+    logger.info(`📧 Email provider preference: ${emailProvider || 'not set (will try both)'}`);
+  } catch (error) {
+    logger.warn('Could not fetch email provider preference:', error.message);
+  }
+  
+  // If Gmail flow selected, only use Gmail API (skip IMAP)
+  if (emailProvider === 'gmail') {
+    logger.info('📧 Gmail flow detected - using Gmail API only (skipping IMAP)');
+    await initGmailApiMonitor();
+    return;
+  }
+  
+  // If GoDaddy flow selected, only use IMAP (skip Gmail API)
+  if (emailProvider === 'godaddy') {
+    logger.info('📧 GoDaddy flow detected - using IMAP only (skipping Gmail API)');
+    const imapConfigured = await initImapMonitor();
+    if (!imapConfigured) {
+      logger.error('📧 ❌ IMAP initialization failed for GoDaddy flow');
+      logger.error('📧    Please check IMAP configuration in Settings → HR Email Configuration');
+      logger.error('📧    Make sure IMAP packages are installed: npm install imap mailparser');
+    }
+    return;
+  }
+  
+  // If no preference set, try IMAP first, then fallback to Gmail API (backward compatibility)
+  logger.info('📧 No email provider preference set - trying both methods (backward compatibility)...');
   logger.info('📧 Step 1: Attempting IMAP initialization...');
   const imapConfigured = await initImapMonitor();
   
   if (!imapConfigured) {
     // Fallback to Gmail API if IMAP not configured
     logger.info('📧 Step 2: IMAP not configured, attempting Gmail API initialization...');
-    try {
+    await initGmailApiMonitor();
+  }
+};
+
+// Initialize Gmail API monitor (separated for clarity)
+const initGmailApiMonitor = async () => {
+  try {
       // Initialize Gmail API with OAuth2
       const oauth2Client = new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
