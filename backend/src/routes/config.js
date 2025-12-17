@@ -914,8 +914,7 @@ router.post('/department-steps', async (req, res) => {
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
           scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
           priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
-          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null
+          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
         },
         include: {
           emailTemplate: true
