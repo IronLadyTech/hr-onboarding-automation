@@ -1505,6 +1505,43 @@ const CandidateDetail = () => {
                         </div>
                         <p className="text-sm text-gray-500">{step.description}</p>
                         {step.date && <p className="text-xs text-gray-400 mt-1">Done: {new Date(step.date).toLocaleString('en-IN')}</p>}
+                        
+                        {/* Show Default Scheduled Time for all auto-scheduled steps */}
+                        {step.auto && step.stepTemplate && step.stepTemplate.schedulingMethod !== 'manual' && (() => {
+                          const stepTemplate = step.stepTemplate;
+                          const schedulingMethod = stepTemplate.schedulingMethod || 'doj';
+                          const scheduledTime = schedulingMethod === 'offerLetter' 
+                            ? (stepTemplate.scheduledTimeOfferLetter || stepTemplate.scheduledTime)
+                            : (stepTemplate.scheduledTimeDoj || stepTemplate.scheduledTime);
+                          
+                          if (scheduledTime && stepTemplate.dueDateOffset !== undefined) {
+                            return (
+                              <div className="mt-2 bg-blue-50 p-2 rounded-md border border-blue-200">
+                                <div className="flex items-center space-x-2 flex-wrap mb-1">
+                                  <span className="text-xs font-semibold text-gray-700">Default Scheduled Time:</span>
+                                  <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-md font-medium">
+                                    ⏰ {formatTime(scheduledTime)}
+                                  </span>
+                                  <span className="text-xs text-gray-600">
+                                    {schedulingMethod === 'offerLetter' 
+                                      ? `(Day ${stepTemplate.dueDateOffset > 0 ? '+' : ''}${stepTemplate.dueDateOffset} from Offer Letter Date)`
+                                      : `(Day ${stepTemplate.dueDateOffset > 0 ? '+' : ''}${stepTemplate.dueDateOffset} from candidate's DOJ)`
+                                    }
+                                  </span>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  <strong>How it works:</strong> For each candidate, this step will be scheduled at <strong>{formatTime(scheduledTime)}</strong> on the date that is <strong>{stepTemplate.dueDateOffset === 0 ? 'the same as' : stepTemplate.dueDateOffset > 0 ? stepTemplate.dueDateOffset + ' days after' : Math.abs(stepTemplate.dueDateOffset) + ' days before'}</strong> {schedulingMethod === 'offerLetter' 
+                                    ? 'when the Offer Letter (Step 1) is sent/scheduled.'
+                                    : 'their Date of Joining (DOJ).'
+                                  }
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
+                        {/* Show calculated scheduled time if available and not yet scheduled */}
                         {step.calculatedScheduledTime && !step.scheduledEvent && (
                           <div className="mt-2 flex items-center space-x-2 flex-wrap">
                             <span className="text-xs font-semibold text-gray-600">Will be scheduled:</span>
