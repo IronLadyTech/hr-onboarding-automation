@@ -64,15 +64,23 @@ const initEmailMonitor = async (prismaClient) => {
       logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
       
       // Start monitoring - check every 30 seconds for faster capture
-      setInterval(async () => {
-        await checkForReplies();
+      const checkInterval = setInterval(async () => {
+        try {
+          logger.info('📧 [SCHEDULED CHECK] Starting automatic email check for signed offer letters...');
+          await checkForReplies();
+          logger.info('📧 [SCHEDULED CHECK] Email check completed');
+        } catch (error) {
+          logger.error('📧 [SCHEDULED CHECK] Error during automatic email check:', error.message);
+        }
       }, 30 * 1000);
       
       // Initial check
+      logger.info('📧 [INITIAL CHECK] Running initial email check for signed offer letters...');
       await checkForReplies();
       
       logger.info('✅ Email reply monitor initialized (Gmail API)');
       logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
+      logger.info('📧 Monitoring candidates with offerSentAt but no offerSignedAt');
     } catch (error) {
       logger.error('❌ Gmail API initialization failed:', error.message);
       logger.error('Full error:', error);
