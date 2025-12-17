@@ -594,46 +594,58 @@ const checkForReplies = async (checkReadEmails = false) => {
         logger.info(`   Offer sent at: ${candidate.offerSentAt?.toISOString() || 'N/A'}`);
         logger.info(`   Offer signed at: ${candidate.offerSignedAt?.toISOString() || 'Not signed yet'}`);
         
-        // First check unread emails with attachments (most likely to be signed offers)
-        // Then check all emails (read + unread) with attachments
-        // Finally check all emails (even without attachments) in case attachment detection fails
-        let emailQuery = `from:${candidate.email} has:attachment newer_than:60d`; // Extended to 60 days
+        // Search for emails from candidate - prioritize replies (Re: subject) which are most likely signed offers
+        // First check for replies (subject contains "Re:" or "Re ") which are most likely signed offers
+        let emailQuery = `from:${candidate.email} (subject:"Re:" OR subject:"Re ") newer_than:60d`;
         if (!checkReadEmails) {
           // Try unread first
-          emailQuery = `from:${candidate.email} is:unread has:attachment newer_than:60d`;
+          emailQuery = `from:${candidate.email} is:unread (subject:"Re:" OR subject:"Re ") newer_than:60d`;
         }
         
-        logger.info(`   Search query: ${emailQuery}`);
+        logger.info(`   Search query (replies): ${emailQuery}`);
         let response = await gmail.users.messages.list({
           userId: 'me',
           q: emailQuery,
-          maxResults: 20 // Check more emails per candidate
+          maxResults: 30 // Check more emails per candidate
         });
 
         let messages = response.data.messages || [];
-        logger.info(`   Found ${messages.length} email(s) with attachments (unread)`);
+        logger.info(`   Found ${messages.length} reply email(s) (unread)`);
         
-        // If no unread emails found and we're not checking read emails, also check read emails
+        // If no unread replies found, check all replies (read + unread)
         if (messages.length === 0 && !checkReadEmails) {
-          logger.info(`   No unread emails with attachments found, checking read emails...`);
+          logger.info(`   No unread replies found, checking all replies...`);
+          emailQuery = `from:${candidate.email} (subject:"Re:" OR subject:"Re ") newer_than:60d`;
+          response = await gmail.users.messages.list({
+            userId: 'me',
+            q: emailQuery,
+            maxResults: 30
+          });
+          messages = response.data.messages || [];
+          logger.info(`   Found ${messages.length} reply email(s) (read + unread)`);
+        }
+        
+        // If still no replies, check all emails with attachments (fallback)
+        if (messages.length === 0) {
+          logger.info(`   No replies found, checking emails with attachments...`);
           emailQuery = `from:${candidate.email} has:attachment newer_than:60d`;
           response = await gmail.users.messages.list({
             userId: 'me',
             q: emailQuery,
-            maxResults: 20
+            maxResults: 30
           });
           messages = response.data.messages || [];
-          logger.info(`   Found ${messages.length} email(s) with attachments (read + unread)`);
+          logger.info(`   Found ${messages.length} email(s) with attachments`);
         }
         
-        // If still no emails with attachments, check all emails (in case attachment detection in Gmail query fails)
+        // Final fallback: check all emails from candidate (in case attachment detection fails)
         if (messages.length === 0) {
-          logger.info(`   No emails with attachments found, checking all emails (including those without detected attachments)...`);
+          logger.info(`   No emails with attachments found, checking all emails from candidate...`);
           emailQuery = `from:${candidate.email} newer_than:60d`;
           response = await gmail.users.messages.list({
             userId: 'me',
             q: emailQuery,
-            maxResults: 20
+            maxResults: 30
           });
           messages = response.data.messages || [];
           logger.info(`   Found ${messages.length} total email(s) from candidate`);
@@ -803,8 +815,8 @@ const processMessage = async (messageId) => {
     }
     
     // Method 2: If no match yet, check subject matching (for cases where headers aren't set properly)
-    // IMPORTANT: Only process if subject contains "offer letter" keywords
-    if (!isReplyToOfferEmail && isReplySubject && hasOfferKeywords) {
+    // More lenient: accept if it's a reply and has offer keywords OR matches offer email subject
+    if (!isReplyToOfferEmail && isReplySubject) {
       logger.info(`No header match found, checking subject matching with offer keywords...`);
       
       for (const offerEmail of offerEmails) {
@@ -813,13 +825,15 @@ const processMessage = async (messageId) => {
         const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
         
         // Check if reply subject matches or contains the original email subject
-        // AND both must contain "offer" and "letter" keywords
-        const subjectsMatch = (cleanReplySubject.includes(cleanOfferSubject) || 
+        // Accept if subjects match OR if reply has offer keywords
+        const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
                              cleanOfferSubject.includes(cleanReplySubject) ||
-                             // Check if both contain key offer-related words
+                             // Check if both contain key offer-related words (case-insensitive)
                              (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer') && 
-                              (cleanReplySubject.includes('letter') || cleanReplySubject.includes('document')))) &&
-                             hasOfferKeywords; // Ensure reply subject has "offer letter" keywords
+                              (cleanReplySubject.includes('letter') || cleanReplySubject.includes('document') || 
+                               cleanReplySubject.includes('offerletter') || cleanReplySubject.includes('offer-letter'))) ||
+                             // Also accept if reply has offer keywords (even if original doesn't match exactly)
+                             hasOfferKeywords;
         
         if (subjectsMatch) {
           isReplyToOfferEmail = true;
@@ -828,6 +842,14 @@ const processMessage = async (messageId) => {
           break;
         }
       }
+    }
+    
+    // If still no match, check one more time with more lenient matching
+    // If email has "offer letter" keywords and is from a candidate with offerSentAt, accept it
+    if (!isReplyToOfferEmail && hasOfferKeywords && candidate.offerSentAt) {
+      logger.info(`✅ Accepting email with offer keywords from candidate with offerSentAt. Subject: "${subject}"`);
+      isReplyToOfferEmail = true;
+      originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER if we can't determine
     }
     
     // If still no match, check one more time with more lenient matching
