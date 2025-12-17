@@ -2310,6 +2310,10 @@ const Settings = () => {
                             toast.error('Please enter a valid email address for SMTP Username');
                             return;
                           }
+                          // Auto-populate newHrEmail with smtpUsername
+                          if (smtpUsername && smtpUsername.includes('@')) {
+                            setNewHrEmail(smtpUsername);
+                          }
                           setWizardCompleted(prev => ({ ...prev, appPassword: true }));
                           if (emailFlow === 'gmail') {
                             setWizardStep(4); // Go to email entry
@@ -2429,10 +2433,10 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 3/4: Enter New Email */}
-              {wizardStep === (emailFlow === 'gmail' ? 3 : 4) && (
+              {/* Step 4/4: Enter New Email */}
+              {wizardStep === (emailFlow === 'gmail' ? 4 : 4) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '3' : '4'}: Enter New HR Email</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '4' : '4'}: Enter New HR Email</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
