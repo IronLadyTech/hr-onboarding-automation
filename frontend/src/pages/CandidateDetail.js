@@ -157,6 +157,62 @@ const CandidateDetail = () => {
     }
   };
 
+  // Auto-schedule Offer Reminder when offer letter is sent/scheduled
+  const autoScheduleOfferReminder = async () => {
+    try {
+      // Find Offer Reminder step template
+      const offerReminderStep = departmentSteps.find(s => s.type === 'OFFER_REMINDER');
+      if (!offerReminderStep) return;
+      
+      // Check if already scheduled
+      const existingEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_REMINDER');
+      if (existingEvent) return;
+      
+      // Get offer letter date (from scheduled event or sent date)
+      const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+      const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt || new Date();
+      
+      // Calculate next day at 2:00 PM IST
+      const offerDate = new Date(offerLetterDate);
+      const reminderDate = new Date(offerDate);
+      reminderDate.setDate(reminderDate.getDate() + 1); // Next day
+      reminderDate.setHours(14, 0, 0, 0); // 2:00 PM
+      
+      // Convert to UTC for backend (IST is UTC+5:30)
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const startTime = new Date(reminderDate.getTime() - istOffset);
+      const endTime = new Date(startTime);
+      endTime.setMinutes(endTime.getMinutes() + 15); // 15 minutes duration
+      
+      // Create the reminder event
+      const formData = new FormData();
+      formData.append('candidateId', id);
+      formData.append('type', 'OFFER_REMINDER');
+      formData.append('stepNumber', offerReminderStep.stepNumber.toString());
+      const replacePlaceholders = (text) => {
+        if (!text) return '';
+        return text
+          .replace(/{{firstName}}/g, candidate.firstName || '')
+          .replace(/{{lastName}}/g, candidate.lastName || '')
+          .replace(/{{position}}/g, candidate.position || '')
+          .replace(/{{department}}/g, candidate.department || '');
+      };
+      formData.append('title', replacePlaceholders(offerReminderStep.title));
+      formData.append('description', replacePlaceholders(offerReminderStep.description || 'Auto-scheduled offer reminder'));
+      formData.append('startTime', startTime.toISOString());
+      formData.append('endTime', endTime.toISOString());
+      formData.append('attendees', JSON.stringify([candidate.email]));
+      
+      await calendarApi.create(formData);
+      toast.success('Offer Reminder auto-scheduled for next day at 2:00 PM!');
+      // Refresh candidate data to show the new event
+      fetchCandidate();
+    } catch (error) {
+      console.error('Failed to auto-schedule offer reminder:', error);
+      // Don't show error to user - this is automatic
+    }
+  };
+
   const handleAction = async (action, data = {}) => {
     setActionLoading(action);
     try {
