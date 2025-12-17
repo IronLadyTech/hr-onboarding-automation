@@ -395,13 +395,16 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
     // Get SMTP credentials (from database if available, else from env)
     let smtpUser = process.env.SMTP_USER;
     let smtpPass = process.env.SMTP_PASS;
+    let smtpHost = process.env.SMTP_HOST;
+    let smtpPort = process.env.SMTP_PORT;
+    let smtpSecure = process.env.SMTP_SECURE === 'true';
     
     if (prisma) {
       try {
         const smtpConfigs = await prisma.workflowConfig.findMany({
           where: {
             key: {
-              in: ['smtp_user', 'smtp_pass']
+              in: ['smtp_user', 'smtp_pass', 'smtp_host', 'smtp_port', 'smtp_secure']
             }
           }
         });
@@ -413,6 +416,15 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
         }
         if (smtpConfigMap.smtp_pass) {
           smtpPass = smtpConfigMap.smtp_pass;
+        }
+        if (smtpConfigMap.smtp_host) {
+          smtpHost = smtpConfigMap.smtp_host;
+        }
+        if (smtpConfigMap.smtp_port) {
+          smtpPort = smtpConfigMap.smtp_port;
+        }
+        if (smtpConfigMap.smtp_secure !== undefined) {
+          smtpSecure = smtpConfigMap.smtp_secure === 'true';
         }
       } catch (error) {
         logger.warn('Could not fetch SMTP credentials from database, using env vars');
