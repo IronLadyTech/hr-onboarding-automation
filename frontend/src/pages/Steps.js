@@ -430,7 +430,7 @@ const Steps = () => {
                       {step.description && (
                         <p className="text-sm text-gray-600 mt-1">{step.description}</p>
                       )}
-                      {step.scheduledTime && step.dueDateOffset !== undefined && (
+                      {step.scheduledTime && step.dueDateOffset !== undefined && step.schedulingMethod !== 'manual' && (
                         <div className="mt-2 bg-blue-50 p-2 rounded-md border border-blue-200">
                           <div className="flex items-center space-x-2 flex-wrap mb-1">
                             <span className="text-xs font-semibold text-gray-700">Default Scheduled Time:</span>
@@ -438,7 +438,10 @@ const Steps = () => {
                               ⏰ {formatTime(step.scheduledTime)}
                             </span>
                             <span className="text-xs text-gray-600">
-                              (Day {step.dueDateOffset > 0 ? '+' : ''}{step.dueDateOffset} from candidate's DOJ)
+                              {step.schedulingMethod === 'offerLetter' 
+                                ? `(Day ${step.dueDateOffset > 0 ? '+' : ''}${step.dueDateOffset} from Offer Letter Date)`
+                                : `(Day ${step.dueDateOffset > 0 ? '+' : ''}${step.dueDateOffset} from candidate's DOJ)`
+                              }
                             </span>
                             <button
                               onClick={() => handleEditStep(step)}
@@ -449,7 +452,10 @@ const Steps = () => {
                             </button>
                           </div>
                           <p className="text-xs text-gray-600 mt-1">
-                            <strong>How it works:</strong> For each candidate, this step will be scheduled at <strong>{formatTime(step.scheduledTime)}</strong> on the date that is <strong>{step.dueDateOffset === 0 ? 'the same as' : step.dueDateOffset > 0 ? step.dueDateOffset + ' days after' : Math.abs(step.dueDateOffset) + ' days before'}</strong> their Date of Joining (DOJ).
+                            <strong>How it works:</strong> For each candidate, this step will be scheduled at <strong>{formatTime(step.scheduledTime)}</strong> on the date that is <strong>{step.dueDateOffset === 0 ? 'the same as' : step.dueDateOffset > 0 ? step.dueDateOffset + ' days after' : Math.abs(step.dueDateOffset) + ' days before'}</strong> {step.schedulingMethod === 'offerLetter' 
+                              ? 'when the Offer Letter (Step 1) is sent/scheduled.'
+                              : 'their Date of Joining (DOJ).'
+                            }
                           </p>
                         </div>
                       )}
