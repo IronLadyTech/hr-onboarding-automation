@@ -545,7 +545,8 @@ const Calendar = () => {
                     if (selectedStep) {
                       // Initialize offset and time from step template
                       setBatchScheduleOffsetDays(selectedStep.dueDateOffset || 0);
-                      setBatchScheduleOffsetTime(selectedStep.scheduledTime || '09:00');
+                      // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                      setBatchScheduleOffsetTime(selectedStep.scheduledTime ? selectedStep.scheduledTime : '09:00');
                       
                       // Calculate initial dateTime based on first candidate's DOJ or offer letter date
                       const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
@@ -693,7 +694,8 @@ const Calendar = () => {
                           });
                           if (selectedStep) {
                             setBatchScheduleOffsetDays(selectedStep.dueDateOffset || 0);
-                            setBatchScheduleOffsetTime(selectedStep.scheduledTime || '09:00');
+                            // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                      setBatchScheduleOffsetTime(selectedStep.scheduledTime ? selectedStep.scheduledTime : '09:00');
                             const doj = new Date(firstCandidate.expectedJoiningDate);
                             const scheduledDate = new Date(doj);
                             scheduledDate.setDate(scheduledDate.getDate() + (selectedStep.dueDateOffset || 0));
