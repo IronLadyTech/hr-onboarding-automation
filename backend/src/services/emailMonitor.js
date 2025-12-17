@@ -594,15 +594,15 @@ const checkForReplies = async (checkReadEmails = false) => {
         logger.info(`   Offer sent at: ${candidate.offerSentAt?.toISOString() || 'N/A'}`);
         logger.info(`   Offer signed at: ${candidate.offerSignedAt?.toISOString() || 'Not signed yet'}`);
         
-        // Search for emails from candidate - prioritize replies (Re: subject) which are most likely signed offers
-        // First check for replies (subject contains "Re:" or "Re ") which are most likely signed offers
-        let emailQuery = `from:${candidate.email} (subject:"Re:" OR subject:"Re ") newer_than:60d`;
+        // SIMPLIFIED: Search for ANY emails with attachments from candidate (no subject restrictions)
+        // First check unread emails with attachments
+        let emailQuery = `from:${candidate.email} has:attachment newer_than:60d`;
         if (!checkReadEmails) {
           // Try unread first
-          emailQuery = `from:${candidate.email} is:unread (subject:"Re:" OR subject:"Re ") newer_than:60d`;
+          emailQuery = `from:${candidate.email} is:unread has:attachment newer_than:60d`;
         }
         
-        logger.info(`   Search query (replies): ${emailQuery}`);
+        logger.info(`   Search query (emails with attachments): ${emailQuery}`);
         let response = await gmail.users.messages.list({
           userId: 'me',
           q: emailQuery,
@@ -610,24 +610,11 @@ const checkForReplies = async (checkReadEmails = false) => {
         });
 
         let messages = response.data.messages || [];
-        logger.info(`   Found ${messages.length} reply email(s) (unread)`);
+        logger.info(`   Found ${messages.length} email(s) with attachments (unread)`);
         
-        // If no unread replies found, check all replies (read + unread)
+        // If no unread emails with attachments, check all emails with attachments (read + unread)
         if (messages.length === 0 && !checkReadEmails) {
-          logger.info(`   No unread replies found, checking all replies...`);
-          emailQuery = `from:${candidate.email} (subject:"Re:" OR subject:"Re ") newer_than:60d`;
-          response = await gmail.users.messages.list({
-            userId: 'me',
-            q: emailQuery,
-            maxResults: 30
-          });
-          messages = response.data.messages || [];
-          logger.info(`   Found ${messages.length} reply email(s) (read + unread)`);
-        }
-        
-        // If still no replies, check all emails with attachments (fallback)
-        if (messages.length === 0) {
-          logger.info(`   No replies found, checking emails with attachments...`);
+          logger.info(`   No unread emails with attachments found, checking all emails with attachments...`);
           emailQuery = `from:${candidate.email} has:attachment newer_than:60d`;
           response = await gmail.users.messages.list({
             userId: 'me',
@@ -635,7 +622,7 @@ const checkForReplies = async (checkReadEmails = false) => {
             maxResults: 30
           });
           messages = response.data.messages || [];
-          logger.info(`   Found ${messages.length} email(s) with attachments`);
+          logger.info(`   Found ${messages.length} email(s) with attachments (read + unread)`);
         }
         
         // Final fallback: check all emails from candidate (in case attachment detection fails)
