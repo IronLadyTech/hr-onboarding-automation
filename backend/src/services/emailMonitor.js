@@ -147,15 +147,23 @@ const initImapMonitor = async () => {
     });
     
     // Start monitoring - check every 30 seconds
-    setInterval(async () => {
-      await checkForRepliesImap();
+    const checkInterval = setInterval(async () => {
+      try {
+        logger.info('📧 [SCHEDULED CHECK] Starting automatic email check for signed offer letters (IMAP)...');
+        await checkForRepliesImap();
+        logger.info('📧 [SCHEDULED CHECK] Email check completed (IMAP)');
+      } catch (error) {
+        logger.error('📧 [SCHEDULED CHECK] Error during automatic email check (IMAP):', error.message);
+      }
     }, 30 * 1000);
     
     // Initial check
+    logger.info('📧 [INITIAL CHECK] Running initial email check for signed offer letters (IMAP)...');
     await checkForRepliesImap();
     
     logger.info('✅ Email reply monitor initialized (IMAP)');
     logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
+    logger.info('📧 Monitoring candidates with offerSentAt but no offerSignedAt');
     return true;
   } catch (error) {
     logger.error('❌ IMAP initialization failed:', error.message);
@@ -482,32 +490,53 @@ const checkForReplies = async (checkReadEmails = false) => {
     let totalProcessed = 0;
     for (const candidate of candidates) {
       try {
-        // First check unread emails, then check read emails if no unread found
-        // This ensures we don't miss emails that were already read
-        let emailQuery = `from:${candidate.email} has:attachment newer_than:30d`;
+        logger.info(`🔍 Checking emails for candidate: ${candidate.firstName} ${candidate.lastName} (${candidate.email})`);
+        logger.info(`   Offer sent at: ${candidate.offerSentAt?.toISOString() || 'N/A'}`);
+        logger.info(`   Offer signed at: ${candidate.offerSignedAt?.toISOString() || 'Not signed yet'}`);
+        
+        // First check unread emails with attachments (most likely to be signed offers)
+        // Then check all emails (read + unread) with attachments
+        // Finally check all emails (even without attachments) in case attachment detection fails
+        let emailQuery = `from:${candidate.email} has:attachment newer_than:60d`; // Extended to 60 days
         if (!checkReadEmails) {
           // Try unread first
-          emailQuery = `from:${candidate.email} is:unread has:attachment newer_than:30d`;
+          emailQuery = `from:${candidate.email} is:unread has:attachment newer_than:60d`;
         }
         
+        logger.info(`   Search query: ${emailQuery}`);
         let response = await gmail.users.messages.list({
           userId: 'me',
           q: emailQuery,
-          maxResults: 10 // Only need a few emails per candidate
+          maxResults: 20 // Check more emails per candidate
         });
 
         let messages = response.data.messages || [];
+        logger.info(`   Found ${messages.length} email(s) with attachments (unread)`);
         
         // If no unread emails found and we're not checking read emails, also check read emails
         if (messages.length === 0 && !checkReadEmails) {
-          logger.info(`No unread emails found for ${candidate.email}, checking read emails...`);
-          emailQuery = `from:${candidate.email} has:attachment newer_than:30d`;
+          logger.info(`   No unread emails with attachments found, checking read emails...`);
+          emailQuery = `from:${candidate.email} has:attachment newer_than:60d`;
           response = await gmail.users.messages.list({
             userId: 'me',
             q: emailQuery,
-            maxResults: 10
+            maxResults: 20
           });
           messages = response.data.messages || [];
+          logger.info(`   Found ${messages.length} email(s) with attachments (read + unread)`);
+        }
+        
+        // If still no emails with attachments, check all emails (in case attachment detection in Gmail query fails)
+        if (messages.length === 0) {
+          logger.info(`   No emails with attachments found, checking all emails (including those without detected attachments)...`);
+          emailQuery = `from:${candidate.email} newer_than:60d`;
+          response = await gmail.users.messages.list({
+            userId: 'me',
+            q: emailQuery,
+            maxResults: 20
+          });
+          messages = response.data.messages || [];
+          logger.info(`   Found ${messages.length} total email(s) from candidate`);
         }
         
         if (messages.length > 0) {
