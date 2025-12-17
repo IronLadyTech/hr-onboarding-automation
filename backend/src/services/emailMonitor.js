@@ -1083,10 +1083,53 @@ const getEmailMonitorStatus = () => {
   };
 };
 
+// Reinitialize email monitor (useful after updating refresh token)
+const reinitializeEmailMonitor = async () => {
+  logger.info('📧 ========================================');
+  logger.info('📧 REINITIALIZING EMAIL MONITOR');
+  logger.info('📧 ========================================');
+  
+  // Clear existing intervals
+  if (gmailCheckInterval) {
+    clearInterval(gmailCheckInterval);
+    gmailCheckInterval = null;
+    logger.info('📧 Cleared existing Gmail check interval');
+  }
+  if (imapCheckInterval) {
+    clearInterval(imapCheckInterval);
+    imapCheckInterval = null;
+    logger.info('📧 Cleared existing IMAP check interval');
+  }
+  
+  // Close existing IMAP connection if any
+  if (imapClient) {
+    try {
+      imapClient.end();
+      logger.info('📧 Closed existing IMAP connection');
+    } catch (error) {
+      logger.warn('Error closing IMAP connection:', error.message);
+    }
+    imapClient = null;
+  }
+  
+  // Reset flags
+  gmail = null;
+  useImap = false;
+  imapEmail = null;
+  
+  // Reinitialize
+  if (prisma) {
+    await initEmailMonitor(prisma);
+  } else {
+    logger.error('❌ Cannot reinitialize: prisma client not available');
+  }
+};
+
 module.exports = {
   initEmailMonitor,
   checkForReplies,
   checkEmailForCandidate,
   checkNow,
-  getEmailMonitorStatus
+  getEmailMonitorStatus,
+  reinitializeEmailMonitor
 };
