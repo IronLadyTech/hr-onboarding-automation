@@ -1950,7 +1950,8 @@ const CandidateDetail = () => {
                           
                           // Then initialize offset and time
                           setScheduleOffsetDays(offset);
-                          setScheduleOffsetTime(stepTemplate.scheduledTime || '14:00');
+                                // Use step template's scheduledTime for Offer Reminder (should be 14:00)
+                                setScheduleOffsetTime(stepTemplate.scheduledTime || '14:00');
                         } else {
                           // Offer letter not sent yet - use default offset/time, calculate from current date
                           const offset = stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
@@ -2167,52 +2168,32 @@ const CandidateDetail = () => {
                 );
               })()}
               
-              <label className="block text-sm font-medium text-gray-700 mb-1">Exact Date & Time *</label>
+              {/* Only show Exact Date & Time field in option 1 (exact mode) */}
+              {scheduleMode === 'exact' && (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Exact Date & Time *</label>
               <input 
                 type="datetime-local" 
                 value={scheduleDateTime}
-                onChange={(e) => {
-                  setScheduleDateTime(e.target.value);
-                  
-                  // If in DOJ mode, recalculate offset and time from the new exact date/time
-                  if (scheduleMode === 'doj' && candidate.expectedJoiningDate) {
-                    const exactDate = new Date(e.target.value);
-                    const doj = new Date(candidate.expectedJoiningDate);
-                    // Calculate days difference
-                    const diffTime = exactDate.getTime() - doj.getTime();
-                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                    setScheduleOffsetDays(diffDays);
-                    // Extract time
-                    const hours = String(exactDate.getHours()).padStart(2, '0');
-                    const minutes = String(exactDate.getMinutes()).padStart(2, '0');
-                    setScheduleOffsetTime(`${hours}:${minutes}`);
-                  }
-                  
-                  // If in offerLetter mode, recalculate offset and time from the new exact date/time
-                  if (scheduleMode === 'offerLetter') {
-                    const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
-                    const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
-                    if (offerLetterDate) {
-                      const exactDate = new Date(e.target.value);
-                      const offerDate = new Date(offerLetterDate);
-                      // Calculate days difference
-                      const diffTime = exactDate.getTime() - offerDate.getTime();
-                      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                      setScheduleOffsetDays(diffDays);
-                      // Extract time
-                      const hours = String(exactDate.getHours()).padStart(2, '0');
-                      const minutes = String(exactDate.getMinutes()).padStart(2, '0');
-                      setScheduleOffsetTime(`${hours}:${minutes}`);
-                    }
-                  }
-                }}
+                    onChange={(e) => {
+                      setScheduleDateTime(e.target.value);
+                    }}
                 className="input w-full"
                 required
               />
-              {(scheduleMode === 'doj' || scheduleMode === 'offerLetter') && (
-                <p className="text-xs text-gray-500 mt-1">
-                  This field is the source of truth. Changing it will update the offset and time above. You can also edit offset/time directly to update this field.
-                </p>
+                </>
+              )}
+              
+              {/* Show calculated date/time display for options 2 and 3 */}
+              {(scheduleMode === 'doj' || scheduleMode === 'offerLetter') && scheduleDateTime && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3 mb-3">
+                  <p className="text-sm text-indigo-800">
+                    <strong>Calculated Date & Time:</strong> {new Date(scheduleDateTime).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {new Date(scheduleDateTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </p>
+                  <p className="text-xs text-indigo-600 mt-1">
+                    This is calculated from your offset and time settings above. Switch to "Exact Date & Time" mode to manually edit.
+                  </p>
+                </div>
               )}
             </div>
             <div className="mb-4">
