@@ -2108,63 +2108,6 @@ const Settings = () => {
               {/* Step 2/3: SMTP Configuration */}
               {((emailFlow === 'gmail' && wizardStep === 3) || (emailFlow === 'godaddy' && wizardStep === 2)) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '3' : '2'}: SMTP Configuration (Required)</h3>
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                    <p className="text-sm text-gray-700 mb-3">
-                      <strong>This step is only needed if you want Google Calendar integration</strong> (to create calendar invites automatically). If you're only using email (SMTP), you can skip this step.
-                    </p>
-                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-md mb-4">
-                      <p className="text-sm text-yellow-800">
-                        <strong>For GoDaddy/Other Email Providers:</strong> You can skip this step if you don't need Google Calendar features. Email sending will work fine with just SMTP configuration.
-                      </p>
-                    </div>
-                    <p className="text-sm text-gray-700 mb-3">
-                      To use Google Calendar API features, you need to add the email as a test user in Google Cloud Console.
-                    </p>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
-                      <li>Sign in to Google Cloud Console with <strong>ironladytech@gmail.com</strong></li>
-                      <li>Click the button below to open OAuth consent screen</li>
-                      <li>Go to <strong>"Audience"</strong> section (or "Test users" tab)</li>
-                      <li>Click <strong>"Add users"</strong> button</li>
-                      <li>Add: <strong>{newHrEmail || 'your-new-email@domain.com'}</strong></li>
-                      <li>Click "Add"</li>
-                      <li>Come back here and mark as completed</li>
-                    </ol>
-                    <div className="flex gap-2">
-                      <a
-                        href="https://console.cloud.google.com/apis/credentials/consent"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-primary"
-                      >
-                        🔗 Open Google Cloud Console (Sign in as ironladytech@gmail.com)
-                      </a>
-                      <button
-                        onClick={() => {
-                          setWizardCompleted(prev => ({ ...prev, oauthTestUser: true }));
-                          setWizardStep(2);
-                        }}
-                        className="btn btn-secondary"
-                      >
-                        ✓ I've Added It
-                      </button>
-                      <button
-                        onClick={() => {
-                          setWizardCompleted(prev => ({ ...prev, oauthTestUser: false }));
-                          setWizardStep(2);
-                        }}
-                        className="btn btn-secondary"
-                      >
-                        ⏭️ Skip (Email Only)
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 2: SMTP Configuration */}
-              {wizardStep === 2 && (
-                <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
