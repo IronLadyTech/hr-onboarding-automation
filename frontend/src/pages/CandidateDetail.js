@@ -727,8 +727,8 @@ const CandidateDetail = () => {
   // Helper to get scheduled event for a step by event type AND step number
   // This ensures each step has its own unique event, even if they share the same type
   const getScheduledEventByType = (eventType, stepNumber = null) => {
-    // Use scheduledEvents (the correct property name from API)
-    const events = candidate?.scheduledEvents || candidate?.calendarEvents || [];
+    // Use calendarEvents (the property name from API) with fallback to scheduledEvents
+    const events = candidate?.calendarEvents || candidate?.scheduledEvents || [];
     if (!events || events.length === 0) return null;
     
     // Map step type to event type (MANUAL -> CUSTOM, WHATSAPP_ADDITION -> WHATSAPP_TASK)
