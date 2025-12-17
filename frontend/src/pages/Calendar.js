@@ -551,24 +551,34 @@ const Calendar = () => {
                       const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
                       if (firstCandidate) {
                         let baseDate;
+                        let shouldUseOfferLetterMode = false;
+                        
                         if (eventType === 'OFFER_REMINDER') {
                           // For Offer Reminder, use offer letter date if available
                           const offerLetterEvent = firstCandidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
                           baseDate = offerLetterEvent?.startTime || firstCandidate.offerSentAt || new Date();
+                          shouldUseOfferLetterMode = true;
+                          // Set mode to offerLetter for OFFER_REMINDER
+                          setBatchScheduleMode('offerLetter');
                         } else if (firstCandidate.expectedJoiningDate) {
                           baseDate = new Date(firstCandidate.expectedJoiningDate);
+                          // Set mode to doj for steps that use DOJ
+                          setBatchScheduleMode('doj');
                         } else {
                           baseDate = new Date();
+                          setBatchScheduleMode('exact');
                         }
                         
                         const scheduledDate = new Date(baseDate);
                         const offset = selectedStep.dueDateOffset || 0;
                         scheduledDate.setDate(scheduledDate.getDate() + offset);
                         
+                        // ALWAYS use step template's scheduledTime - never default to 9 AM
                         if (selectedStep.scheduledTime) {
                           const [hours, minutes] = selectedStep.scheduledTime.split(':');
                           scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
                         } else {
+                          // Only fallback to 9 AM if template doesn't have scheduledTime (shouldn't happen)
                           scheduledDate.setHours(9, 0, 0, 0);
                         }
                         
@@ -580,6 +590,9 @@ const Calendar = () => {
                         setBatchScheduleData(prev => ({ ...prev, dateTime: `${year}-${month}-${day}T${hour}:${minute}` }));
                       }
                     }
+                  } else {
+                    // Reset mode when no step selected
+                    setBatchScheduleMode('exact');
                   }
                 }}
                 className="input w-full"
@@ -617,14 +630,45 @@ const Calendar = () => {
                     checked={batchScheduleMode === 'exact'}
                     onChange={(e) => {
                       setBatchScheduleMode(e.target.value);
-                      if (!batchScheduleData.dateTime) {
-                        const now = new Date();
-                        const year = now.getFullYear();
-                        const month = String(now.getMonth() + 1).padStart(2, '0');
-                        const day = String(now.getDate()).padStart(2, '0');
-                        const hour = String(now.getHours()).padStart(2, '0');
-                        const minute = String(now.getMinutes()).padStart(2, '0');
-                        setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                      // If dateTime is already set, keep it. Otherwise, calculate from step template
+                      if (!batchScheduleData.dateTime && batchScheduleData.eventType && selectedCandidates.length > 0) {
+                        const [eventType, stepNumber] = batchScheduleData.eventType.split('|');
+                        const selectedStep = departmentSteps.find(s => s.type === eventType && s.stepNumber === parseInt(stepNumber));
+                        if (selectedStep) {
+                          const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                          let baseDate;
+                          if (eventType === 'OFFER_REMINDER') {
+                            const offerLetterEvent = firstCandidate?.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                            baseDate = offerLetterEvent?.startTime || firstCandidate?.offerSentAt || new Date();
+                          } else if (firstCandidate?.expectedJoiningDate) {
+                            baseDate = new Date(firstCandidate.expectedJoiningDate);
+                          } else {
+                            baseDate = new Date();
+                          }
+                          const scheduledDate = new Date(baseDate);
+                          const offset = selectedStep.dueDateOffset || 0;
+                          scheduledDate.setDate(scheduledDate.getDate() + offset);
+                          if (selectedStep.scheduledTime) {
+                            const [hours, minutes] = selectedStep.scheduledTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                          } else {
+                            scheduledDate.setHours(9, 0, 0, 0);
+                          }
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                        } else {
+                          const now = new Date();
+                          const year = now.getFullYear();
+                          const month = String(now.getMonth() + 1).padStart(2, '0');
+                          const day = String(now.getDate()).padStart(2, '0');
+                          const hour = String(now.getHours()).padStart(2, '0');
+                          const minute = String(now.getMinutes()).padStart(2, '0');
+                          setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                        }
                       }
                     }}
                     className="mr-2"

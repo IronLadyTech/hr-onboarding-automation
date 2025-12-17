@@ -1629,7 +1629,59 @@ const CandidateDetail = () => {
                                 // Calculate default dateTime from step template using scheduledTime and dueDateOffset
                                 let defaultDateTime = '';
                                 const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
-                                if (stepTemplate && candidate.expectedJoiningDate) {
+                                
+                                // Set schedule mode and initialize based on step type
+                                if (step.stepType === 'OFFER_REMINDER') {
+                                  // Always use offerLetter mode for OFFER_REMINDER
+                                  setScheduleMode('offerLetter');
+                                  setScheduleOffsetDays(stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
+                                  setScheduleOffsetTime(stepTemplate?.scheduledTime || '14:00');
+                                  
+                                  // Calculate based on offer letter date if available
+                                  const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                                  const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                                  if (offerLetterDate) {
+                                    const offerDate = new Date(offerLetterDate);
+                                    const scheduledDate = new Date(offerDate);
+                                    const offset = stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                                    scheduledDate.setDate(scheduledDate.getDate() + offset);
+                                    if (stepTemplate?.scheduledTime) {
+                                      const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                      scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                                    } else {
+                                      scheduledDate.setHours(14, 0, 0, 0);
+                                    }
+                                    const year = scheduledDate.getFullYear();
+                                    const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                    const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                    const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                    const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                    defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                  } else {
+                                    // If offer letter not sent, use current date + offset + time
+                                    const now = new Date();
+                                    const scheduledDate = new Date(now);
+                                    const offset = stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                                    scheduledDate.setDate(scheduledDate.getDate() + offset);
+                                    if (stepTemplate?.scheduledTime) {
+                                      const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                      scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                                    } else {
+                                      scheduledDate.setHours(14, 0, 0, 0);
+                                    }
+                                    const year = scheduledDate.getFullYear();
+                                    const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                    const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                    const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                    const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                    defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                  }
+                                } else if (stepTemplate && candidate.expectedJoiningDate) {
+                                  // Use DOJ mode for other steps
+                                  setScheduleMode('doj');
+                                  setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
+                                  setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
+                                  
                                   const doj = new Date(candidate.expectedJoiningDate);
                                   const offset = stepTemplate.dueDateOffset || 0;
                                   
@@ -1637,12 +1689,12 @@ const CandidateDetail = () => {
                                   const scheduledDate = new Date(doj);
                                   scheduledDate.setDate(scheduledDate.getDate() + offset);
                                   
-                                  // Use scheduledTime from template if available
+                                  // ALWAYS use scheduledTime from template - never default to 9 AM
                                   if (stepTemplate.scheduledTime) {
                                     const [hours, minutes] = stepTemplate.scheduledTime.split(':');
                                     scheduledDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
                                   } else {
-                                    // Default to 9:00 AM if no scheduledTime
+                                    // Only fallback to 9:00 AM if template doesn't have scheduledTime (shouldn't happen)
                                     scheduledDate.setHours(9, 0, 0, 0);
                                   }
                                   
@@ -1653,11 +1705,17 @@ const CandidateDetail = () => {
                                   const hour = String(scheduledDate.getHours()).padStart(2, '0');
                                   const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
                                   defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                } else {
+                                  // Fallback to exact mode if no DOJ
+                                  setScheduleMode('exact');
+                                  setScheduleOffsetDays(0);
+                                  setScheduleOffsetTime(stepTemplate?.scheduledTime || '09:00');
                                 }
                                 
                                 setScheduleDuration(durationMap[step.stepType] || 60);
                                 setScheduleDateTime(defaultDateTime);
                                 setSchedulingStepType(step.stepType);
+                                setSchedulingStepNumber(step.step);
                                 setShowScheduleModal(scheduleAction);
                               }}
                               className="btn btn-sm btn-primary"
