@@ -2043,6 +2043,68 @@ const CandidateDetail = () => {
               {scheduleMode === 'offerLetter' && (() => {
                 const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
                 const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                // If offer letter not sent yet, show warning message
+                if (!offerLetterDate) {
+                  return (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-3">
+                      <p className="text-xs text-yellow-800 mb-2">
+                        ⚠️ Offer letter not sent yet. This will calculate automatically when Step 1 (Offer Letter) is scheduled or completed. You can still set offset and time now.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                          <input
+                            type="number"
+                            value={scheduleOffsetDays}
+                            onChange={(e) => {
+                              const offset = parseInt(e.target.value) || 0;
+                              setScheduleOffsetDays(offset);
+                              // Update scheduleDateTime based on current value
+                              if (scheduleDateTime) {
+                                const baseDate = new Date(scheduleDateTime);
+                                const scheduledDate = new Date(baseDate);
+                                scheduledDate.setDate(scheduledDate.getDate() + (offset - scheduleOffsetDays));
+                                const [hours, minutes] = scheduleOffsetTime.split(':');
+                                scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                const year = scheduledDate.getFullYear();
+                                const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                              }
+                            }}
+                            className="input text-sm"
+                            placeholder="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                          <input
+                            type="time"
+                            value={scheduleOffsetTime}
+                            onChange={(e) => {
+                              setScheduleOffsetTime(e.target.value);
+                              // Update time in scheduleDateTime
+                              if (scheduleDateTime) {
+                                const scheduledDate = new Date(scheduleDateTime);
+                                const [hours, minutes] = e.target.value.split(':');
+                                scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                const year = scheduledDate.getFullYear();
+                                const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                              }
+                            }}
+                            className="input text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
                     <p className="text-xs text-green-600 mb-2">
