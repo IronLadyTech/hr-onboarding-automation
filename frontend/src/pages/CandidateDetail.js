@@ -2172,15 +2172,31 @@ const CandidateDetail = () => {
               {scheduleMode === 'exact' && (
                 <>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Exact Date & Time *</label>
-              <input 
-                type="datetime-local" 
-                value={scheduleDateTime}
+                  <input 
+                    type="datetime-local" 
+                    value={scheduleDateTime}
                     onChange={(e) => {
                       setScheduleDateTime(e.target.value);
+                      
+                      // Recalculate offset and time from the new exact date/time
+                      const exactDate = new Date(e.target.value);
+                      
+                      // If we have DOJ, calculate offset from DOJ
+                      if (candidate.expectedJoiningDate) {
+                        const doj = new Date(candidate.expectedJoiningDate);
+                        const diffTime = exactDate.getTime() - doj.getTime();
+                        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                        setScheduleOffsetDays(diffDays);
+                      }
+                      
+                      // Extract time
+                      const hours = String(exactDate.getHours()).padStart(2, '0');
+                      const minutes = String(exactDate.getMinutes()).padStart(2, '0');
+                      setScheduleOffsetTime(`${hours}:${minutes}`);
                     }}
-                className="input w-full"
-                required
-              />
+                    className="input w-full"
+                    required
+                  />
                 </>
               )}
               
@@ -2193,6 +2209,8 @@ const CandidateDetail = () => {
                   <p className="text-xs text-indigo-600 mt-1">
                     This is calculated from your offset and time settings above. Switch to "Exact Date & Time" mode to manually edit.
                   </p>
+                  {/* Hidden input to ensure scheduleDateTime is set for form validation */}
+                  <input type="hidden" value={scheduleDateTime} required />
                 </div>
               )}
             </div>
