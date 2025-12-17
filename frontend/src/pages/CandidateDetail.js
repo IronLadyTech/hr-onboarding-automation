@@ -1629,6 +1629,13 @@ const CandidateDetail = () => {
                               setScheduleAttachmentPreview(null);
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
+                              // Set schedule mode based on whether we have DOJ and step template
+                              const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                              if (candidate.expectedJoiningDate && stepTemplate) {
+                                setScheduleMode('doj');
+                              } else {
+                                setScheduleMode('exact');
+                              }
                               setShowScheduleModal(scheduleAction);
                             }}
                             className="text-indigo-600 hover:text-indigo-800 text-xl p-1 hover:bg-indigo-50 rounded"
