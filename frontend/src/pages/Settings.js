@@ -2395,8 +2395,11 @@ const Settings = () => {
                             </div>
                           </div>
                           <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs text-blue-800 mb-2">
+                              <strong>Email:</strong> {smtpUsername || newHrEmail || 'Enter email in Step 2'}
+                            </p>
                             <p className="text-xs text-blue-800">
-                              <strong>Note:</strong> IMAP will use the same email ({smtpUsername || newHrEmail || 'your email'}) and password as SMTP.
+                              <strong>Note:</strong> IMAP will use the same email and password as SMTP (from Step 2).
                               The system will automatically monitor your inbox for candidate replies.
                             </p>
                           </div>
@@ -2472,8 +2475,14 @@ const Settings = () => {
                           toast.error('Please enter a valid email address');
                           return;
                         }
-                        if (!smtpPassword || smtpPassword.length < 16) {
-                          toast.error('Please go back to Step 2 and provide an App Password for the new email');
+                        // Only require 16-character App Password for Gmail flow
+                        if (emailFlow === 'gmail' && (!smtpPassword || smtpPassword.length < 16)) {
+                          toast.error('Please go back to Step 2 and provide a 16-character App Password for Gmail');
+                          return;
+                        }
+                        // For GoDaddy flow, just check if password exists
+                        if (emailFlow === 'godaddy' && !smtpPassword) {
+                          toast.error('Please go back to Step 2 and provide the email password');
                           return;
                         }
                         setSavingHREmail(true);
