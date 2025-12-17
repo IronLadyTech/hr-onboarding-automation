@@ -2551,7 +2551,7 @@ const Settings = () => {
                               gmailConfigured: response.data.data?.gmailConfigured || false,
                               gmailConfigMessage: response.data.data?.gmailConfigMessage || ''
                             }));
-                            setWizardStep(emailFlow === 'gmail' ? 4 : 5); // Go to Test Email step
+                            setWizardStep(emailFlow === 'gmail' ? 6 : 5); // Go to Test Email step
                             toast.success('HR email saved successfully!');
                           }
                         } catch (error) {
