@@ -1946,6 +1946,23 @@ router.post('/init-department-tasks', async (req, res) => {
   }
 });
 
+// Check email monitor status
+router.get('/email-monitor-status', authMiddleware, async (req, res) => {
+  try {
+    const status = emailMonitor.getEmailMonitorStatus();
+    res.json({
+      success: true,
+      data: status,
+      message: status.isActive 
+        ? 'Email monitoring is active and checking automatically every 30 seconds'
+        : 'Email monitoring is not active. Gmail API is not configured.'
+    });
+  } catch (error) {
+    logger.error('Error getting email monitor status:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Manually check for signed offer letter from candidate email
 router.post('/check-email/:id', authMiddleware, async (req, res) => {
   try {
@@ -1963,6 +1980,15 @@ router.post('/check-email/:id', authMiddleware, async (req, res) => {
 
     if (!candidate.offerSentAt) {
       return res.status(400).json({ success: false, message: 'Offer letter has not been sent to this candidate yet' });
+    }
+
+    // Check if email monitor is active
+    const status = emailMonitor.getEmailMonitorStatus();
+    if (!status.isActive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email monitoring is not configured. Please configure Gmail API in Settings to enable automatic detection.'
+      });
     }
 
     // Manually check for emails from this candidate

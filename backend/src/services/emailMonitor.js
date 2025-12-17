@@ -53,18 +53,34 @@ const initEmailMonitor = async (prismaClient) => {
     await checkForReplies();
     
     logger.info('✅ Email reply monitor initialized (Gmail API)');
+    logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
   } catch (error) {
-    logger.error('Gmail API initialization failed:', error.message);
-    logger.info('📧 Email monitoring disabled. To enable:');
-    logger.info('   1. Go to Google Cloud Console');
+    logger.error('❌ Gmail API initialization failed:', error.message);
+    logger.error('Full error:', error);
+    logger.warn('📧 Email monitoring DISABLED. Automatic detection will NOT work.');
+    logger.info('📧 To enable automatic email detection:');
+    logger.info('   1. Go to Google Cloud Console (https://console.cloud.google.com)');
     logger.info('   2. Enable Gmail API');
-    logger.info('   3. Create OAuth credentials');
-    logger.info('   4. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN to .env');
+    logger.info('   3. Create OAuth 2.0 credentials');
+    logger.info('   4. Add to .env file:');
+    logger.info('      GOOGLE_CLIENT_ID=your_client_id');
+    logger.info('      GOOGLE_CLIENT_SECRET=your_client_secret');
+    logger.info('      GOOGLE_REFRESH_TOKEN=your_refresh_token');
+    logger.info('   5. Restart the server');
+    gmail = null; // Ensure gmail is null if initialization failed
   }
 };
 
 const checkForReplies = async (checkReadEmails = false) => {
-  if (isProcessing || !gmail) return;
+  if (isProcessing) {
+    logger.debug('📧 Email check already in progress, skipping...');
+    return;
+  }
+  
+  if (!gmail) {
+    logger.debug('📧 Gmail API not initialized, skipping email check');
+    return;
+  }
   
   isProcessing = true;
   
@@ -88,11 +104,11 @@ const checkForReplies = async (checkReadEmails = false) => {
     });
 
     if (candidates.length === 0) {
-      logger.info('📧 No candidates waiting for signed offers');
+      logger.debug('📧 No candidates waiting for signed offers');
       return;
     }
 
-    logger.info(`📧 Checking emails for ${candidates.length} candidate(s) waiting for signed offers`);
+    logger.info(`📧 [AUTO-CHECK] Checking emails for ${candidates.length} candidate(s) waiting for signed offers`);
 
     // Search for emails from each candidate specifically
     let totalProcessed = 0;
@@ -132,18 +148,23 @@ const checkForReplies = async (checkReadEmails = false) => {
             await processMessage(msg.id);
             totalProcessed++;
           }
+        } else {
+          logger.debug(`📧 No emails with attachments found for ${candidate.email}`);
         }
       } catch (error) {
-        logger.error(`Error checking emails for ${candidate.email}:`, error.message);
+        logger.error(`❌ Error checking emails for ${candidate.email}:`, error.message);
         // Continue with next candidate even if one fails
       }
     }
 
     if (totalProcessed > 0) {
-      logger.info(`✅ Processed ${totalProcessed} email(s) from ${candidates.length} candidate(s)`);
+      logger.info(`✅ [AUTO-CHECK] Processed ${totalProcessed} email(s) from ${candidates.length} candidate(s)`);
+    } else {
+      logger.debug(`📧 [AUTO-CHECK] No new emails to process`);
     }
   } catch (error) {
-    logger.error('Error checking emails:', error.message);
+    logger.error('❌ Error in checkForReplies:', error.message);
+    logger.error('Full error:', error);
   } finally {
     isProcessing = false;
   }
@@ -519,9 +540,19 @@ const checkNow = async () => {
   await checkForReplies();
 };
 
+// Get email monitor status
+const getEmailMonitorStatus = () => {
+  return {
+    isActive: !!gmail,
+    isProcessing: isProcessing,
+    hasGmail: !!gmail
+  };
+};
+
 module.exports = {
   initEmailMonitor,
   checkForReplies,
   checkEmailForCandidate,
-  checkNow
+  checkNow,
+  getEmailMonitorStatus
 };

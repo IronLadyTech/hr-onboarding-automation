@@ -54,10 +54,33 @@ const CandidateDetail = () => {
   const [schedulingStepNumber, setSchedulingStepNumber] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [emailMonitorActive, setEmailMonitorActive] = useState(null); // null = not checked, true/false = status
 
   useEffect(() => {
     fetchCandidate();
+    checkEmailMonitorStatus();
   }, [id]);
+  
+  // Check email monitor status every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      checkEmailMonitorStatus();
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  const checkEmailMonitorStatus = async () => {
+    try {
+      const response = await candidateApi.getEmailMonitorStatus();
+      if (response.data.success) {
+        setEmailMonitorActive(response.data.data.isActive);
+      }
+    } catch (error) {
+      // Silently fail - don't show error for status check
+      setEmailMonitorActive(false);
+    }
+  };
 
   useEffect(() => {
     if (candidate?.department) {
@@ -1373,7 +1396,11 @@ const CandidateDetail = () => {
                       <p className="text-xs text-gray-500">
                         {candidate.signedOfferPath 
                           ? `Auto-captured on ${candidate.offerSignedAt ? new Date(candidate.offerSignedAt).toLocaleString('en-IN') : 'N/A'}`
-                          : 'Waiting for candidate response (auto-detects from email replies)'
+                          : emailMonitorActive === false
+                            ? '⚠️ Auto-detection disabled - Gmail API not configured'
+                            : emailMonitorActive === true
+                              ? '✅ Auto-detecting from email replies (checking every 30 seconds)'
+                              : 'Waiting for candidate response (auto-detects from email replies)'
                         }
                       </p>
                     </div>
@@ -1404,21 +1431,56 @@ const CandidateDetail = () => {
                       </a>
                     ) : (
                       <>
-                        <button
-                          onClick={handleCheckEmail}
-                          disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
-                          className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
-                          title="Check email inbox for signed offer letter from candidate"
-                        >
-                          {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
-                        </button>
-                        <button
-                          onClick={() => setShowUploadModal('signedOffer')}
-                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
-                          title="Upload signed offer letter received from candidate"
-                        >
-                          📤 Upload
-                        </button>
+                        {/* Only show manual buttons if auto-detection is not active */}
+                        {emailMonitorActive === false && (
+                          <>
+                            <button
+                              onClick={handleCheckEmail}
+                              disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
+                              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
+                              title="Check email inbox for signed offer letter from candidate"
+                            >
+                              {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
+                            </button>
+                            <button
+                              onClick={() => setShowUploadModal('signedOffer')}
+                              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                              title="Upload signed offer letter received from candidate"
+                            >
+                              📤 Upload
+                            </button>
+                          </>
+                        )}
+                        {/* If auto-detection is active, only show upload as backup */}
+                        {emailMonitorActive === true && (
+                          <button
+                            onClick={() => setShowUploadModal('signedOffer')}
+                            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                            title="Manual upload (auto-detection is active)"
+                          >
+                            📤 Upload (Manual)
+                          </button>
+                        )}
+                        {/* If status unknown, show both */}
+                        {emailMonitorActive === null && (
+                          <>
+                            <button
+                              onClick={handleCheckEmail}
+                              disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
+                              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
+                              title="Check email inbox for signed offer letter from candidate"
+                            >
+                              {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
+                            </button>
+                            <button
+                              onClick={() => setShowUploadModal('signedOffer')}
+                              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                              title="Upload signed offer letter received from candidate"
+                            >
+                              📤 Upload
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>

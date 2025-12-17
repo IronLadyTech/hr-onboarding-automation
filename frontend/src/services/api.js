@@ -81,6 +81,7 @@ export const candidateApi = {
   }),
   sendOfferReminder: (id) => api.post(`/candidates/${id}/send-offer-reminder`),
   checkEmail: (id) => api.post(`/candidates/check-email/${id}`),
+  getEmailMonitorStatus: () => api.get('/candidates/email-monitor-status'),
   
   // Step 3: Welcome Email
   sendWelcomeEmail: (id) => api.post(`/candidates/${id}/welcome-email`),
