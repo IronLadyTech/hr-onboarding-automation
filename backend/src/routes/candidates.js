@@ -1947,6 +1947,7 @@ router.post('/init-department-tasks', async (req, res) => {
 });
 
 // Check email monitor status
+// Get email monitor status (supports both Gmail API and IMAP)
 router.get('/email-monitor-status', authMiddleware, async (req, res) => {
   try {
     const status = emailMonitor.getEmailMonitorStatus();

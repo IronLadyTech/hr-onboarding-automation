@@ -1800,7 +1800,8 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
 // Update HR email and optionally configure Google Cloud
 router.post('/update-hr-email', requireAdmin, async (req, res) => {
   try {
-    const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername } = req.body;
+    const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername, 
+            imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure } = req.body;
     
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
@@ -1882,6 +1883,65 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         logger.error('Error storing SMTP credentials:', smtpError);
         // Don't fail the request, just log the error
       }
+    }
+
+    // Store IMAP credentials and settings in database (for email monitoring)
+    let imapUpdated = false;
+    if (imapEnabled && imapHost && imapUser && imapPass) {
+      try {
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'imap_enabled' },
+          update: { value: 'true' },
+          create: { key: 'imap_enabled', value: 'true' }
+        });
+        
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'imap_host' },
+          update: { value: imapHost },
+          create: { key: 'imap_host', value: imapHost }
+        });
+        
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'imap_user' },
+          update: { value: imapUser },
+          create: { key: 'imap_user', value: imapUser }
+        });
+        
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'imap_pass' },
+          update: { value: imapPass },
+          create: { key: 'imap_pass', value: imapPass }
+        });
+
+        if (imapPort) {
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'imap_port' },
+            update: { value: imapPort.toString() },
+            create: { key: 'imap_port', value: imapPort.toString() }
+          });
+        }
+
+        if (imapSecure !== undefined) {
+          await req.prisma.workflowConfig.upsert({
+            where: { key: 'imap_secure' },
+            update: { value: imapSecure.toString() },
+            create: { key: 'imap_secure', value: imapSecure.toString() }
+          });
+        }
+        
+        imapUpdated = true;
+        logger.info(`✅ IMAP credentials stored in database (no restart needed)`);
+      } catch (imapError) {
+        logger.error('Error storing IMAP credentials:', imapError);
+      }
+    } else if (imapEnabled === false) {
+      // Disable IMAP
+      await req.prisma.workflowConfig.upsert({
+        where: { key: 'imap_enabled' },
+        update: { value: 'false' },
+        create: { key: 'imap_enabled', value: 'false' }
+      });
+      logger.info(`✅ IMAP disabled`);
     }
 
     // Try to configure Gmail "Send As" using Gmail API if OAuth is configured

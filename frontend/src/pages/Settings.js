@@ -80,9 +80,18 @@ const Settings = () => {
   // HR Email Change Wizard state
   const [showEmailWizard, setShowEmailWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
+  const [emailFlow, setEmailFlow] = useState('gmail'); // 'gmail' or 'godaddy'
+  const [imapEnabled, setImapEnabled] = useState(false);
+  const [imapHost, setImapHost] = useState('imap.secureserver.net');
+  const [imapPort, setImapPort] = useState('993');
+  const [imapSecure, setImapSecure] = useState(true);
+  const [googleRefreshToken, setGoogleRefreshToken] = useState('');
   const [wizardCompleted, setWizardCompleted] = useState({
+    flowSelected: false,
+    refreshToken: false,
     oauthTestUser: false,
     appPassword: false,
+    imapConfig: false,
     emailSaved: false,
     smtpUpdated: false,
     gmailConfigured: false,
@@ -1941,44 +1950,165 @@ const Settings = () => {
               </button>
             </div>
 
-            {/* Progress Steps */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                {[1, 2, 3, 4].map((step) => (
-                  <div key={step} className="flex items-center flex-1">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                        wizardStep >= step
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-200 text-gray-500'
-                      }`}
-                    >
-                      {wizardCompleted[Object.keys(wizardCompleted)[step - 1]] ? '✓' : step}
-                    </div>
-                    {step < 4 && (
-                      <div
-                        className={`flex-1 h-1 mx-2 ${
-                          wizardStep > step ? 'bg-indigo-600' : 'bg-gray-200'
-                        }`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between text-xs text-gray-600">
-                <span>OAuth</span>
-                <span>App Pass</span>
-                <span>Save Email</span>
-                <span>Test</span>
-              </div>
-            </div>
-
             {/* Step Content */}
             <div className="space-y-4">
-              {/* Step 1: Add to OAuth Test Users (Optional - Only for Google Calendar) */}
+              {/* Step 0: Flow Selection */}
               {wizardStep === 1 && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 1: Google Calendar Integration (Optional)</h3>
+                  <h3 className="text-lg font-semibold">Step 1: Choose Your Email Setup Flow</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Gmail Flow */}
+                    <div 
+                      className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                        emailFlow === 'gmail' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setEmailFlow('gmail')}
+                    >
+                      <div className="flex items-center mb-3">
+                        <input
+                          type="radio"
+                          checked={emailFlow === 'gmail'}
+                          onChange={() => setEmailFlow('gmail')}
+                          className="mr-3"
+                        />
+                        <h4 className="text-lg font-semibold">📧 Gmail Flow</h4>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Use Gmail API for automatic email detection + SMTP for sending
+                      </p>
+                      <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                        <li>Gmail API for receiving emails</li>
+                        <li>Automatic signed offer detection</li>
+                        <li>Google Calendar integration</li>
+                        <li>Requires Google Refresh Token</li>
+                      </ul>
+                    </div>
+
+                    {/* GoDaddy Flow */}
+                    <div 
+                      className={`p-6 border-2 rounded-lg cursor-pointer transition-all ${
+                        emailFlow === 'godaddy' ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setEmailFlow('godaddy')}
+                    >
+                      <div className="flex items-center mb-3">
+                        <input
+                          type="radio"
+                          checked={emailFlow === 'godaddy'}
+                          onChange={() => setEmailFlow('godaddy')}
+                          className="mr-3"
+                        />
+                        <h4 className="text-lg font-semibold">🏢 GoDaddy Flow</h4>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Use IMAP for receiving + SMTP for sending (Professional Email)
+                      </p>
+                      <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                        <li>IMAP for receiving emails</li>
+                        <li>Automatic signed offer detection</li>
+                        <li>SMTP for sending emails</li>
+                        <li>No Google API needed</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setWizardCompleted(prev => ({ ...prev, flowSelected: true }));
+                      if (emailFlow === 'gmail') {
+                        setWizardStep(2); // Refresh Token step
+                      } else {
+                        setWizardStep(3); // SMTP step (skip refresh token)
+                      }
+                    }}
+                    className="btn btn-primary w-full"
+                  >
+                    Continue with {emailFlow === 'gmail' ? 'Gmail' : 'GoDaddy'} Flow →
+                  </button>
+                </div>
+              )}
+
+              {/* Step 2: Google Refresh Token (Gmail Flow Only) */}
+              {wizardStep === 2 && emailFlow === 'gmail' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step 2: Generate Google Refresh Token</h3>
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      <strong>Required for Gmail API:</strong> You need to generate a Google Refresh Token to enable automatic email detection.
+                    </p>
+                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 mb-4">
+                      <li>Go to <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Google OAuth Playground</a></li>
+                      <li>Click the gear icon (⚙️) in top right</li>
+                      <li>Check "Use your own OAuth credentials"</li>
+                      <li>Enter your Client ID and Client Secret (from Google Cloud Console)</li>
+                      <li>In the left panel, find and select these scopes:
+                        <ul className="list-disc list-inside ml-4 mt-1">
+                          <li>https://www.googleapis.com/auth/gmail.readonly</li>
+                          <li>https://www.googleapis.com/auth/gmail.modify</li>
+                          <li>https://www.googleapis.com/auth/calendar</li>
+                          <li>https://www.googleapis.com/auth/calendar.events</li>
+                        </ul>
+                      </li>
+                      <li>Click "Authorize APIs"</li>
+                      <li>Sign in with <strong>ironladytech@gmail.com</strong></li>
+                      <li>Click "Exchange authorization code for tokens"</li>
+                      <li>Copy the <strong>Refresh token</strong> and paste it below</li>
+                    </ol>
+                    <div className="flex gap-2 mb-4">
+                      <a
+                        href="https://developers.google.com/oauthplayground"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary"
+                      >
+                        🔗 Open OAuth Playground
+                      </a>
+                    </div>
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Refresh Token *
+                      </label>
+                      <input
+                        type="text"
+                        value={googleRefreshToken}
+                        onChange={(e) => setGoogleRefreshToken(e.target.value)}
+                        placeholder="Paste your refresh token here"
+                        className="input w-full"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        This will be saved to your backend .env file as GOOGLE_REFRESH_TOKEN
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          if (googleRefreshToken) {
+                            setWizardCompleted(prev => ({ ...prev, refreshToken: true }));
+                            setWizardStep(3);
+                          } else {
+                            toast.error('Please enter a refresh token');
+                          }
+                        }}
+                        className="btn btn-primary"
+                      >
+                        Continue →
+                      </button>
+                      <button
+                        onClick={() => {
+                          setWizardStep(1);
+                        }}
+                        className="btn btn-secondary"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2/3: SMTP Configuration */}
+              {((emailFlow === 'gmail' && wizardStep === 3) || (emailFlow === 'godaddy' && wizardStep === 2)) && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '3' : '2'}: SMTP Configuration (Required)</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
                       <strong>This step is only needed if you want Google Calendar integration</strong> (to create calendar invites automatically). If you're only using email (SMTP), you can skip this step.
@@ -2238,7 +2368,11 @@ const Settings = () => {
                             return;
                           }
                           setWizardCompleted(prev => ({ ...prev, appPassword: true }));
-                          setWizardStep(3);
+                          if (emailFlow === 'gmail') {
+                            setWizardStep(4); // Go to email entry
+                          } else {
+                            setWizardStep(3); // Go to IMAP config
+                          }
                         }}
                         className="btn btn-primary w-full"
                         disabled={!smtpHost || !smtpPort || !smtpUsername || !smtpPassword}
@@ -2249,10 +2383,110 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 3: Enter New Email */}
-              {wizardStep === 3 && (
+              {/* Step 3: IMAP Configuration (GoDaddy Flow Only) */}
+              {wizardStep === 3 && emailFlow === 'godaddy' && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 3: Enter New HR Email</h3>
+                  <h3 className="text-lg font-semibold">Step 3: IMAP Configuration (For Email Detection)</h3>
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-md">
+                    <p className="text-sm text-gray-700 mb-3">
+                      <strong>IMAP is used to automatically detect candidate replies with signed offer letters.</strong>
+                    </p>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Use the same email and password as your SMTP configuration above.
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Enable IMAP Monitoring *
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={imapEnabled}
+                            onChange={(e) => setImapEnabled(e.target.checked)}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">Enable automatic email detection via IMAP</span>
+                        </label>
+                      </div>
+                      {imapEnabled && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              IMAP Host *
+                            </label>
+                            <input
+                              type="text"
+                              value={imapHost}
+                              onChange={(e) => setImapHost(e.target.value)}
+                              className="input w-full"
+                              placeholder="imap.secureserver.net"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                IMAP Port *
+                              </label>
+                              <input
+                                type="number"
+                                value={imapPort}
+                                onChange={(e) => setImapPort(e.target.value)}
+                                className="input w-full"
+                                placeholder="993"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Use SSL/TLS
+                              </label>
+                              <label className="flex items-center mt-2">
+                                <input
+                                  type="checkbox"
+                                  checked={imapSecure}
+                                  onChange={(e) => setImapSecure(e.target.checked)}
+                                  className="mr-2"
+                                />
+                                <span className="text-sm text-gray-700">Enable SSL/TLS</span>
+                              </label>
+                            </div>
+                          </div>
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs text-blue-800">
+                              <strong>Note:</strong> IMAP will use the same email ({smtpUsername || newHrEmail || 'your email'}) and password as SMTP.
+                              The system will automatically monitor your inbox for candidate replies.
+                            </p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <button
+                        onClick={() => {
+                          setWizardCompleted(prev => ({ ...prev, imapConfig: true }));
+                          setWizardStep(4); // Go to email entry step
+                        }}
+                        className="btn btn-primary"
+                      >
+                        Continue →
+                      </button>
+                      <button
+                        onClick={() => {
+                          setWizardStep(2); // Back to SMTP step
+                        }}
+                        className="btn btn-secondary"
+                      >
+                        ← Back
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3/4: Enter New Email */}
+              {wizardStep === (emailFlow === 'gmail' ? 3 : 4) && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '3' : '4'}: Enter New HR Email</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2309,7 +2543,14 @@ const Settings = () => {
                             smtpHost: smtpHost,
                             smtpPort: parseInt(smtpPort),
                             smtpSecure: smtpSecure,
-                            smtpUsername: smtpUsername || newHrEmail // Use provided username or default to email
+                            smtpUsername: smtpUsername || newHrEmail, // Use provided username or default to email
+                            // IMAP settings (for GoDaddy flow)
+                            imapEnabled: emailFlow === 'godaddy' ? imapEnabled : false,
+                            imapHost: emailFlow === 'godaddy' && imapEnabled ? imapHost : null,
+                            imapUser: emailFlow === 'godaddy' && imapEnabled ? (smtpUsername || newHrEmail) : null,
+                            imapPass: emailFlow === 'godaddy' && imapEnabled ? smtpPassword : null,
+                            imapPort: emailFlow === 'godaddy' && imapEnabled ? parseInt(imapPort) : null,
+                            imapSecure: emailFlow === 'godaddy' && imapEnabled ? imapSecure : null
                           });
                           if (response.data?.success) {
                             updateConfig('hr_email', newHrEmail);
@@ -2323,7 +2564,7 @@ const Settings = () => {
                               gmailConfigured: response.data.data?.gmailConfigured || false,
                               gmailConfigMessage: response.data.data?.gmailConfigMessage || ''
                             }));
-                            setWizardStep(4); // Go directly to Test Email (Step 4, which was Step 6)
+                            setWizardStep(emailFlow === 'gmail' ? 4 : 5); // Go to Test Email step
                             toast.success('HR email saved successfully!');
                           }
                         } catch (error) {
@@ -2341,10 +2582,10 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 4: Test Email */}
-              {wizardStep === 4 && (
+              {/* Step 4/5: Test Email */}
+              {wizardStep === (emailFlow === 'gmail' ? 4 : 5) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 4: Test Email Configuration</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '4' : '5'}: Test Email Configuration</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
                       Send a test email to verify everything is working correctly.

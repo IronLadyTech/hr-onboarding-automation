@@ -2,6 +2,8 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
+const Imap = require('imap');
+const { simpleParser } = require('mailparser');
 
 // Helper to convert absolute file path to relative path for storage
 const getRelativeFilePath = (filePath) => {
@@ -15,7 +17,10 @@ const getRelativeFilePath = (filePath) => {
 
 let prisma;
 let gmail;
+let imapClient;
 let isProcessing = false;
+let useImap = false;
+let imapEmail = null;
 
 // ============================================================
 // AUTOMATIC EMAIL REPLY DETECTION USING GMAIL API
@@ -25,49 +30,393 @@ let isProcessing = false;
 const initEmailMonitor = async (prismaClient) => {
   prisma = prismaClient;
   
-  try {
-    // Initialize Gmail API with OAuth2
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_REDIRECT_URI
-    );
+  // Try IMAP first (for GoDaddy/professional emails), then fallback to Gmail API
+  const imapConfigured = await initImapMonitor();
+  
+  if (!imapConfigured) {
+    // Fallback to Gmail API if IMAP not configured
+    try {
+      // Initialize Gmail API with OAuth2
+      const oauth2Client = new google.auth.OAuth2(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI
+      );
 
-    // Set credentials from refresh token
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
-    });
+      // Set credentials from refresh token
+      oauth2Client.setCredentials({
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+      });
 
-    gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    
-    // Test connection
-    const profile = await gmail.users.getProfile({ userId: 'me' });
-    logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
-    
-    // Start monitoring - check every 30 seconds for faster capture
-    setInterval(async () => {
+      gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+      
+      // Test connection
+      const profile = await gmail.users.getProfile({ userId: 'me' });
+      logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
+      
+      // Start monitoring - check every 30 seconds for faster capture
+      setInterval(async () => {
+        await checkForReplies();
+      }, 30 * 1000);
+      
+      // Initial check
       await checkForReplies();
+      
+      logger.info('✅ Email reply monitor initialized (Gmail API)');
+      logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
+    } catch (error) {
+      logger.error('❌ Gmail API initialization failed:', error.message);
+      logger.error('Full error:', error);
+      logger.warn('📧 Email monitoring DISABLED. Automatic detection will NOT work.');
+      logger.info('📧 To enable automatic email detection:');
+      logger.info('   Option 1 - IMAP (for GoDaddy/professional emails):');
+      logger.info('     Configure IMAP settings in Settings → HR Email Configuration');
+      logger.info('   Option 2 - Gmail API:');
+      logger.info('     1. Go to Google Cloud Console');
+      logger.info('     2. Enable Gmail API');
+      logger.info('     3. Create OAuth 2.0 credentials');
+      logger.info('     4. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN to .env');
+      gmail = null; // Ensure gmail is null if initialization failed
+    }
+  }
+};
+
+// Initialize IMAP monitor for GoDaddy/professional emails
+const initImapMonitor = async () => {
+  try {
+    // Get IMAP credentials from database
+    const imapConfigs = await prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['imap_enabled', 'imap_host', 'imap_user', 'imap_pass', 'imap_port', 'imap_secure']
+        }
+      }
+    });
+    
+    const configMap = {};
+    imapConfigs.forEach(c => { configMap[c.key] = c.value; });
+    
+    const imapEnabled = configMap.imap_enabled === 'true';
+    const imapHost = configMap.imap_host;
+    const imapUser = configMap.imap_user;
+    const imapPass = configMap.imap_pass;
+    const imapPort = parseInt(configMap.imap_port) || 993;
+    const imapSecure = configMap.imap_secure !== 'false'; // Default to true
+    
+    if (!imapEnabled || !imapHost || !imapUser || !imapPass) {
+      logger.debug('📧 IMAP not configured - will try Gmail API instead');
+      return false;
+    }
+    
+    logger.info(`📧 Initializing IMAP monitor for ${imapUser}...`);
+    
+    // Create IMAP connection
+    imapClient = new Imap({
+      user: imapUser,
+      password: imapPass,
+      host: imapHost,
+      port: imapPort,
+      tls: imapSecure,
+      tlsOptions: { rejectUnauthorized: false } // Allow self-signed certificates
+    });
+    
+    // Connect to IMAP server
+    await new Promise((resolve, reject) => {
+      imapClient.once('ready', () => {
+        logger.info(`✅ IMAP connected: ${imapUser} (${imapHost}:${imapPort})`);
+        useImap = true;
+        imapEmail = imapUser;
+        resolve();
+      });
+      
+      imapClient.once('error', (err) => {
+        logger.error('❌ IMAP connection error:', err.message);
+        reject(err);
+      });
+      
+      imapClient.connect();
+    });
+    
+    // Start monitoring - check every 30 seconds
+    setInterval(async () => {
+      await checkForRepliesImap();
     }, 30 * 1000);
     
     // Initial check
-    await checkForReplies();
+    await checkForRepliesImap();
     
-    logger.info('✅ Email reply monitor initialized (Gmail API)');
+    logger.info('✅ Email reply monitor initialized (IMAP)');
     logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
+    return true;
   } catch (error) {
-    logger.error('❌ Gmail API initialization failed:', error.message);
-    logger.error('Full error:', error);
-    logger.warn('📧 Email monitoring DISABLED. Automatic detection will NOT work.');
-    logger.info('📧 To enable automatic email detection:');
-    logger.info('   1. Go to Google Cloud Console (https://console.cloud.google.com)');
-    logger.info('   2. Enable Gmail API');
-    logger.info('   3. Create OAuth 2.0 credentials');
-    logger.info('   4. Add to .env file:');
-    logger.info('      GOOGLE_CLIENT_ID=your_client_id');
-    logger.info('      GOOGLE_CLIENT_SECRET=your_client_secret');
-    logger.info('      GOOGLE_REFRESH_TOKEN=your_refresh_token');
-    logger.info('   5. Restart the server');
-    gmail = null; // Ensure gmail is null if initialization failed
+    logger.error('❌ IMAP initialization failed:', error.message);
+    logger.warn('📧 Will try Gmail API instead');
+    imapClient = null;
+    useImap = false;
+    return false;
+  }
+};
+
+// IMAP-based email checking
+const checkForRepliesImap = async () => {
+  if (isProcessing) {
+    logger.debug('📧 Email check already in progress, skipping...');
+    return;
+  }
+  
+  if (!imapClient || !useImap) {
+    logger.debug('📧 IMAP not initialized, skipping email check');
+    return;
+  }
+  
+  isProcessing = true;
+  
+  try {
+    // Get all candidates waiting for signed offers
+    const candidates = await prisma.candidate.findMany({
+      where: {
+        offerSentAt: { not: null },
+        offerSignedAt: null
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        offerSentAt: true,
+        status: true
+      }
+    });
+
+    if (candidates.length === 0) {
+      logger.debug('📧 No candidates waiting for signed offers');
+      return;
+    }
+
+    logger.info(`📧 [IMAP AUTO-CHECK] Checking emails for ${candidates.length} candidate(s)`);
+
+    // Open inbox
+    await new Promise((resolve, reject) => {
+      imapClient.openBox('INBOX', false, (err, box) => {
+        if (err) reject(err);
+        else resolve(box);
+      });
+    });
+
+    let totalProcessed = 0;
+    for (const candidate of candidates) {
+      try {
+        // Search for unread emails from this candidate
+        const searchCriteria = [
+          ['UNSEEN'],
+          ['FROM', candidate.email]
+        ];
+
+        const results = await new Promise((resolve, reject) => {
+          imapClient.search(searchCriteria, (err, results) => {
+            if (err) reject(err);
+            else resolve(results || []);
+          });
+        });
+
+        if (results.length === 0) {
+          logger.debug(`📧 No unread emails from ${candidate.email}`);
+          continue;
+        }
+
+        // Fetch messages
+        const messages = await new Promise((resolve, reject) => {
+          const fetch = imapClient.fetch(results, { bodies: '' });
+          const emailMessages = [];
+          
+          fetch.on('message', (msg, seqno) => {
+            let buffer = '';
+            let uid = null;
+            
+            msg.once('attributes', (attrs) => {
+              uid = attrs.uid;
+            });
+            
+            msg.on('body', (stream, info) => {
+              stream.on('data', (chunk) => {
+                buffer += chunk.toString('utf8');
+              });
+            });
+            
+            msg.once('end', () => {
+              emailMessages.push({ uid, raw: buffer });
+            });
+          });
+          
+          fetch.once('end', () => {
+            resolve(emailMessages);
+          });
+          
+          fetch.once('error', (err) => {
+            reject(err);
+          });
+        });
+
+        if (messages && messages.length > 0) {
+          logger.info(`📧 Found ${messages.length} unread email(s) from ${candidate.email}`);
+          for (const msg of messages) {
+            await processMessageImap(msg, candidate);
+            totalProcessed++;
+          }
+        }
+      } catch (error) {
+        logger.error(`❌ Error checking IMAP emails for ${candidate.email}:`, error.message);
+      }
+    }
+
+    if (totalProcessed > 0) {
+      logger.info(`✅ [IMAP AUTO-CHECK] Processed ${totalProcessed} email(s)`);
+    }
+  } catch (error) {
+    logger.error('❌ Error in checkForRepliesImap:', error.message);
+  } finally {
+    isProcessing = false;
+  }
+};
+
+const processMessageImap = async (emailData, candidate) => {
+  try {
+    // Parse email using mailparser
+    const parsed = await simpleParser(emailData.raw);
+    
+    const fromEmail = parsed.from?.value[0]?.address || '';
+    const subject = parsed.subject || '';
+    const inReplyTo = parsed.inReplyTo || '';
+    
+    logger.info(`Processing IMAP email: From=${fromEmail}, Subject=${subject}, InReplyTo=${inReplyTo || 'none'}`);
+
+    // Verify it's a reply to offer email (same logic as Gmail API)
+    const offerEmails = await prisma.email.findMany({
+      where: {
+        candidateId: candidate.id,
+        type: { in: ['OFFER_LETTER', 'OFFER_REMINDER'] },
+        status: { in: ['SENT', 'PENDING'] }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 20
+    });
+    
+    if (offerEmails.length === 0) {
+      logger.info(`⏭️ Skipping IMAP email: No offer emails found for candidate`);
+      return;
+    }
+    
+    let isReplyToOfferEmail = false;
+    const subjectLower = subject.toLowerCase();
+    
+    // Check subject matching
+    for (const offerEmail of offerEmails) {
+      const offerSubjectLower = offerEmail.subject.toLowerCase();
+      const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').trim();
+      const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').trim();
+      
+      const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
+                           cleanOfferSubject.includes(cleanReplySubject) ||
+                           (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer')) ||
+                           (cleanReplySubject.includes('letter') && cleanOfferSubject.includes('letter'));
+      
+      if (subjectsMatch) {
+        isReplyToOfferEmail = true;
+        logger.info(`✅ Detected as reply to ${offerEmail.type} email`);
+        break;
+      }
+    }
+    
+    if (!isReplyToOfferEmail) {
+      logger.info(`⏭️ Skipping IMAP email: Not a reply to offer email`);
+      return;
+    }
+    
+    // Process attachments
+    if (parsed.attachments && parsed.attachments.length > 0) {
+      logger.info(`📎 Found ${parsed.attachments.length} attachment(s) in IMAP email`);
+      
+      for (const att of parsed.attachments) {
+        const ext = path.extname(att.filename || '').toLowerCase();
+        const validExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.txt', '.rtf'];
+        
+        if (validExtensions.includes(ext)) {
+          const savedPath = await saveImapAttachment(att, candidate.id);
+          
+          if (savedPath) {
+            const signedAt = new Date();
+            
+            // Update candidate
+            await prisma.candidate.update({
+              where: { id: candidate.id },
+              data: {
+                signedOfferPath: getRelativeFilePath(savedPath),
+                offerSignedAt: signedAt,
+                status: 'OFFER_SIGNED',
+                offerReminderSent: true
+              }
+            });
+
+            // Mark Step 2 as completed
+            try {
+              const stepService = require('./stepService');
+              await stepService.completeStep(prisma, candidate.id, 2, null, 'Signed offer received via email (IMAP)');
+              logger.info(`✅ Marked Step 2 as completed for ${candidate.firstName} ${candidate.lastName}`);
+            } catch (stepError) {
+              logger.warn(`⚠️ Could not mark Step 2 as completed: ${stepError.message}`);
+            }
+
+            // Log activity
+            await prisma.activityLog.create({
+              data: {
+                candidateId: candidate.id,
+                userId: null,
+                action: 'SIGNED_OFFER_AUTO_DETECTED',
+                description: `✅ Signed offer auto-captured from email reply (IMAP) - Step 2 marked as completed`,
+                metadata: { 
+                  filename: att.filename,
+                  emailSubject: subject,
+                  receivedAt: signedAt.toISOString(),
+                  stepCompleted: 2
+                }
+              }
+            });
+
+            logger.info(`✅ AUTO-CAPTURED (IMAP): Signed offer from ${candidate.firstName} ${candidate.lastName}`);
+            
+            // Mark email as read
+            if (emailData.uid) {
+              imapClient.addFlags(emailData.uid, '\\Seen', (err) => {
+                if (err) logger.warn(`Could not mark email as read: ${err.message}`);
+              });
+            }
+            
+            break; // Only process first valid attachment
+          }
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('Error processing IMAP message:', error.message);
+  }
+};
+
+const saveImapAttachment = async (attachment, candidateId) => {
+  try {
+    const uploadDir = path.join(__dirname, '../../uploads/signed-offers');
+    await fs.mkdir(uploadDir, { recursive: true });
+
+    const ext = path.extname(attachment.filename || '.pdf');
+    const filename = `signed-${candidateId}-${Date.now()}${ext}`;
+    const filepath = path.join(uploadDir, filename);
+
+    await fs.writeFile(filepath, attachment.content);
+    
+    logger.info(`Saved IMAP attachment: ${filename}`);
+    return filepath;
+  } catch (error) {
+    logger.error('Error saving IMAP attachment:', error.message);
+    return null;
   }
 };
 
@@ -577,9 +926,12 @@ const checkNow = async () => {
 // Get email monitor status
 const getEmailMonitorStatus = () => {
   return {
-    isActive: !!gmail,
+    isActive: useImap ? !!imapClient : !!gmail,
     isProcessing: isProcessing,
-    hasGmail: !!gmail
+    hasGmail: !!gmail,
+    hasImap: useImap && !!imapClient,
+    method: useImap ? 'IMAP' : (gmail ? 'Gmail API' : 'None'),
+    email: useImap ? imapEmail : (gmail ? 'Gmail API' : null)
   };
 };
 
