@@ -500,7 +500,7 @@ const CandidateDetail = () => {
     }
   };
 
-  const handleScheduleSubmit = () => {
+  const handleScheduleSubmit = async () => {
     if (!scheduleDateTime) {
       toast.error('Please select date and time');
       return;
