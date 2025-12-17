@@ -2500,6 +2500,7 @@ const Settings = () => {
                             smtpPort: parseInt(smtpPort),
                             smtpSecure: smtpSecure,
                             smtpUsername: smtpUsername || newHrEmail, // Use provided username or default to email
+                            emailProvider: emailProvider, // Send email provider for default host determination
                             // IMAP settings (for GoDaddy flow)
                             imapEnabled: emailFlow === 'godaddy' ? imapEnabled : false,
                             imapHost: emailFlow === 'godaddy' && imapEnabled ? imapHost : null,

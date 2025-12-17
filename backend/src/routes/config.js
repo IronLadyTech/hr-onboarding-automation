@@ -1801,7 +1801,7 @@ router.delete('/custom-placeholders/:id', requireAdmin, async (req, res) => {
 router.post('/update-hr-email', requireAdmin, async (req, res) => {
   try {
     const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername, 
-            imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure } = req.body;
+            imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure, emailProvider } = req.body;
     
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
