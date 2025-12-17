@@ -2330,17 +2330,36 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 3: IMAP Configuration (GoDaddy Flow Only) */}
-              {wizardStep === 3 && emailFlow === 'godaddy' && (
+              {/* Step 3: IMAP Configuration (GoDaddy Flow) OR Step 4: IMAP Configuration (Gmail Flow) */}
+              {((wizardStep === 3 && emailFlow === 'godaddy') || (wizardStep === 4 && emailFlow === 'gmail')) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 3: IMAP Configuration (For Email Detection)</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '4' : '3'}: IMAP Configuration (For Email Detection)</h3>
                   <div className="p-4 bg-green-50 border border-green-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
                       <strong>IMAP is used to automatically detect candidate replies with signed offer letters.</strong>
                     </p>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Use the same email and password as your SMTP configuration above.
-                    </p>
+                    {emailFlow === 'gmail' ? (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-600 mb-2">
+                          <strong>For Gmail:</strong> Use the same email and <strong>App Password</strong> as your SMTP configuration above.
+                        </p>
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-xs text-blue-800 mb-1">
+                            <strong>Gmail IMAP Settings:</strong>
+                          </p>
+                          <ul className="text-xs text-blue-800 list-disc list-inside space-y-1">
+                            <li>IMAP Host: <code className="bg-blue-100 px-1 rounded">imap.gmail.com</code></li>
+                            <li>IMAP Port: <code className="bg-blue-100 px-1 rounded">993</code></li>
+                            <li>Use SSL/TLS: <strong>Yes</strong> (checked)</li>
+                            <li>Password: Use the same <strong>16-character App Password</strong> from Step 3</li>
+                          </ul>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-600 mb-4">
+                        Use the same email and password as your SMTP configuration above.
+                      </p>
+                    )}
                     <div className="space-y-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2367,8 +2386,11 @@ const Settings = () => {
                               value={imapHost}
                               onChange={(e) => setImapHost(e.target.value)}
                               className="input w-full"
-                              placeholder="imap.secureserver.net"
+                              placeholder={emailFlow === 'gmail' ? 'imap.gmail.com' : 'imap.secureserver.net'}
                             />
+                            {emailFlow === 'gmail' && !imapHost && (
+                              <p className="text-xs text-gray-500 mt-1">Default: imap.gmail.com (auto-filled below)</p>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -2414,7 +2436,11 @@ const Settings = () => {
                       <button
                         onClick={() => {
                           setWizardCompleted(prev => ({ ...prev, imapConfig: true }));
-                          setWizardStep(4); // Go to email entry step
+                          if (emailFlow === 'gmail') {
+                            setWizardStep(5); // Go to email entry step (Step 5 for Gmail)
+                          } else {
+                            setWizardStep(4); // Go to email entry step (Step 4 for GoDaddy)
+                          }
                         }}
                         className="btn btn-primary"
                       >
@@ -2422,7 +2448,11 @@ const Settings = () => {
                       </button>
                       <button
                         onClick={() => {
-                          setWizardStep(2); // Back to SMTP step
+                          if (emailFlow === 'gmail') {
+                            setWizardStep(3); // Back to SMTP step (Step 3 for Gmail)
+                          } else {
+                            setWizardStep(2); // Back to SMTP step (Step 2 for GoDaddy)
+                          }
                         }}
                         className="btn btn-secondary"
                       >
@@ -2433,10 +2463,10 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 4: Enter New Email */}
-              {wizardStep === 4 && (
+              {/* Step 4/5: Enter New Email */}
+              {((wizardStep === 4 && emailFlow === 'godaddy') || (wizardStep === 5 && emailFlow === 'gmail')) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 4: Enter New HR Email</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '5' : '4'}: Enter New HR Email</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2501,13 +2531,13 @@ const Settings = () => {
                             smtpSecure: smtpSecure,
                             smtpUsername: smtpUsername || newHrEmail, // Use provided username or default to email
                             emailProvider: emailProvider, // Send email provider for default host determination
-                            // IMAP settings (for GoDaddy flow)
-                            imapEnabled: emailFlow === 'godaddy' ? imapEnabled : false,
-                            imapHost: emailFlow === 'godaddy' && imapEnabled ? imapHost : null,
-                            imapUser: emailFlow === 'godaddy' && imapEnabled ? (smtpUsername || newHrEmail) : null,
-                            imapPass: emailFlow === 'godaddy' && imapEnabled ? smtpPassword : null,
-                            imapPort: emailFlow === 'godaddy' && imapEnabled ? parseInt(imapPort) : null,
-                            imapSecure: emailFlow === 'godaddy' && imapEnabled ? imapSecure : null
+                            // IMAP settings (for both Gmail and GoDaddy flows)
+                            imapEnabled: imapEnabled,
+                            imapHost: imapEnabled ? imapHost : null,
+                            imapUser: imapEnabled ? (smtpUsername || newHrEmail) : null,
+                            imapPass: imapEnabled ? smtpPassword : null, // Use same App Password for Gmail IMAP
+                            imapPort: imapEnabled ? parseInt(imapPort) : null,
+                            imapSecure: imapEnabled ? imapSecure : null
                           });
                           if (response.data?.success) {
                             updateConfig('hr_email', newHrEmail);
