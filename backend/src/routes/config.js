@@ -1967,12 +1967,49 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
       logger.info(`✅ IMAP disabled`);
     }
 
+    // Update Google Refresh Token in .env file if provided
+    if (googleRefreshToken && googleRefreshToken.trim()) {
+      try {
+        const fs = require('fs');
+        const path = require('path');
+        const envPath = path.join(__dirname, '../../.env');
+        
+        // Read current .env file
+        let envContent = '';
+        if (fs.existsSync(envPath)) {
+          envContent = fs.readFileSync(envPath, 'utf8');
+        }
+        
+        // Update or add GOOGLE_REFRESH_TOKEN
+        const tokenLine = `GOOGLE_REFRESH_TOKEN=${googleRefreshToken.trim()}`;
+        if (envContent.includes('GOOGLE_REFRESH_TOKEN=')) {
+          // Replace existing token
+          envContent = envContent.replace(/GOOGLE_REFRESH_TOKEN=.*/g, tokenLine);
+        } else {
+          // Add new token at the end
+          envContent += (envContent.endsWith('\n') ? '' : '\n') + tokenLine + '\n';
+        }
+        
+        // Write back to .env file
+        fs.writeFileSync(envPath, envContent, 'utf8');
+        logger.info('✅ Google Refresh Token updated in .env file');
+        
+        // Reload environment variables (for current process)
+        process.env.GOOGLE_REFRESH_TOKEN = googleRefreshToken.trim();
+      } catch (error) {
+        logger.error('Error updating Google Refresh Token in .env:', error);
+        // Don't fail the request, just log the error
+      }
+    }
+
     // Try to configure Gmail "Send As" using Gmail API if OAuth is configured
     // Note: The OAuth account (ironladytech@gmail.com) needs to have permission to send as the HR email
     let gmailConfigured = false;
     let gmailConfigMessage = '';
     try {
-      if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_REFRESH_TOKEN) {
+      // Use token from request (if provided) or from .env (which may have been just updated)
+      const refreshToken = googleRefreshToken?.trim() || process.env.GOOGLE_REFRESH_TOKEN;
+      if (process.env.GOOGLE_CLIENT_ID && refreshToken) {
         const { google } = require('googleapis');
         const oauth2Client = new google.auth.OAuth2(
           process.env.GOOGLE_CLIENT_ID,
