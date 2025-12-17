@@ -1803,6 +1803,13 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
     const { hrEmail, hrName, updateSmtpUser, smtpPassword, smtpHost, smtpPort, smtpSecure, smtpUsername, 
             imapEnabled, imapHost, imapUser, imapPass, imapPort, imapSecure, emailProvider, googleRefreshToken } = req.body;
     
+    // Log received refresh token (for debugging - don't log the actual token value)
+    if (googleRefreshToken) {
+      logger.info(`📝 Received Google Refresh Token in request (length: ${googleRefreshToken.length} characters)`);
+    } else {
+      logger.debug('📝 No Google Refresh Token received in request');
+    }
+    
     if (!hrEmail || !hrEmail.includes('@')) {
       return res.status(400).json({ success: false, message: 'Please provide a valid HR email address' });
     }
