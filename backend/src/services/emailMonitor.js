@@ -84,7 +84,9 @@ const initEmailMonitor = async (prismaClient) => {
       logger.info('📧 [INITIAL CHECK] Running initial email check for signed offer letters...');
       await checkForReplies();
       
-      logger.info('✅ Email reply monitor initialized (Gmail API)');
+      logger.info('📧 ========================================');
+      logger.info('📧 ✅ EMAIL MONITORING ACTIVE (Gmail API)');
+      logger.info('📧 ========================================');
       logger.info('📧 Automatic email detection is ACTIVE - checking every 30 seconds');
       logger.info('📧 Monitoring candidates with offerSentAt but no offerSignedAt');
     } catch (error) {
@@ -98,31 +100,13 @@ const initEmailMonitor = async (prismaClient) => {
       logger.warn('📧 ⚠️  EMAIL MONITORING DISABLED ⚠️');
       logger.warn('📧 Automatic detection will NOT work!');
       logger.warn('📧 ========================================');
-      logger.info('📧 To enable automatic email detection:');
-      logger.info('');
-      logger.info('   Option 1 - IMAP (Recommended - Works with Gmail & GoDaddy):');
-      logger.info('     1. Install IMAP packages: cd backend && npm install imap mailparser');
-      logger.info('     2. Go to Settings → HR Email Configuration → Quick Setup Wizard');
-      logger.info('     3. Select "GoDaddy / Other Professional Email Flow" (works for Gmail too)');
-      logger.info('     4. Configure SMTP (Step 2)');
-      logger.info('     5. Enable IMAP and configure (Step 3):');
-      logger.info('        - For Gmail: imap.gmail.com:993');
-      logger.info('        - Use same App Password as SMTP');
-      logger.info('     6. Save and restart backend: pm2 restart hr-onboarding-backend');
-      logger.info('');
-      logger.info('   Option 2 - Gmail API:');
-      logger.info('     1. Generate new refresh token (see FIX_EXPIRED_GMAIL_TOKEN.md)');
-      logger.info('     2. Update GOOGLE_REFRESH_TOKEN in .env file');
-      logger.info('     3. Restart backend: pm2 restart hr-onboarding-backend');
-      logger.info('');
+      logger.info('📧 To fix Gmail API:');
+      logger.info('   1. Generate new refresh token (see FIX_EXPIRED_GMAIL_TOKEN.md)');
+      logger.info('   2. Update GOOGLE_REFRESH_TOKEN in .env file');
+      logger.info('   3. Restart backend: pm2 restart hr-onboarding-backend');
       logger.warn('📧 ========================================');
       gmail = null; // Ensure gmail is null if initialization failed
     }
-  } else {
-    logger.info('📧 ========================================');
-    logger.info('📧 ✅ EMAIL MONITORING ACTIVE (IMAP)');
-    logger.info('📧 ========================================');
-  }
 };
 
 // Initialize IMAP monitor for GoDaddy/professional emails

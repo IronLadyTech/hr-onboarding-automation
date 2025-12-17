@@ -1894,6 +1894,20 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
       }
     }
 
+    // Store email provider/monitoring method preference in database
+    if (emailProvider) {
+      try {
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'email_provider' },
+          update: { value: emailProvider },
+          create: { key: 'email_provider', value: emailProvider }
+        });
+        logger.info(`✅ Email provider preference stored: ${emailProvider}`);
+      } catch (error) {
+        logger.error('Error storing email provider preference:', error);
+      }
+    }
+
     // Store IMAP credentials and settings in database (for email monitoring)
     let imapUpdated = false;
     if (imapEnabled && imapHost && imapUser && imapPass) {
