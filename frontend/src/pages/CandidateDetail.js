@@ -3,6 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { candidateApi, calendarApi, configApi } from '../services/api';
 import toast from 'react-hot-toast';
 
+// Helper function to format time (HH:mm to 12-hour format)
+const formatTime = (timeStr) => {
+  if (!timeStr) return '';
+  const [hours, minutes] = timeStr.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+};
+
 const statusColors = {
   OFFER_PENDING: 'bg-gray-100 text-gray-800',
   OFFER_SENT: 'bg-yellow-100 text-yellow-800',
@@ -29,6 +39,7 @@ const CandidateDetail = () => {
   const [scheduleDateTime, setScheduleDateTime] = useState('');
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [editingEventId, setEditingEventId] = useState(null);
+  const [scheduleMode, setScheduleMode] = useState('exact'); // 'exact' or 'doj'
   const [scheduleAttachment, setScheduleAttachment] = useState(null);
   const [scheduleAttachments, setScheduleAttachments] = useState([]); // Multiple attachments (new files)
   const [existingAttachmentPaths, setExistingAttachmentPaths] = useState([]); // Existing attachment paths from event
@@ -1355,10 +1366,90 @@ const CandidateDetail = () => {
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
                               setShowScheduleModal(scheduleAction);
                             }}
-                            className="btn btn-secondary text-sm"
-                            title="Click to edit/reschedule"
+                            className="badge badge-info"
+                            title="Already scheduled"
                           >
-                            Scheduled
+                            ⏰ Scheduled: {new Date(step.scheduledEvent.startTime).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} at {new Date(step.scheduledEvent.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                              const durationMap = { 
+                                'OFFER_LETTER': 30, 
+                                'OFFER_REMINDER': 15, 
+                                'WELCOME_EMAIL': 30, 
+                                'HR_INDUCTION': 60, 
+                                'WHATSAPP_ADDITION': 15, 
+                                'ONBOARDING_FORM': 30, 
+                                'FORM_REMINDER': 15, 
+                                'CEO_INDUCTION': 60, 
+                                'SALES_INDUCTION': 90, 
+                                'DEPARTMENT_INDUCTION': 90,
+                                'TRAINING_PLAN': 30, 
+                                'CHECKIN_CALL': 30 
+                              };
+                              const event = step.scheduledEvent;
+                              setEditingEventId(event?.id || null);
+                              
+                              // If editing, use event time; otherwise calculate default from step template
+                              let defaultDateTime = '';
+                              if (event) {
+                                defaultDateTime = formatDateForInput(event.startTime);
+                              } else {
+                                const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                                if (stepTemplate) {
+                                  const referenceDate = candidate.expectedJoiningDate || candidate.actualJoiningDate || new Date();
+                                  const baseDate = new Date(referenceDate);
+                                  
+                                  // Apply dueDateOffset (days from joining date)
+                                  if (stepTemplate.dueDateOffset !== null && stepTemplate.dueDateOffset !== undefined) {
+                                    baseDate.setDate(baseDate.getDate() + stepTemplate.dueDateOffset);
+                                  }
+                                  
+                                  // Apply scheduledTime (default time like "14:00")
+                                  if (stepTemplate.scheduledTime) {
+                                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                    baseDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                  }
+                                  
+                                  // Format as datetime-local (YYYY-MM-DDTHH:mm)
+                                  const year = baseDate.getFullYear();
+                                  const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+                                  const day = String(baseDate.getDate()).padStart(2, '0');
+                                  const hour = String(baseDate.getHours()).padStart(2, '0');
+                                  const minute = String(baseDate.getMinutes()).padStart(2, '0');
+                                  defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                }
+                              }
+                              
+                              setScheduleDateTime(defaultDateTime);
+                              // Set duration but don't show it in UI - use default based on step type
+                              setScheduleDuration(event ? Math.round((new Date(event.endTime) - new Date(event.startTime)) / 60000) : durationMap[step.stepType] || 30);
+                              // Load existing attachment(s) if event has any
+                              if (event?.attachmentPaths && Array.isArray(event.attachmentPaths) && event.attachmentPaths.length > 0) {
+                                // Multiple attachments - store paths for display
+                                setExistingAttachmentPaths(event.attachmentPaths);
+                                const fileNames = event.attachmentPaths.map(path => path.split('/').pop() || path);
+                                updateAttachmentPreview(fileNames, []);
+                              } else if (event?.attachmentPath) {
+                                // Single attachment (backward compatibility)
+                                setExistingAttachmentPaths([event.attachmentPath]);
+                                const fileName = event.attachmentPath.split('/').pop() || event.attachmentPath;
+                                updateAttachmentPreview([fileName], []);
+                              } else {
+                                setScheduleAttachment(null);
+                                setScheduleAttachments([]);
+                                setExistingAttachmentPaths([]);
+                                setScheduleAttachmentPreview(null);
+                              }
+                              setSchedulingStepType(step.stepType); // Store step type for generic handler
+                              setSchedulingStepNumber(step.step); // Store step number for unique identification
+                              setShowScheduleModal(scheduleAction);
+                            }}
+                            className="btn btn-sm btn-secondary"
+                            title="Edit scheduled time"
+                          >
+                            ✏️ Edit
                           </button>
                           {/* Undo scheduled step button */}
                           <button
@@ -1631,14 +1722,132 @@ const CandidateDetail = () => {
               })()}
             </h3>
             <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Scheduling Method *</label>
+              <div className="flex space-x-4 mb-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    value="exact"
+                    checked={scheduleMode === 'exact'}
+                    onChange={(e) => {
+                      setScheduleMode(e.target.value);
+                      // If switching to exact, keep current value or clear
+                      if (!scheduleDateTime) {
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const hour = String(now.getHours()).padStart(2, '0');
+                        const minute = String(now.getMinutes().padStart(2, '0'));
+                        setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                      }
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Exact Date & Time</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    value="doj"
+                    checked={scheduleMode === 'doj'}
+                    onChange={(e) => {
+                      setScheduleMode(e.target.value);
+                      // Calculate based on DOJ when switching to DOJ mode
+                      const currentStep = workflowSteps.find(s => {
+                        const action = getScheduleActionName(s.stepType || 'MANUAL');
+                        return action === showScheduleModal;
+                      });
+                      if (currentStep && candidate.expectedJoiningDate) {
+                        const stepTemplate = departmentSteps.find(s => s.stepNumber === currentStep.step);
+                        if (stepTemplate) {
+                          const doj = new Date(candidate.expectedJoiningDate);
+                          const scheduledDate = new Date(doj);
+                          scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
+                          
+                          if (stepTemplate.scheduledTime) {
+                            const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                          } else {
+                            scheduledDate.setHours(9, 0, 0, 0);
+                          }
+                          
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                        }
+                      }
+                    }}
+                    className="mr-2"
+                    disabled={!candidate.expectedJoiningDate}
+                  />
+                  <span className={`text-sm ${!candidate.expectedJoiningDate ? 'text-gray-400' : ''}`}>
+                    Based on DOJ {!candidate.expectedJoiningDate && '(DOJ not set)'}
+                  </span>
+                </label>
+              </div>
+              
+              {scheduleMode === 'doj' && candidate.expectedJoiningDate && (() => {
+                const currentStep = workflowSteps.find(s => {
+                  const action = getScheduleActionName(s.stepType || 'MANUAL');
+                  return action === showScheduleModal;
+                });
+                const stepTemplate = currentStep ? departmentSteps.find(s => s.stepNumber === currentStep.step) : null;
+                if (stepTemplate) {
+                  const doj = new Date(candidate.expectedJoiningDate);
+                  const scheduledDate = new Date(doj);
+                  scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
+                  
+                  if (stepTemplate.scheduledTime) {
+                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                    scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                  } else {
+                    scheduledDate.setHours(9, 0, 0, 0);
+                  }
+                  
+                  return (
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Calculated Time:</strong> {scheduledDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {scheduledDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Based on DOJ ({new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN')}) + {stepTemplate.dueDateOffset === 0 ? 'same day' : stepTemplate.dueDateOffset > 0 ? `${stepTemplate.dueDateOffset} days after` : `${Math.abs(stepTemplate.dueDateOffset)} days before`} + {stepTemplate.scheduledTime ? formatTime(stepTemplate.scheduledTime) : '9:00 AM (default)'}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
               <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time *</label>
               <input 
                 type="datetime-local" 
                 value={scheduleDateTime}
-                onChange={(e) => setScheduleDateTime(e.target.value)}
+                onChange={(e) => {
+                  if (scheduleMode === 'exact') {
+                    setScheduleDateTime(e.target.value);
+                  }
+                  // In DOJ mode, allow manual override but switch to exact mode
+                  if (scheduleMode === 'doj') {
+                    setScheduleMode('exact');
+                    setScheduleDateTime(e.target.value);
+                  }
+                }}
                 className="input w-full"
                 required
+                disabled={scheduleMode === 'doj' && candidate.expectedJoiningDate}
+                title={scheduleMode === 'doj' ? 'Switch to "Exact Date & Time" to manually edit' : ''}
               />
+              {scheduleMode === 'doj' && candidate.expectedJoiningDate && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Time is calculated automatically. Switch to "Exact Date & Time" to manually edit.
+                </p>
+              )}
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
