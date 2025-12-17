@@ -1523,6 +1523,19 @@ const CandidateDetail = () => {
                               }
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
+                              // Set schedule mode based on step type and available dates
+                              if (step.stepType === 'OFFER_REMINDER' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) {
+                                setScheduleMode('offerLetter');
+                              } else if (candidate.expectedJoiningDate) {
+                                const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                                if (stepTemplate) {
+                                  setScheduleMode('doj');
+                                } else {
+                                  setScheduleMode('exact');
+                                }
+                              } else {
+                                setScheduleMode('exact');
+                              }
                               setShowScheduleModal(scheduleAction);
                             }}
                             className="btn btn-sm btn-secondary"
