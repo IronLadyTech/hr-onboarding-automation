@@ -1630,7 +1630,7 @@ const CandidateDetail = () => {
                               setSchedulingStepType(step.stepType); // Store step type for generic handler
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
                               // Set schedule mode based on whether we have DOJ and step template
-                              const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                              // stepTemplate is already declared above, so we reuse it
                               if (candidate.expectedJoiningDate && stepTemplate) {
                                 setScheduleMode('doj');
                               } else {
