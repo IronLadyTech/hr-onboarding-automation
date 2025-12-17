@@ -2108,7 +2108,7 @@ const Settings = () => {
               {/* Step 2/3: SMTP Configuration */}
               {((emailFlow === 'gmail' && wizardStep === 3) || (emailFlow === 'godaddy' && wizardStep === 2)) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step 2: SMTP Configuration (Required)</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '3' : '2'}: SMTP Configuration (Required)</h3>
                   
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md mb-4">
                     <p className="text-sm text-gray-700">
