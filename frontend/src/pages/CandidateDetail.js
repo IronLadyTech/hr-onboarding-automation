@@ -164,6 +164,8 @@ const CandidateDetail = () => {
         case 'sendOffer':
           await candidateApi.sendOffer(id);
           toast.success('Step 1: Offer letter sent!');
+          // Auto-schedule Offer Reminder for next day at 2:00 PM
+          await autoScheduleOfferReminder();
           break;
         case 'sendOfferReminder':
           await candidateApi.sendOfferReminder(id);
@@ -1811,6 +1813,55 @@ const CandidateDetail = () => {
                     Based on DOJ {!candidate.expectedJoiningDate && '(DOJ not set)'}
                   </span>
                 </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="scheduleMode"
+                    value="offerLetter"
+                    checked={scheduleMode === 'offerLetter'}
+                    onChange={(e) => {
+                      setScheduleMode(e.target.value);
+                      // Calculate based on Offer Letter date when switching to offerLetter mode
+                      const currentStep = workflowSteps.find(s => {
+                        const action = getScheduleActionName(s.stepType || 'MANUAL');
+                        return action === showScheduleModal;
+                      });
+                      // Find offer letter event or sent date
+                      const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                      const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                      
+                      if (currentStep && offerLetterDate) {
+                        const stepTemplate = departmentSteps.find(s => s.stepNumber === currentStep.step);
+                        if (stepTemplate) {
+                          const offerDate = new Date(offerLetterDate);
+                          const scheduledDate = new Date(offerDate);
+                          // For Offer Reminder, it's next day (+1)
+                          scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 1));
+                          
+                          if (stepTemplate.scheduledTime) {
+                            const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                          } else {
+                            // Default to 2:00 PM for Offer Reminder
+                            scheduledDate.setHours(14, 0, 0, 0);
+                          }
+                          
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                        }
+                      }
+                    }}
+                    className="mr-2"
+                    disabled={!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')}
+                  />
+                  <span className={`text-sm ${(!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) ? 'text-gray-400' : ''}`}>
+                    Based on Offer Letter Date {(!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && '(Offer letter not sent)'}
+                  </span>
+                </label>
               </div>
               
               {scheduleMode === 'doj' && candidate.expectedJoiningDate && (() => {
@@ -1861,14 +1912,14 @@ const CandidateDetail = () => {
                 }}
                 className="input w-full"
                 required
-                disabled={scheduleMode === 'doj' && candidate.expectedJoiningDate}
-                title={scheduleMode === 'doj' ? 'Switch to "Exact Date & Time" to manually edit' : ''}
+                disabled={(scheduleMode === 'doj' && candidate.expectedJoiningDate) || (scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')))}
+                title={scheduleMode === 'doj' ? 'Switch to "Exact Date & Time" to manually edit' : scheduleMode === 'offerLetter' ? 'Switch to "Exact Date & Time" to manually edit' : ''}
               />
-              {scheduleMode === 'doj' && candidate.expectedJoiningDate && (
+              {(scheduleMode === 'doj' && candidate.expectedJoiningDate) || (scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) ? (
                 <p className="text-xs text-gray-500 mt-1">
                   Time is calculated automatically. Switch to "Exact Date & Time" to manually edit.
                 </p>
-              )}
+              ) : null}
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
