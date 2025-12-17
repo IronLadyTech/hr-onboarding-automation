@@ -1542,7 +1542,8 @@ const CandidateDetail = () => {
                               } else if (candidate.expectedJoiningDate && stepTemplate) {
                                 setScheduleMode('doj');
                                 setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
-                                setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
+                                // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                                setScheduleOffsetTime(stepTemplate.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                               } else {
                                 setScheduleMode('exact');
                                 setScheduleOffsetDays(0);
@@ -1680,7 +1681,9 @@ const CandidateDetail = () => {
                                   // Use DOJ mode for other steps
                                   setScheduleMode('doj');
                                   setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
-                                  setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
+                                  // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                                  // Only fallback to '09:00' if scheduledTime is truly null/undefined
+                                  setScheduleOffsetTime(stepTemplate.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                                   
                                   const doj = new Date(candidate.expectedJoiningDate);
                                   const offset = stepTemplate.dueDateOffset || 0;
@@ -1709,7 +1712,8 @@ const CandidateDetail = () => {
                                   // Fallback to exact mode if no DOJ
                                   setScheduleMode('exact');
                                   setScheduleOffsetDays(0);
-                                  setScheduleOffsetTime(stepTemplate?.scheduledTime || '09:00');
+                                  // Use step template's scheduledTime if available
+                                  setScheduleOffsetTime(stepTemplate?.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                                 }
                                 
                                 setScheduleDuration(durationMap[step.stepType] || 60);
@@ -1784,6 +1788,7 @@ const CandidateDetail = () => {
                                 // Always use offerLetter mode for OFFER_REMINDER, even if offer letter not sent yet
                                 setScheduleMode('offerLetter');
                                 setScheduleOffsetDays(stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
+                                // CRITICAL: Use step template's scheduledTime - it should be '14:00' for Offer Reminder
                                 setScheduleOffsetTime(stepTemplate?.scheduledTime || '14:00');
                                 // Calculate initial scheduleDateTime based on offer letter date if available, otherwise use current date + offset
                                 const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
@@ -1827,11 +1832,13 @@ const CandidateDetail = () => {
                               } else if (candidate.expectedJoiningDate && stepTemplate) {
                                 setScheduleMode('doj');
                                 setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
-                                setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
+                                // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                                setScheduleOffsetTime(stepTemplate.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                               } else {
                                 setScheduleMode('exact');
                                 setScheduleOffsetDays(0);
-                                setScheduleOffsetTime(stepTemplate?.scheduledTime || '09:00');
+                                // Use step template's scheduledTime if available
+                                setScheduleOffsetTime(stepTemplate?.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                               }
                               setShowScheduleModal(scheduleAction);
                             }}
@@ -1983,7 +1990,8 @@ const CandidateDetail = () => {
                         if (stepTemplate) {
                           // Initialize offset and time from step template
                           setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
-                          setScheduleOffsetTime(stepTemplate.scheduledTime || '09:00');
+                                // CRITICAL: Use step template's scheduledTime - NEVER default to '09:00' if template has a value
+                                setScheduleOffsetTime(stepTemplate.scheduledTime ? stepTemplate.scheduledTime : '09:00');
                           
                           // Calculate and update scheduleDateTime
                           const doj = new Date(candidate.expectedJoiningDate);
