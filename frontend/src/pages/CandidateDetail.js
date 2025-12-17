@@ -235,7 +235,12 @@ const CandidateDetail = () => {
               description = replacePlaceholders(stepTemplate.description || description);
             }
             
-            const startTime = new Date(hrDateTime);
+            // Parse datetime-local as IST (UTC+5:30) - India timezone
+            // datetime-local input doesn't include timezone, so we treat it as IST
+            const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30 in milliseconds
+            const localDate = new Date(hrDateTime);
+            // Create date in IST by subtracting the offset, then add it back when converting to UTC
+            const startTime = new Date(localDate.getTime() - istOffset);
             const endTime = new Date(startTime);
             endTime.setMinutes(endTime.getMinutes() + hrDuration);
             
@@ -309,7 +314,12 @@ const CandidateDetail = () => {
               return;
             }
             
-            const startTime = new Date(dateTime);
+            // Parse datetime-local as IST (UTC+5:30) - India timezone
+            // datetime-local input doesn't include timezone, so we treat it as IST
+            const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30 in milliseconds
+            const localDate = new Date(dateTime);
+            // Create date in IST by subtracting the offset, then add it back when converting to UTC
+            const startTime = new Date(localDate.getTime() - istOffset);
             const endTime = new Date(startTime);
             endTime.setMinutes(endTime.getMinutes() + duration);
             
@@ -695,16 +705,18 @@ const CandidateDetail = () => {
   };
 
   // Helper to convert date to local datetime-local format (YYYY-MM-DDTHH:mm)
-  // Treats the datetime as IST (India Standard Time - UTC+5:30)
+  // Converts from UTC (stored in DB) to IST (India Standard Time - UTC+5:30) for display
   const formatDateForInput = (dateTime) => {
     if (!dateTime) return '';
     const date = new Date(dateTime);
-    // Get local date/time components
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    // Convert UTC to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST offset in milliseconds
+    const istDate = new Date(date.getTime() + istOffset);
+    const year = istDate.getUTCFullYear();
+    const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(istDate.getUTCDate()).padStart(2, '0');
+    const hours = String(istDate.getUTCHours()).padStart(2, '0');
+    const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
