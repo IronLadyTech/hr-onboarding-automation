@@ -439,10 +439,10 @@ model DepartmentStepTemplate {
   icon          String? // Icon emoji
   isAuto        Boolean @default(false) // Auto-scheduled or manual
   dueDateOffset Int? // Days offset from joining date (null = immediate)
-  scheduledTime String? // Scheduled time in HH:MM format (e.g., "14:00" for 2:00 PM)
+  scheduledTime String? // Default scheduled time in HH:mm format (e.g., "14:00" for 2:00 PM)
+  schedulingMethod String @default("doj") // "doj", "offerLetter", "manual"
   priority      String  @default("MEDIUM") // HIGH, MEDIUM, LOW
   isActive      Boolean @default(true)
-  scheduledTime String? // Default scheduled time in HH:mm format (e.g., "14:00" for 2:00 PM)
   
   // Email Template Selection - REQUIRED: Every step must use an existing email template
   emailTemplateId String? // Link to EmailTemplate (required for all steps)
