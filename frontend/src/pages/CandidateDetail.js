@@ -134,7 +134,23 @@ const CandidateDetail = () => {
       toast.success(`Step ${pendingStep} completed! Email sent to candidate.`);
       fetchCandidate();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to complete step');
+      const errorMessage = error.response?.data?.message || 'Failed to complete step';
+      
+      // Show error with better formatting for multi-line messages
+      // Replace newlines with spaces for toast display, or show first line with details
+      if (errorMessage.includes('\n')) {
+        // For multi-line messages, show the first line as main message
+        const lines = errorMessage.split('\n').filter(line => line.trim());
+        toast.error(lines[0], { 
+          duration: 8000,
+          // Add description if available
+          description: lines.length > 1 ? lines.slice(1).join(' ') : undefined
+        });
+        // Also log full error for debugging
+        console.error('Step completion error:', errorMessage);
+      } else {
+        toast.error(errorMessage, { duration: 5000 });
+      }
     } finally {
       setActionLoading('');
       setPendingStep(null);

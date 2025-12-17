@@ -1857,11 +1857,32 @@ router.post('/:id/complete-step', async (req, res) => {
     res.json({ success: true, data: updated });
   } catch (error) {
     logger.error('Error completing step:', error);
-    const statusCode = error.message.includes('not found') ? 404 : 
-                      error.message.includes('Invalid') ? 400 : 500;
+    
+    // Provide user-friendly error messages for SMTP/email errors
+    let errorMessage = error.message || 'Server error';
+    let statusCode = 500;
+    
+    if (error.message?.includes('not found')) {
+      statusCode = 404;
+    } else if (error.message?.includes('Invalid')) {
+      statusCode = 400;
+    } else if (error.code === 'EAUTH' || error.message?.includes('Invalid login') || error.message?.includes('535-5.7.8') || error.message?.includes('BadCredentials')) {
+      // SMTP authentication error
+      statusCode = 500;
+      errorMessage = 'SMTP authentication failed. Please check your email configuration:\n\n' +
+        '1. Go to Settings → HR Email Configuration\n' +
+        '2. Verify your SMTP credentials are correct\n' +
+        '3. If using Gmail, ensure you\'re using an App Password (not your regular password)\n' +
+        '4. Make sure 2-Step Verification is enabled on your Google account\n' +
+        '5. Test your email configuration using the "Test Email" button in Settings';
+    } else if (error.message?.includes('SMTP configuration is missing') || error.message?.includes('SMTP')) {
+      statusCode = 500;
+      errorMessage = 'SMTP configuration is missing or incorrect. Please configure your email settings in Settings → HR Email Configuration.';
+    }
+    
     res.status(statusCode).json({ 
       success: false, 
-      message: error.message || 'Server error' 
+      message: errorMessage 
     });
   }
 });
