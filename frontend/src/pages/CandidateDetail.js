@@ -1537,30 +1537,6 @@ const CandidateDetail = () => {
                           }
                           return null;
                         })()}
-                        
-                        {/* Show calculated scheduled time if available and not yet scheduled */}
-                        {step.calculatedScheduledTime && !step.scheduledEvent && (
-                          <div className="mt-2 flex items-center space-x-2 flex-wrap">
-                            <span className="text-xs font-semibold text-gray-600">Will be scheduled:</span>
-                            <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-md font-medium border border-green-200">
-                              ⏰ {step.calculatedScheduledTime.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at {step.calculatedScheduledTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {(() => {
-                                const schedulingMethod = step.stepTemplate?.schedulingMethod || 'doj';
-                                if (schedulingMethod === 'offerLetter') {
-                                  const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
-                                  const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
-                                  return offerLetterDate 
-                                    ? `(Based on Offer Letter: ${new Date(offerLetterDate).toLocaleDateString('en-IN')})`
-                                    : '(Based on Offer Letter: Not scheduled yet)';
-                                } else {
-                                  return `(Based on DOJ: ${candidate.expectedJoiningDate ? new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN') : 'Not set'})`;
-                                }
-                              })()}
-                            </span>
-                          </div>
-                        )}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
@@ -1568,7 +1544,7 @@ const CandidateDetail = () => {
                       {/* If step is completed, show completed badge only - no calendar */}
                       {step.status === 'completed' ? (
                         <span className="badge badge-success">✓ Completed</span>
-                      ) : step.scheduledEvent && step.scheduledEvent.status !== 'COMPLETED' ? (
+                      ) : step.scheduledEvent ? (
                         /* If scheduled, show "Scheduled" button for editing + "Send" button */
                         <>
                           <button
