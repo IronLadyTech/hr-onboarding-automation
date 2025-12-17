@@ -1048,6 +1048,19 @@ const CandidateDetail = () => {
       const description = getStepDescription(stepTemplate);
       const title = replacePlaceholders(stepTemplate.title);
       
+      // Calculate scheduled time based on candidate's DOJ + step template configuration
+      let calculatedScheduledTime = null;
+      if (candidate.expectedJoiningDate && stepTemplate.scheduledTime && stepTemplate.dueDateOffset !== undefined) {
+        const doj = new Date(candidate.expectedJoiningDate);
+        const scheduledDate = new Date(doj);
+        scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
+        
+        const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+        scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+        
+        calculatedScheduledTime = scheduledDate;
+      }
+      
       // All steps now follow the same pattern - no special actions
       return {
         step: stepTemplate.stepNumber,
@@ -1059,7 +1072,9 @@ const CandidateDetail = () => {
         scheduledEvent: event,
         auto: stepTemplate.isAuto || false,
         actions: null, // No special actions - all steps use calendar + send pattern
-        stepType: stepTemplate.type
+        stepType: stepTemplate.type,
+        calculatedScheduledTime: calculatedScheduledTime, // Calculated time based on DOJ (not actually scheduled)
+        stepTemplate: stepTemplate // Store template for reference
       };
     });
   };
