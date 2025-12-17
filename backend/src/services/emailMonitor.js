@@ -725,7 +725,7 @@ const processMessage = async (messageId) => {
 
     if (!fromEmail) return;
 
-    logger.info(`Processing: From=${fromEmail}, Subject=${subject}, Date=${emailDate.toISOString()}, InReplyTo=${inReplyTo || 'none'}`);
+    logger.info(`Processing: From=${fromEmail}, Subject=${subject}, Date=${emailDate.toISOString()}`);
 
     // Find candidate by email
     const candidate = await prisma.candidate.findFirst({
@@ -738,131 +738,31 @@ const processMessage = async (messageId) => {
       logger.info(`No matching candidate for: ${fromEmail}`);
       return;
     }
-
-    // CRITICAL: Only process attachments from replies to Step 1 (OFFER_LETTER) or Step 2 (OFFER_REMINDER) emails
-    // We must verify this is a reply to an offer email, not to any other step email
-    let isReplyToOfferEmail = false;
-    let originalEmailType = null;
     
-    const subjectLower = subject.toLowerCase();
-    const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
+    // SIMPLIFIED LOGIC: Process ANY email with attachment from candidate who has offerSentAt but no offerSignedAt
+    // No restrictions - accept first attachment from candidate after offer is sent
+    // Once detected, candidate.offerSignedAt will be set, so won't process again
     
-    // Check if subject contains "offer letter" keywords (case-insensitive)
-    // Accept variations: "offer letter", "offerletter", "offer-letter", etc.
-    const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('document') || subjectLower.includes('offerletter'));
-    const hasReplyHeaders = !!(inReplyTo || references);
-    const isReply = isReplySubject || hasReplyHeaders;
+    logger.info(`Email from ${fromEmail}: Subject="${subject}", Date=${emailDate.toISOString()}`);
     
-    logger.info(`Email from ${fromEmail}: Subject="${subject}", In-Reply-To=${inReplyTo || 'none'}, References=${references || 'none'}, IsReply=${isReply}`);
-    
-    // First, get all OFFER_LETTER and OFFER_REMINDER emails sent to this candidate
-    const offerEmails = await prisma.email.findMany({
-      where: {
-        candidateId: candidate.id,
-        type: { in: ['OFFER_LETTER', 'OFFER_REMINDER'] },
-        status: { in: ['SENT', 'PENDING'] }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20 // Check more emails to find matches
-    });
-    
-    logger.info(`Found ${offerEmails.length} offer-related email(s) (OFFER_LETTER or OFFER_REMINDER) for candidate ${candidate.email}`);
-    
-    if (offerEmails.length === 0) {
-      // No offer emails in database - can't verify it's a reply to offer email
-      logger.info(`⏭️ Skipping email from ${fromEmail}: No OFFER_LETTER or OFFER_REMINDER emails found in database for this candidate. Subject: "${subject}"`);
+    // Only process if candidate has offerSentAt but no offerSignedAt (first time detection)
+    if (!candidate.offerSentAt) {
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Candidate has not been sent an offer letter yet`);
       return;
     }
     
-    // Method 1: Check if In-Reply-To or References headers match (most reliable)
-    // Extract Message-ID from In-Reply-To/References and try to match
-    if (hasReplyHeaders) {
-      logger.info(`Reply headers found, checking if this is a reply to an offer email...`);
-      
-      // Check subject matching - if reply subject contains original subject (after removing "Re:")
-      for (const offerEmail of offerEmails) {
-        const offerSubjectLower = offerEmail.subject.toLowerCase();
-        const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
-        const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
-        
-        // Check if subjects match (reply contains original or vice versa)
-        const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
-                             cleanOfferSubject.includes(cleanReplySubject) ||
-                             // Also check if both contain key offer-related words
-                             (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer')) ||
-                             (cleanReplySubject.includes('letter') && cleanOfferSubject.includes('letter'));
-        
-        if (subjectsMatch) {
-          isReplyToOfferEmail = true;
-          originalEmailType = offerEmail.type;
-          logger.info(`✅ Detected as reply to ${offerEmail.type} email - In-Reply-To/References present and subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
-          break;
-        }
-      }
-    }
-    
-    // Method 2: If no match yet, check subject matching (for cases where headers aren't set properly)
-    // More lenient: accept if it's a reply and has offer keywords OR matches offer email subject
-    if (!isReplyToOfferEmail && isReplySubject) {
-      logger.info(`No header match found, checking subject matching with offer keywords...`);
-      
-      for (const offerEmail of offerEmails) {
-        const offerSubjectLower = offerEmail.subject.toLowerCase();
-        const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
-        const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').replace(/^fwd?:\s*/i, '').trim();
-        
-        // Check if reply subject matches or contains the original email subject
-        // Accept if subjects match OR if reply has offer keywords
-        const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
-                             cleanOfferSubject.includes(cleanReplySubject) ||
-                             // Check if both contain key offer-related words (case-insensitive)
-                             (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer') && 
-                              (cleanReplySubject.includes('letter') || cleanReplySubject.includes('document') || 
-                               cleanReplySubject.includes('offerletter') || cleanReplySubject.includes('offer-letter'))) ||
-                             // Also accept if reply has offer keywords (even if original doesn't match exactly)
-                             hasOfferKeywords;
-        
-        if (subjectsMatch) {
-          isReplyToOfferEmail = true;
-          originalEmailType = offerEmail.type;
-          logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches with offer keywords. Original: "${offerEmail.subject}", Reply: "${subject}"`);
-          break;
-        }
-      }
-    }
-    
-    // If still no match, check one more time with more lenient matching
-    // If email has "offer letter" keywords and is from a candidate with offerSentAt, accept it
-    if (!isReplyToOfferEmail && hasOfferKeywords && candidate.offerSentAt) {
-      logger.info(`✅ Accepting email with offer keywords from candidate with offerSentAt. Subject: "${subject}"`);
-      isReplyToOfferEmail = true;
-      originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER if we can't determine
-    }
-    
-    // If still no match, check one more time with more lenient matching
-    // If email has "offer letter" keywords and is from a candidate with offerSentAt, accept it
-    if (!isReplyToOfferEmail && hasOfferKeywords && candidate.offerSentAt) {
-      logger.info(`✅ Accepting email with offer keywords from candidate with offerSentAt. Subject: "${subject}"`);
-      isReplyToOfferEmail = true;
-      originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER if we can't determine
-    }
-    
-    // If still no match, this is NOT a reply to Step 1 or Step 2 - skip it
-    if (!isReplyToOfferEmail) {
-      logger.info(`⏭️ Skipping email from ${fromEmail}: Not a reply to Step 1 (OFFER_LETTER) or Step 2 (OFFER_REMINDER) email. Subject: "${subject}"`);
-      logger.info(`   This email might be a reply to Step 3, 4, 5, or other emails - ignoring to prevent false positives.`);
-      return;
-    }
-    
-    // Only process if candidate hasn't signed yet
     if (candidate.offerSignedAt) {
-      logger.info(`⏭️ Skipping email from ${fromEmail}: Candidate has already signed offer letter`);
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Candidate has already signed offer letter (signed at: ${candidate.offerSignedAt.toISOString()})`);
       return;
     }
     
-    const shouldProcessSignedOffer = true;
+    // Check if email was sent AFTER the offer was sent
+    if (emailDate < candidate.offerSentAt) {
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Email date (${emailDate.toISOString()}) is before offer was sent (${candidate.offerSentAt.toISOString()})`);
+      return;
+    }
     
-    logger.info(`📧 Processing email from ${candidate.firstName} ${candidate.lastName}: OfferSentAt=${candidate.offerSentAt?.toISOString()}, EmailDate=${emailDate.toISOString()}, HasSigned=${!!candidate.offerSignedAt}, WillProcess=${shouldProcessSignedOffer}`);
+    logger.info(`✅ Processing email from ${candidate.firstName} ${candidate.lastName}: OfferSentAt=${candidate.offerSentAt.toISOString()}, EmailDate=${emailDate.toISOString()}, HasSigned=${!!candidate.offerSignedAt}`);
 
     // Check for attachments
     const attachments = findAttachments(message.data.payload);
