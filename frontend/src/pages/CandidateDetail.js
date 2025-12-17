@@ -1383,31 +1383,92 @@ const CandidateDetail = () => {
                           )}
                         </>
                       ) : (
-                        /* If not completed and not scheduled, show calendar icon + Send button */
+                        /* If not completed and not scheduled, show "Schedule" button for auto steps or calendar for manual */
                         <>
-                          {/* Calendar icon for scheduling */}
-                          <button
-                            onClick={() => {
-                              const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
-                              const durationMap = { 
-                                'OFFER_LETTER': 30, 
-                                'OFFER_REMINDER': 15, 
-                                'WELCOME_EMAIL': 30, 
-                                'HR_INDUCTION': 60, 
-                                'WHATSAPP_ADDITION': 15, 
-                                'ONBOARDING_FORM': 30, 
-                                'FORM_REMINDER': 15, 
-                                'CEO_INDUCTION': 60, 
-                                'SALES_INDUCTION': 90, 
-                                'DEPARTMENT_INDUCTION': 90,
-                                'TRAINING_PLAN': 30, 
-                                'CHECKIN_CALL': 30 
-                              };
-                              
-                              // Calculate default dateTime from step template
-                              let defaultDateTime = '';
-                              const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
-                              if (stepTemplate) {
+                          {step.auto ? (
+                            /* For auto steps, show "Schedule" button that uses scheduledTime from template */
+                            <button
+                              onClick={() => {
+                                const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                                const durationMap = { 
+                                  'OFFER_LETTER': 30, 
+                                  'OFFER_REMINDER': 15, 
+                                  'WELCOME_EMAIL': 30, 
+                                  'HR_INDUCTION': 60, 
+                                  'WHATSAPP_ADDITION': 15, 
+                                  'ONBOARDING_FORM': 30, 
+                                  'FORM_REMINDER': 15, 
+                                  'CEO_INDUCTION': 60, 
+                                  'SALES_INDUCTION': 90, 
+                                  'DEPARTMENT_INDUCTION': 90,
+                                  'TRAINING_PLAN': 30, 
+                                  'CHECKIN_CALL': 30 
+                                };
+                                
+                                // Calculate default dateTime from step template using scheduledTime and dueDateOffset
+                                let defaultDateTime = '';
+                                const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                                if (stepTemplate && candidate.expectedJoiningDate) {
+                                  const doj = new Date(candidate.expectedJoiningDate);
+                                  const offset = stepTemplate.dueDateOffset || 0;
+                                  
+                                  // Calculate date based on offset
+                                  const scheduledDate = new Date(doj);
+                                  scheduledDate.setDate(scheduledDate.getDate() + offset);
+                                  
+                                  // Use scheduledTime from template if available
+                                  if (stepTemplate.scheduledTime) {
+                                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                    scheduledDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+                                  } else {
+                                    // Default to 9:00 AM if no scheduledTime
+                                    scheduledDate.setHours(9, 0, 0, 0);
+                                  }
+                                  
+                                  // Format as datetime-local (YYYY-MM-DDTHH:mm)
+                                  const year = scheduledDate.getFullYear();
+                                  const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                  const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                  const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                  const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                  defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                }
+                                
+                                setScheduleDuration(durationMap[step.stepType] || 60);
+                                setScheduleDateTime(defaultDateTime);
+                                setSchedulingStepType(step.stepType);
+                                setShowScheduleModal(scheduleAction);
+                              }}
+                              className="btn btn-sm btn-primary"
+                              disabled={!candidate.expectedJoiningDate}
+                              title={!candidate.expectedJoiningDate ? 'Set expected joining date first' : 'Schedule using default time from step configuration'}
+                            >
+                              ⏰ Schedule
+                            </button>
+                          ) : (
+                            /* For manual steps, show calendar icon */
+                            <button
+                              onClick={() => {
+                                const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                                const durationMap = { 
+                                  'OFFER_LETTER': 30, 
+                                  'OFFER_REMINDER': 15, 
+                                  'WELCOME_EMAIL': 30, 
+                                  'HR_INDUCTION': 60, 
+                                  'WHATSAPP_ADDITION': 15, 
+                                  'ONBOARDING_FORM': 30, 
+                                  'FORM_REMINDER': 15, 
+                                  'CEO_INDUCTION': 60, 
+                                  'SALES_INDUCTION': 90, 
+                                  'DEPARTMENT_INDUCTION': 90,
+                                  'TRAINING_PLAN': 30, 
+                                  'CHECKIN_CALL': 30 
+                                };
+                                
+                                // Calculate default dateTime from step template
+                                let defaultDateTime = '';
+                                const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                                if (stepTemplate) {
                                 const referenceDate = candidate.expectedJoiningDate || candidate.actualJoiningDate || new Date();
                                 const baseDate = new Date(referenceDate);
                                 

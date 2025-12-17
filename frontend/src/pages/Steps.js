@@ -27,7 +27,8 @@ const Steps = () => {
     type: 'MANUAL',
     icon: '📋',
     emailTemplateId: '',
-    scheduledTime: ''
+    scheduledTime: '',
+    dueDateOffset: 0
   });
 
   useEffect(() => {
@@ -109,7 +110,8 @@ const Steps = () => {
       type: 'MANUAL',
       icon: '📋',
       emailTemplateId: '',
-      scheduledTime: ''
+      scheduledTime: '',
+      dueDateOffset: 0
     });
     setShowStepModal(true);
   };
@@ -449,20 +451,45 @@ const Steps = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Default Scheduled Time (HH:mm)
-                  </label>
-                  <input
-                    type="time"
-                    value={stepForm.scheduledTime || ''}
-                    onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
-                    className="input"
-                    placeholder="14:00"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Default time for this step (e.g., 14:00 for 2:00 PM). Leave empty for manual scheduling. This time will be used when scheduling calendar events automatically.
-                  </p>
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">⏰ Default Scheduling Configuration</h3>
+                  
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Days Offset from DOJ *
+                    </label>
+                    <input
+                      type="number"
+                      value={stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : ''}
+                      onChange={(e) => setStepForm({ ...stepForm, dueDateOffset: e.target.value ? parseInt(e.target.value) : 0 })}
+                      className="input"
+                      placeholder="0"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Days from Date of Joining (DOJ). Use negative numbers for before DOJ (e.g., -1 for day before), 0 for on DOJ, positive for after DOJ.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Default Scheduled Time (HH:mm) ⏰
+                    </label>
+                    <input
+                      type="time"
+                      value={stepForm.scheduledTime || ''}
+                      onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
+                      className="input"
+                      placeholder="14:00"
+                    />
+                    {stepForm.scheduledTime && (
+                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                        ⏰ Default time: {formatTime(stepForm.scheduledTime)}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Default time for this step (e.g., 14:00 for 2:00 PM). This time will be used when scheduling calendar events automatically based on DOJ + offset. Leave empty for manual scheduling.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Email Template Selection - REQUIRED */}
