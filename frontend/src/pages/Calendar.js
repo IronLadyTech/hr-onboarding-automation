@@ -560,17 +560,355 @@ const Calendar = () => {
               )}
             </div>
 
+            {/* Scheduling Method Selection */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date & Time *
-              </label>
-              <input
-                type="datetime-local"
-                value={batchScheduleData.dateTime}
-                onChange={(e) => setBatchScheduleData({ ...batchScheduleData, dateTime: e.target.value })}
-                className="input w-full"
-              />
-            </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Scheduling Method *</label>
+              <div className="flex space-x-4 mb-3">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="batchScheduleMode"
+                    value="exact"
+                    checked={batchScheduleMode === 'exact'}
+                    onChange={(e) => {
+                      setBatchScheduleMode(e.target.value);
+                      if (!batchScheduleData.dateTime) {
+                        const now = new Date();
+                        const year = now.getFullYear();
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const hour = String(now.getHours()).padStart(2, '0');
+                        const minute = String(now.getMinutes()).padStart(2, '0');
+                        setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                      }
+                    }}
+                    className="mr-2"
+                  />
+                  <span className="text-sm">Exact Date & Time</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="batchScheduleMode"
+                    value="doj"
+                    checked={batchScheduleMode === 'doj'}
+                    onChange={(e) => {
+                      setBatchScheduleMode(e.target.value);
+                      // Calculate based on DOJ for first selected candidate
+                      if (selectedCandidates.length > 0) {
+                        const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                        if (firstCandidate?.expectedJoiningDate) {
+                          const selectedStep = departmentSteps.find(s => {
+                            const [eventType, stepNumber] = batchScheduleData.eventType.split('|');
+                            return s.type === eventType && s.stepNumber === parseInt(stepNumber);
+                          });
+                          if (selectedStep) {
+                            setBatchScheduleOffsetDays(selectedStep.dueDateOffset || 0);
+                            setBatchScheduleOffsetTime(selectedStep.scheduledTime || '09:00');
+                            const doj = new Date(firstCandidate.expectedJoiningDate);
+                            const scheduledDate = new Date(doj);
+                            scheduledDate.setDate(scheduledDate.getDate() + (selectedStep.dueDateOffset || 0));
+                            if (selectedStep.scheduledTime) {
+                              const [hours, minutes] = selectedStep.scheduledTime.split(':');
+                              scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            } else {
+                              scheduledDate.setHours(9, 0, 0, 0);
+                            }
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }
+                        }
+                      }
+                    }}
+                    className="mr-2"
+                    disabled={selectedCandidates.length === 0}
+                  />
+                  <span className={`text-sm ${selectedCandidates.length === 0 ? 'text-gray-400' : ''}`}>
+                    Based on DOJ {selectedCandidates.length === 0 && '(Select candidates first)'}
+                  </span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="batchScheduleMode"
+                    value="offerLetter"
+                    checked={batchScheduleMode === 'offerLetter'}
+                    onChange={(e) => {
+                      setBatchScheduleMode(e.target.value);
+                      // Calculate based on Offer Letter date for first selected candidate
+                      if (selectedCandidates.length > 0) {
+                        const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                        const offerLetterEvent = firstCandidate?.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                        const offerLetterDate = offerLetterEvent?.startTime || firstCandidate?.offerSentAt;
+                        if (offerLetterDate) {
+                          const selectedStep = departmentSteps.find(s => {
+                            const [eventType, stepNumber] = batchScheduleData.eventType.split('|');
+                            return s.type === eventType && s.stepNumber === parseInt(stepNumber);
+                          });
+                          if (selectedStep) {
+                            setBatchScheduleOffsetDays(selectedStep.dueDateOffset !== undefined ? selectedStep.dueDateOffset : 1);
+                            setBatchScheduleOffsetTime(selectedStep.scheduledTime || '14:00');
+                            const offerDate = new Date(offerLetterDate);
+                            const scheduledDate = new Date(offerDate);
+                            const offset = selectedStep.dueDateOffset !== undefined ? selectedStep.dueDateOffset : 1;
+                            scheduledDate.setDate(scheduledDate.getDate() + offset);
+                            if (selectedStep.scheduledTime) {
+                              const [hours, minutes] = selectedStep.scheduledTime.split(':');
+                              scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                            } else {
+                              scheduledDate.setHours(14, 0, 0, 0);
+                            }
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }
+                        }
+                      }
+                    }}
+                    className="mr-2"
+                    disabled={selectedCandidates.length === 0}
+                  />
+                  <span className="text-sm">
+                    Based on Offer Letter Date {selectedCandidates.length === 0 && '(Select candidates first)'}
+                  </span>
+                </label>
+              </div>
+              
+              {/* Show offset inputs for DOJ mode */}
+              {batchScheduleMode === 'doj' && selectedCandidates.length > 0 && (() => {
+                const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                if (!firstCandidate?.expectedJoiningDate) return null;
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
+                    <p className="text-xs text-blue-600 mb-2">
+                      <strong>Base Date (DOJ):</strong> {new Date(firstCandidate.expectedJoiningDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                        <input
+                          type="number"
+                          value={batchScheduleOffsetDays}
+                          onChange={(e) => {
+                            const offset = parseInt(e.target.value) || 0;
+                            setBatchScheduleOffsetDays(offset);
+                            const doj = new Date(firstCandidate.expectedJoiningDate);
+                            const scheduledDate = new Date(doj);
+                            scheduledDate.setDate(scheduledDate.getDate() + offset);
+                            const [hours, minutes] = batchScheduleOffsetTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }}
+                          className="input text-sm"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                        <input
+                          type="time"
+                          value={batchScheduleOffsetTime}
+                          onChange={(e) => {
+                            setBatchScheduleOffsetTime(e.target.value);
+                            const doj = new Date(firstCandidate.expectedJoiningDate);
+                            const scheduledDate = new Date(doj);
+                            scheduledDate.setDate(scheduledDate.getDate() + batchScheduleOffsetDays);
+                            const [hours, minutes] = e.target.value.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }}
+                          className="input text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              {/* Show offset inputs for offerLetter mode */}
+              {batchScheduleMode === 'offerLetter' && selectedCandidates.length > 0 && (() => {
+                const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                const offerLetterEvent = firstCandidate?.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                const offerLetterDate = offerLetterEvent?.startTime || firstCandidate?.offerSentAt;
+                if (!offerLetterDate) {
+                  return (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-3">
+                      <p className="text-xs text-yellow-800 mb-2">
+                        ⚠️ Offer letter not sent yet for selected candidate(s). This will calculate when Step 1 is scheduled/completed.
+                      </p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                          <input
+                            type="number"
+                            value={batchScheduleOffsetDays}
+                            onChange={(e) => {
+                              const offset = parseInt(e.target.value) || 0;
+                              setBatchScheduleOffsetDays(offset);
+                              if (batchScheduleData.dateTime) {
+                                const baseDate = new Date(batchScheduleData.dateTime);
+                                const scheduledDate = new Date(baseDate);
+                                scheduledDate.setDate(scheduledDate.getDate() + (offset - batchScheduleOffsetDays));
+                                const [hours, minutes] = batchScheduleOffsetTime.split(':');
+                                scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                const year = scheduledDate.getFullYear();
+                                const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                              }
+                            }}
+                            className="input text-sm"
+                            placeholder="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                          <input
+                            type="time"
+                            value={batchScheduleOffsetTime}
+                            onChange={(e) => {
+                              setBatchScheduleOffsetTime(e.target.value);
+                              if (batchScheduleData.dateTime) {
+                                const scheduledDate = new Date(batchScheduleData.dateTime);
+                                const [hours, minutes] = e.target.value.split(':');
+                                scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                const year = scheduledDate.getFullYear();
+                                const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                              }
+                            }}
+                            className="input text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
+                    <p className="text-xs text-green-600 mb-2">
+                      <strong>Base Date:</strong> {new Date(offerLetterDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {offerLetterEvent?.startTime ? `at ${new Date(offerLetterEvent.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}` : ''}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                        <input
+                          type="number"
+                          value={batchScheduleOffsetDays}
+                          onChange={(e) => {
+                            const offset = parseInt(e.target.value) || 0;
+                            setBatchScheduleOffsetDays(offset);
+                            const offerDate = new Date(offerLetterDate);
+                            const scheduledDate = new Date(offerDate);
+                            scheduledDate.setDate(scheduledDate.getDate() + offset);
+                            const [hours, minutes] = batchScheduleOffsetTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }}
+                          className="input text-sm"
+                          placeholder="1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                        <input
+                          type="time"
+                          value={batchScheduleOffsetTime}
+                          onChange={(e) => {
+                            setBatchScheduleOffsetTime(e.target.value);
+                            const offerDate = new Date(offerLetterDate);
+                            const scheduledDate = new Date(offerDate);
+                            scheduledDate.setDate(scheduledDate.getDate() + batchScheduleOffsetDays);
+                            const [hours, minutes] = e.target.value.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setBatchScheduleData({ ...batchScheduleData, dateTime: `${year}-${month}-${day}T${hour}:${minute}` });
+                          }}
+                          className="input text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              
+              {/* Show Exact Date & Time field only in exact mode */}
+              {batchScheduleMode === 'exact' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Exact Date & Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={batchScheduleData.dateTime}
+                    onChange={(e) => {
+                      setBatchScheduleData({ ...batchScheduleData, dateTime: e.target.value });
+                      // Recalculate offset and time
+                      const exactDate = new Date(e.target.value);
+                      if (selectedCandidates.length > 0) {
+                        const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                        if (firstCandidate?.expectedJoiningDate) {
+                          const doj = new Date(firstCandidate.expectedJoiningDate);
+                          const diffTime = exactDate.getTime() - doj.getTime();
+                          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                          setBatchScheduleOffsetDays(diffDays);
+                        }
+                        const hours = String(exactDate.getHours()).padStart(2, '0');
+                        const minutes = String(exactDate.getMinutes()).padStart(2, '0');
+                        setBatchScheduleOffsetTime(`${hours}:${minutes}`);
+                      }
+                    }}
+                    className="input w-full"
+                    required
+                  />
+                </div>
+              )}
+              
+              {/* Show calculated date/time for DOJ and offerLetter modes */}
+              {(batchScheduleMode === 'doj' || batchScheduleMode === 'offerLetter') && batchScheduleData.dateTime && (
+                <div className="mb-4">
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3">
+                    <p className="text-sm text-indigo-800">
+                      <strong>Calculated Date & Time:</strong> {new Date(batchScheduleData.dateTime).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {new Date(batchScheduleData.dateTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                    </p>
+                    <p className="text-xs text-indigo-600 mt-1">
+                      This is calculated from your offset and time settings above. Switch to "Exact Date & Time" mode to manually edit.
+                    </p>
+                    <input type="hidden" value={batchScheduleData.dateTime} required />
+                  </div>
+                </div>
+              )}
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
