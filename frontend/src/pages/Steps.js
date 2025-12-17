@@ -325,6 +325,11 @@ const Steps = () => {
                       <div className="flex items-center space-x-2">
                         <span className="text-sm font-medium text-gray-500">Step {step.stepNumber}:</span>
                         <p className="font-medium text-gray-900">{step.title}</p>
+                        {step.scheduledTime && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold ml-2">
+                            ⏰ {formatTime(step.scheduledTime)}
+                          </span>
+                        )}
                       </div>
                       {step.description && (
                         <p className="text-sm text-gray-600 mt-1">{step.description}</p>

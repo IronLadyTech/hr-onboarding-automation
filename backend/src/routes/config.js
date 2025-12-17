@@ -968,7 +968,7 @@ router.put('/department-steps/:id', async (req, res) => {
         ...(priority && { priority }),
         ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
         ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
-        ...(scheduledTime !== undefined && { scheduledTime: scheduledTime || null })
+        ...(scheduledTime !== undefined && { scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null })
       },
       include: {
         emailTemplate: true
