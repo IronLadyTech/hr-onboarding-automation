@@ -2053,6 +2053,20 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         // Reload environment variables (for current process)
         process.env.GOOGLE_REFRESH_TOKEN = trimmedToken;
         logger.info('✅ Google Refresh Token reloaded in current process');
+        
+        // Reinitialize email monitor with new token (if Gmail flow)
+        if (emailProvider === 'gmail') {
+          try {
+            const { reinitializeEmailMonitor } = require('../services/emailMonitor');
+            logger.info('📧 Reinitializing email monitor with new refresh token...');
+            await reinitializeEmailMonitor();
+            logger.info('✅ Email monitor reinitialized successfully');
+            tokenUpdateMessage = 'Google Refresh Token updated and email monitor reinitialized';
+          } catch (reinitError) {
+            logger.error('⚠️  Could not reinitialize email monitor:', reinitError.message);
+            tokenUpdateMessage = 'Token updated but email monitor needs manual restart. Please restart backend: pm2 restart hr-onboarding-backend';
+          }
+        }
       } catch (error) {
         logger.error('❌ Error updating Google Refresh Token in .env:', error.message);
         logger.error('Full error:', error);

@@ -30,6 +30,8 @@ let imapClient;
 let isProcessing = false;
 let useImap = false;
 let imapEmail = null;
+let gmailCheckInterval = null; // Store interval ID so we can clear it
+let imapCheckInterval = null; // Store interval ID so we can clear it
 
 // ============================================================
 // AUTOMATIC EMAIL REPLY DETECTION USING GMAIL API
@@ -107,8 +109,14 @@ const initGmailApiMonitor = async () => {
       const profile = await gmail.users.getProfile({ userId: 'me' });
       logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
       
+      // Clear any existing interval
+      if (gmailCheckInterval) {
+        clearInterval(gmailCheckInterval);
+        logger.info('📧 Cleared existing Gmail check interval');
+      }
+      
       // Start monitoring - check every 30 seconds for faster capture
-      const checkInterval = setInterval(async () => {
+      gmailCheckInterval = setInterval(async () => {
         try {
           logger.info('📧 [SCHEDULED CHECK] Starting automatic email check for signed offer letters...');
           await checkForReplies();
