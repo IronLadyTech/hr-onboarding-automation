@@ -1134,6 +1134,14 @@ router.post('/department-steps/init-defaults/:department', async (req, res) => {
       { stepNumber: 9, title: `${department} Induction`, description: `HR confirms time with ${department} team, then system sends invite at 10:15 AM on DOJ`, type: department === 'Sales' ? 'SALES_INDUCTION' : 'DEPARTMENT_INDUCTION', icon: '💼', isAuto: false, dueDateOffset: 0, priority: 'MEDIUM', scheduledTime: '10:15' },
       { stepNumber: 10, title: 'Training Plan Email (Auto)', description: 'Auto-sends on Day 3 with structured training', type: 'TRAINING_PLAN', icon: '📚', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM', scheduledTime: null },
       { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled exactly one week later at 10:00 AM', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM', scheduledTime: '10:00' }
+      { stepNumber: 4, title: 'HR Induction (Auto)', description: 'Calendar invite at 8:30 AM on joining day', type: 'HR_INDUCTION', icon: '🏢', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '08:30' },
+      { stepNumber: 5, title: 'WhatsApp Group Addition (Auto)', description: 'Send WhatsApp group URLs via email at 9:30 AM on joining day', type: 'WHATSAPP_ADDITION', icon: '💬', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '09:30' },
+      { stepNumber: 6, title: 'Onboarding Form Email (Auto)', description: 'Sent at 1:00 PM on joining day', type: 'ONBOARDING_FORM', icon: '📝', isAuto: true, dueDateOffset: 0, priority: 'HIGH', scheduledTime: '13:00' },
+      { stepNumber: 7, title: 'Form Reminder (Auto)', description: 'Auto-sends next day after DOJ at 9:00 AM if not completed', type: 'FORM_REMINDER', icon: '🔔', isAuto: true, dueDateOffset: 1, priority: 'MEDIUM', scheduledTime: '09:00' },
+      { stepNumber: 8, title: 'CEO Induction', description: 'HR confirms time with CEO, then system sends invite', type: 'CEO_INDUCTION', icon: '👔', isAuto: false, dueDateOffset: 2, priority: 'MEDIUM', scheduledTime: null },
+      { stepNumber: 9, title: `${department} Induction`, description: `HR confirms time with ${department} team, then system sends invite at 10:15 AM on DOJ`, type: department === 'Sales' ? 'SALES_INDUCTION' : 'DEPARTMENT_INDUCTION', icon: '💼', isAuto: false, dueDateOffset: 0, priority: 'MEDIUM', scheduledTime: '10:15' },
+      { stepNumber: 10, title: 'Training Plan Email (Auto)', description: 'Auto-sends on Day 3 with structured training', type: 'TRAINING_PLAN', icon: '📚', isAuto: true, dueDateOffset: 3, priority: 'MEDIUM', scheduledTime: null },
+      { stepNumber: 11, title: 'HR Check-in Call (Day 7) (Auto)', description: 'Auto-scheduled exactly one week later at 10:00 AM', type: 'CHECKIN_CALL', icon: '📞', isAuto: true, dueDateOffset: 7, priority: 'MEDIUM', scheduledTime: '10:00' }
     ];
 
     // Validate that we have templates for all steps

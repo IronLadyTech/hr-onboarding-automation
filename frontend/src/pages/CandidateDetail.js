@@ -1924,14 +1924,10 @@ const CandidateDetail = () => {
                       const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
                       const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
                       
-                      if (currentStep && offerLetterDate) {
-                        const stepTemplate = departmentSteps.find(s => s.stepNumber === currentStep.step);
-                        if (stepTemplate) {
-                          // Initialize offset and time from step template
-                          setScheduleOffsetDays(stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
-                          setScheduleOffsetTime(stepTemplate.scheduledTime || '14:00');
-                          
-                          // Calculate and update scheduleDateTime
+                      const stepTemplate = currentStep ? departmentSteps.find(s => s.stepNumber === currentStep.step) : null;
+                      if (stepTemplate) {
+                        // If offer letter date exists, calculate from it
+                        if (offerLetterDate) {
                           const offerDate = new Date(offerLetterDate);
                           const scheduledDate = new Date(offerDate);
                           const offset = stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
@@ -1944,6 +1940,30 @@ const CandidateDetail = () => {
                             scheduledDate.setHours(14, 0, 0, 0);
                           }
                           
+                          // Set exact date/time first (source of truth)
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                          
+                          // Then initialize offset and time
+                          setScheduleOffsetDays(offset);
+                          setScheduleOffsetTime(stepTemplate.scheduledTime || '14:00');
+                        } else {
+                          // Offer letter not sent yet - use default offset/time, calculate from current date
+                          const offset = stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                          const defaultTime = stepTemplate.scheduledTime || '14:00';
+                          setScheduleOffsetDays(offset);
+                          setScheduleOffsetTime(defaultTime);
+                          
+                          // Calculate from today as placeholder
+                          const today = new Date();
+                          const scheduledDate = new Date(today);
+                          scheduledDate.setDate(scheduledDate.getDate() + offset);
+                          const [hours, minutes] = defaultTime.split(':');
+                          scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
                           const year = scheduledDate.getFullYear();
                           const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
                           const day = String(scheduledDate.getDate()).padStart(2, '0');
@@ -1956,8 +1976,8 @@ const CandidateDetail = () => {
                     className="mr-2"
                     disabled={!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')}
                   />
-                  <span className={`text-sm ${(!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) ? 'text-gray-400' : ''}`}>
-                    Based on Offer Letter Date {(!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && '(Offer letter not sent)'}
+                  <span className="text-sm">
+                    Based on Offer Letter Date {(!candidate.offerSentAt && !candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && '(Will calculate when Step 1 is scheduled/completed)'}
                   </span>
                 </label>
               </div>
@@ -2062,9 +2082,12 @@ const CandidateDetail = () => {
                           onChange={(e) => {
                             setScheduleOffsetTime(e.target.value);
                             // Recalculate and update scheduleDateTime
-                            const offerDate = new Date(offerLetterDate);
-                            const scheduledDate = new Date(offerDate);
-                            scheduledDate.setDate(scheduledDate.getDate() + scheduleOffsetDays);
+                            // Use current scheduleDateTime as base if offer letter not sent yet
+                            const baseDate = offerLetterDate ? new Date(offerLetterDate) : (scheduleDateTime ? new Date(scheduleDateTime) : new Date());
+                            const scheduledDate = new Date(baseDate);
+                            if (offerLetterDate) {
+                              scheduledDate.setDate(scheduledDate.getDate() + scheduleOffsetDays);
+                            }
                             const [hours, minutes] = e.target.value.split(':');
                             scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
                             const year = scheduledDate.getFullYear();
@@ -2087,18 +2110,46 @@ const CandidateDetail = () => {
                 type="datetime-local" 
                 value={scheduleDateTime}
                 onChange={(e) => {
-                  // Always allow editing - if in DOJ or offerLetter mode, switch to exact mode
-                  if (scheduleMode === 'doj' || scheduleMode === 'offerLetter') {
-                    setScheduleMode('exact');
-                  }
                   setScheduleDateTime(e.target.value);
+                  
+                  // If in DOJ mode, recalculate offset and time from the new exact date/time
+                  if (scheduleMode === 'doj' && candidate.expectedJoiningDate) {
+                    const exactDate = new Date(e.target.value);
+                    const doj = new Date(candidate.expectedJoiningDate);
+                    // Calculate days difference
+                    const diffTime = exactDate.getTime() - doj.getTime();
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    setScheduleOffsetDays(diffDays);
+                    // Extract time
+                    const hours = String(exactDate.getHours()).padStart(2, '0');
+                    const minutes = String(exactDate.getMinutes()).padStart(2, '0');
+                    setScheduleOffsetTime(`${hours}:${minutes}`);
+                  }
+                  
+                  // If in offerLetter mode, recalculate offset and time from the new exact date/time
+                  if (scheduleMode === 'offerLetter') {
+                    const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                    const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                    if (offerLetterDate) {
+                      const exactDate = new Date(e.target.value);
+                      const offerDate = new Date(offerLetterDate);
+                      // Calculate days difference
+                      const diffTime = exactDate.getTime() - offerDate.getTime();
+                      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                      setScheduleOffsetDays(diffDays);
+                      // Extract time
+                      const hours = String(exactDate.getHours()).padStart(2, '0');
+                      const minutes = String(exactDate.getMinutes()).padStart(2, '0');
+                      setScheduleOffsetTime(`${hours}:${minutes}`);
+                    }
+                  }
                 }}
                 className="input w-full"
                 required
               />
               {(scheduleMode === 'doj' || scheduleMode === 'offerLetter') && (
                 <p className="text-xs text-gray-500 mt-1">
-                  This field is auto-updated based on your offset and time settings above. You can switch to "Exact Date & Time" mode to manually edit.
+                  This field is the source of truth. Changing it will update the offset and time above. You can also edit offset/time directly to update this field.
                 </p>
               )}
             </div>
