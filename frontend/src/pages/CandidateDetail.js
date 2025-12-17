@@ -174,11 +174,19 @@ const CandidateDetail = () => {
       const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
       const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt || new Date();
       
-      // Calculate next day at 2:00 PM IST
+      // Calculate date using step template's dueDateOffset and scheduledTime
       const offerDate = new Date(offerLetterDate);
       const reminderDate = new Date(offerDate);
-      reminderDate.setDate(reminderDate.getDate() + 1); // Next day
-      reminderDate.setHours(14, 0, 0, 0); // 2:00 PM
+      const offset = offerReminderStep.dueDateOffset !== undefined ? offerReminderStep.dueDateOffset : 1; // Default to 1 day
+      reminderDate.setDate(reminderDate.getDate() + offset);
+      
+      // Use step template's scheduledTime (should be '14:00' for 2:00 PM)
+      if (offerReminderStep.scheduledTime) {
+        const [hours, minutes] = offerReminderStep.scheduledTime.split(':');
+        reminderDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+      } else {
+        reminderDate.setHours(14, 0, 0, 0); // Fallback to 2:00 PM
+      }
       
       // Convert to UTC for backend (IST is UTC+5:30)
       const istOffset = 5.5 * 60 * 60 * 1000;
@@ -1714,10 +1722,50 @@ const CandidateDetail = () => {
                               setSchedulingStepNumber(step.step); // Store step number for unique identification
                               // Set schedule mode and initialize offset/time based on step type and available dates
                               // stepTemplate is already declared above, so we reuse it
-                              if (step.stepType === 'OFFER_REMINDER' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER'))) {
+                              if (step.stepType === 'OFFER_REMINDER') {
+                                // Always use offerLetter mode for OFFER_REMINDER, even if offer letter not sent yet
                                 setScheduleMode('offerLetter');
                                 setScheduleOffsetDays(stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
                                 setScheduleOffsetTime(stepTemplate?.scheduledTime || '14:00');
+                                // Calculate initial scheduleDateTime based on offer letter date if available, otherwise use current date + offset
+                                const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                                const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                                if (offerLetterDate) {
+                                  const offerDate = new Date(offerLetterDate);
+                                  const scheduledDate = new Date(offerDate);
+                                  const offset = stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                                  scheduledDate.setDate(scheduledDate.getDate() + offset);
+                                  if (stepTemplate?.scheduledTime) {
+                                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                    scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                                  } else {
+                                    scheduledDate.setHours(14, 0, 0, 0);
+                                  }
+                                  const year = scheduledDate.getFullYear();
+                                  const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                  const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                  const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                  const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                  setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                                } else {
+                                  // If offer letter not sent, use current date + offset + time
+                                  const now = new Date();
+                                  const scheduledDate = new Date(now);
+                                  const offset = stepTemplate?.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                                  scheduledDate.setDate(scheduledDate.getDate() + offset);
+                                  if (stepTemplate?.scheduledTime) {
+                                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                    scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                                  } else {
+                                    scheduledDate.setHours(14, 0, 0, 0);
+                                  }
+                                  const year = scheduledDate.getFullYear();
+                                  const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                                  const day = String(scheduledDate.getDate()).padStart(2, '0');
+                                  const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                                  const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                                  setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                                }
                               } else if (candidate.expectedJoiningDate && stepTemplate) {
                                 setScheduleMode('doj');
                                 setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
@@ -1725,7 +1773,7 @@ const CandidateDetail = () => {
                               } else {
                                 setScheduleMode('exact');
                                 setScheduleOffsetDays(0);
-                                setScheduleOffsetTime('09:00');
+                                setScheduleOffsetTime(stepTemplate?.scheduledTime || '09:00');
                               }
                               setShowScheduleModal(scheduleAction);
                             }}

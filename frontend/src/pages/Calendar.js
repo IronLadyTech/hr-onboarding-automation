@@ -536,7 +536,52 @@ const Calendar = () => {
               </label>
               <select
                 value={batchScheduleData.eventType}
-                onChange={(e) => setBatchScheduleData({ ...batchScheduleData, eventType: e.target.value })}
+                onChange={(e) => {
+                  setBatchScheduleData({ ...batchScheduleData, eventType: e.target.value });
+                  // When a step is selected, initialize with step template's scheduledTime
+                  if (e.target.value && selectedCandidates.length > 0) {
+                    const [eventType, stepNumber] = e.target.value.split('|');
+                    const selectedStep = departmentSteps.find(s => s.type === eventType && s.stepNumber === parseInt(stepNumber));
+                    if (selectedStep) {
+                      // Initialize offset and time from step template
+                      setBatchScheduleOffsetDays(selectedStep.dueDateOffset || 0);
+                      setBatchScheduleOffsetTime(selectedStep.scheduledTime || '09:00');
+                      
+                      // Calculate initial dateTime based on first candidate's DOJ or offer letter date
+                      const firstCandidate = candidates.find(c => selectedCandidates.includes(c.id));
+                      if (firstCandidate) {
+                        let baseDate;
+                        if (eventType === 'OFFER_REMINDER') {
+                          // For Offer Reminder, use offer letter date if available
+                          const offerLetterEvent = firstCandidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                          baseDate = offerLetterEvent?.startTime || firstCandidate.offerSentAt || new Date();
+                        } else if (firstCandidate.expectedJoiningDate) {
+                          baseDate = new Date(firstCandidate.expectedJoiningDate);
+                        } else {
+                          baseDate = new Date();
+                        }
+                        
+                        const scheduledDate = new Date(baseDate);
+                        const offset = selectedStep.dueDateOffset || 0;
+                        scheduledDate.setDate(scheduledDate.getDate() + offset);
+                        
+                        if (selectedStep.scheduledTime) {
+                          const [hours, minutes] = selectedStep.scheduledTime.split(':');
+                          scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                        } else {
+                          scheduledDate.setHours(9, 0, 0, 0);
+                        }
+                        
+                        const year = scheduledDate.getFullYear();
+                        const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                        const day = String(scheduledDate.getDate()).padStart(2, '0');
+                        const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                        const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                        setBatchScheduleData(prev => ({ ...prev, dateTime: `${year}-${month}-${day}T${hour}:${minute}` }));
+                      }
+                    }
+                  }
+                }}
                 className="input w-full"
                 disabled={!selectedDepartment || departmentSteps.length === 0}
               >
