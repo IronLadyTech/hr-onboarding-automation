@@ -875,8 +875,9 @@ router.post('/department-steps', async (req, res) => {
           type,
           icon,
           isAuto: isAuto || false,
-          dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
           scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
+          schedulingMethod: schedulingMethod || 'doj',
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
         },
@@ -910,8 +911,9 @@ router.post('/department-steps', async (req, res) => {
           type,
           icon,
           isAuto: isAuto || false,
-          dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
           scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
+          schedulingMethod: schedulingMethod || 'doj',
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
         },
@@ -932,7 +934,7 @@ router.post('/department-steps', async (req, res) => {
 router.put('/department-steps/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, priority, stepNumber, emailTemplateId } = req.body;
+    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
 
     // Get existing step to check current emailTemplateId
     const existingStep = await req.prisma.departmentStepTemplate.findUnique({
@@ -952,22 +954,24 @@ router.put('/department-steps/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
     }
 
-    const { scheduledTime } = req.body;
+    // Prepare update data
+    const updateData = {
+      ...(title && { title }),
+      ...(description !== undefined && { description }),
+      ...(type && { type }),
+      ...(icon !== undefined && { icon }),
+      ...(isAuto !== undefined && { isAuto }),
+      ...(priority && { priority }),
+      ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
+      ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
+      ...(schedulingMethod !== undefined && { schedulingMethod }),
+      ...(dueDateOffset !== undefined && { dueDateOffset: dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null }),
+      ...(scheduledTime !== undefined && { scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null })
+    };
     
     const step = await req.prisma.departmentStepTemplate.update({
       where: { id },
-      data: {
-        ...(title && { title }),
-        ...(description !== undefined && { description }),
-        ...(type && { type }),
-        ...(icon !== undefined && { icon }),
-        ...(isAuto !== undefined && { isAuto }),
-        ...(dueDateOffset !== undefined && { dueDateOffset: parseInt(dueDateOffset) }),
-        ...(priority && { priority }),
-        ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
-        ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
-        ...(scheduledTime !== undefined && { scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null })
-      },
+      data: updateData,
       include: {
         emailTemplate: true
       }
