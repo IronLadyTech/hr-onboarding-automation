@@ -843,12 +843,22 @@ router.get('/department-steps/:department', async (req, res) => {
       dueDateOffset: s.dueDateOffset
     })));
 
-    // Ensure scheduledTime and schedulingMethod are always included (even if null)
-    const stepsWithDefaults = steps.map(step => ({
-      ...step,
-      scheduledTime: step.scheduledTime ?? null, // Explicitly set to null if undefined
-      schedulingMethod: step.schedulingMethod ?? 'doj' // Default to 'doj' if undefined
-    }));
+    // Ensure scheduledTime fields and schedulingMethod are always included (even if null)
+    const stepsWithDefaults = steps.map(step => {
+      const schedulingMethod = step.schedulingMethod ?? 'doj';
+      // Get the active time based on schedulingMethod
+      const activeTime = schedulingMethod === 'offerLetter' 
+        ? (step.scheduledTimeOfferLetter ?? step.scheduledTime ?? null)
+        : (step.scheduledTimeDoj ?? step.scheduledTime ?? null);
+      
+      return {
+        ...step,
+        scheduledTime: activeTime, // Active time based on schedulingMethod (for backward compatibility)
+        scheduledTimeDoj: step.scheduledTimeDoj ?? null, // Separate time for DOJ
+        scheduledTimeOfferLetter: step.scheduledTimeOfferLetter ?? null, // Separate time for Offer Letter
+        schedulingMethod: schedulingMethod // Default to 'doj' if undefined
+      };
+    });
 
     res.json({ success: true, data: stepsWithDefaults });
   } catch (error) {
@@ -860,7 +870,7 @@ router.get('/department-steps/:department', async (req, res) => {
 // Create or update step template
 router.post('/department-steps', async (req, res) => {
   try {
-    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId, scheduledTime, schedulingMethod } = req.body;
+    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId, scheduledTime, scheduledTimeDoj, scheduledTimeOfferLetter, schedulingMethod } = req.body;
 
     if (!department || !stepNumber || !title || !type) {
       return res.status(400).json({ success: false, message: 'Department, stepNumber, title, and type are required' });
@@ -883,30 +893,57 @@ router.post('/department-steps', async (req, res) => {
 
     let step;
     if (existing) {
+      // Prepare update data with separate times
+      const updateData = {
+        title,
+        description,
+        type,
+        icon,
+        isAuto: isAuto || false,
+        dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
+        schedulingMethod: schedulingMethod || 'doj',
+        priority: priority || 'MEDIUM',
+        emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
+      };
+      
+      // Handle separate scheduled times
+      if (scheduledTimeDoj !== undefined) {
+        updateData.scheduledTimeDoj = (scheduledTimeDoj && scheduledTimeDoj.trim() !== '') ? scheduledTimeDoj.trim() : null;
+      }
+      if (scheduledTimeOfferLetter !== undefined) {
+        updateData.scheduledTimeOfferLetter = (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ? scheduledTimeOfferLetter.trim() : null;
+      }
+      // Backward compatibility: if old scheduledTime is provided, use it
+      if (scheduledTime !== undefined && scheduledTimeDoj === undefined && scheduledTimeOfferLetter === undefined) {
+        const method = schedulingMethod || existing.schedulingMethod || 'doj';
+        updateData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        if (method === 'doj') {
+          updateData.scheduledTimeDoj = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        } else if (method === 'offerLetter') {
+          updateData.scheduledTimeOfferLetter = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        }
+      }
+      
       // Update existing step
       step = await req.prisma.departmentStepTemplate.update({
         where: { id: existing.id },
-        data: {
-          title,
-          description,
-          type,
-          icon,
-          isAuto: isAuto || false,
-          dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
-          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
-          schedulingMethod: schedulingMethod || 'doj',
-          priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
-        },
+        data: updateData,
         include: {
           emailTemplate: true
         }
       });
       
-      // Ensure scheduledTime is explicitly included in response (even if null)
+      // Ensure all scheduled time fields are explicitly included in response
+      const method = step.schedulingMethod ?? 'doj';
+      const activeTime = method === 'offerLetter' 
+        ? (step.scheduledTimeOfferLetter ?? step.scheduledTime ?? null)
+        : (step.scheduledTimeDoj ?? step.scheduledTime ?? null);
+      
       step = {
         ...step,
-        scheduledTime: step.scheduledTime ?? null,
+        scheduledTime: activeTime,
+        scheduledTimeDoj: step.scheduledTimeDoj ?? null,
+        scheduledTimeOfferLetter: step.scheduledTimeOfferLetter ?? null,
         schedulingMethod: step.schedulingMethod ?? 'doj'
       };
     } else {
@@ -926,30 +963,57 @@ router.post('/department-steps', async (req, res) => {
         });
       }
 
+      // Prepare create data with separate times
+      const createMethod = schedulingMethod || 'doj';
+      const createData = {
+        department,
+        stepNumber: parseInt(stepNumber),
+        title,
+        description,
+        type,
+        icon,
+        isAuto: isAuto || false,
+        dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
+        schedulingMethod: createMethod,
+        priority: priority || 'MEDIUM',
+        emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
+      };
+      
+      // Handle separate scheduled times
+      if (scheduledTimeDoj !== undefined) {
+        createData.scheduledTimeDoj = (scheduledTimeDoj && scheduledTimeDoj.trim() !== '') ? scheduledTimeDoj.trim() : null;
+      }
+      if (scheduledTimeOfferLetter !== undefined) {
+        createData.scheduledTimeOfferLetter = (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ? scheduledTimeOfferLetter.trim() : null;
+      }
+      // Backward compatibility: if old scheduledTime is provided, use it
+      if (scheduledTime !== undefined && scheduledTimeDoj === undefined && scheduledTimeOfferLetter === undefined) {
+        createData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        if (createMethod === 'doj') {
+          createData.scheduledTimeDoj = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        } else if (createMethod === 'offerLetter') {
+          createData.scheduledTimeOfferLetter = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        }
+      }
+      
       step = await req.prisma.departmentStepTemplate.create({
-        data: {
-          department,
-          stepNumber: parseInt(stepNumber),
-          title,
-          description,
-          type,
-          icon,
-          isAuto: isAuto || false,
-          dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
-          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
-          schedulingMethod: schedulingMethod || 'doj',
-          priority: priority || 'MEDIUM',
-          emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
-        },
+        data: createData,
         include: {
           emailTemplate: true
         }
       });
       
-      // Ensure scheduledTime is explicitly included in response (even if null)
+      // Ensure all scheduled time fields are explicitly included in response
+      const method = step.schedulingMethod ?? 'doj';
+      const activeTime = method === 'offerLetter' 
+        ? (step.scheduledTimeOfferLetter ?? step.scheduledTime ?? null)
+        : (step.scheduledTimeDoj ?? step.scheduledTime ?? null);
+      
       step = {
         ...step,
-        scheduledTime: step.scheduledTime ?? null,
+        scheduledTime: activeTime,
+        scheduledTimeDoj: step.scheduledTimeDoj ?? null,
+        scheduledTimeOfferLetter: step.scheduledTimeOfferLetter ?? null,
         schedulingMethod: step.schedulingMethod ?? 'doj'
       };
     }
@@ -965,11 +1029,13 @@ router.post('/department-steps', async (req, res) => {
 router.put('/department-steps/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
+    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, scheduledTimeDoj, scheduledTimeOfferLetter, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
 
     // Debug: Log what we're receiving
     logger.info(`Updating step ${id} with data:`, {
       scheduledTime: scheduledTime,
+      scheduledTimeDoj: scheduledTimeDoj,
+      scheduledTimeOfferLetter: scheduledTimeOfferLetter,
       schedulingMethod: schedulingMethod,
       dueDateOffset: dueDateOffset
     });
@@ -1017,10 +1083,27 @@ router.put('/department-steps/:id', async (req, res) => {
       updateData.dueDateOffset = (dueDateOffset !== null && dueDateOffset !== '' && !isNaN(dueDateOffset)) ? parseInt(dueDateOffset) : null;
     }
     
-    // CRITICAL: Handle scheduledTime - preserve the value if provided, even if it's an empty string (convert to null)
-    // This MUST be set in updateData so it's saved to the database
-    if (scheduledTime !== undefined) {
+    // CRITICAL: Handle separate scheduled times for each method
+    // scheduledTimeDoj - for DOJ-based scheduling
+    if (scheduledTimeDoj !== undefined) {
+      updateData.scheduledTimeDoj = (scheduledTimeDoj && scheduledTimeDoj.trim() !== '') ? scheduledTimeDoj.trim() : null;
+    }
+    
+    // scheduledTimeOfferLetter - for Offer Letter-based scheduling
+    if (scheduledTimeOfferLetter !== undefined) {
+      updateData.scheduledTimeOfferLetter = (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ? scheduledTimeOfferLetter.trim() : null;
+    }
+    
+    // Handle old scheduledTime for backward compatibility
+    // If new separate times are not provided, use old scheduledTime
+    if (scheduledTime !== undefined && scheduledTimeDoj === undefined && scheduledTimeOfferLetter === undefined) {
       updateData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+      // Also set the appropriate separate field based on schedulingMethod
+      if (schedulingMethod === 'doj' || (!schedulingMethod && existingStep.schedulingMethod === 'doj')) {
+        updateData.scheduledTimeDoj = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+      } else if (schedulingMethod === 'offerLetter' || (!schedulingMethod && existingStep.schedulingMethod === 'offerLetter')) {
+        updateData.scheduledTimeOfferLetter = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+      }
     }
     
     // Debug: Log what we're saving
@@ -1037,17 +1120,24 @@ router.put('/department-steps/:id', async (req, res) => {
     // Debug: Log what we got back from database
     logger.info(`Step ${id} saved successfully:`, {
       scheduledTime: step.scheduledTime,
+      scheduledTimeDoj: step.scheduledTimeDoj,
+      scheduledTimeOfferLetter: step.scheduledTimeOfferLetter,
       schedulingMethod: step.schedulingMethod,
-      dueDateOffset: step.dueDateOffset,
-      updateDataScheduledTime: updateData.scheduledTime
+      dueDateOffset: step.dueDateOffset
     });
 
-    // CRITICAL: Ensure scheduledTime is explicitly included in response
-    // Use the value from updateData if step.scheduledTime is undefined/null
-    // This handles cases where Prisma might not return the field properly
-    const finalScheduledTime = step.scheduledTime !== undefined && step.scheduledTime !== null 
-      ? step.scheduledTime 
-      : (updateData.scheduledTime !== undefined ? updateData.scheduledTime : null);
+    // CRITICAL: Ensure all scheduled time fields are explicitly included in response
+    const finalScheduledTimeDoj = step.scheduledTimeDoj !== undefined && step.scheduledTimeDoj !== null 
+      ? step.scheduledTimeDoj 
+      : (updateData.scheduledTimeDoj !== undefined ? updateData.scheduledTimeDoj : null);
+    
+    const finalScheduledTimeOfferLetter = step.scheduledTimeOfferLetter !== undefined && step.scheduledTimeOfferLetter !== null 
+      ? step.scheduledTimeOfferLetter 
+      : (updateData.scheduledTimeOfferLetter !== undefined ? updateData.scheduledTimeOfferLetter : null);
+    
+    // For backward compatibility, set scheduledTime based on current schedulingMethod
+    const currentMethod = step.schedulingMethod || updateData.schedulingMethod || 'doj';
+    const finalScheduledTime = currentMethod === 'offerLetter' ? finalScheduledTimeOfferLetter : finalScheduledTimeDoj;
     
     const finalSchedulingMethod = step.schedulingMethod !== undefined && step.schedulingMethod !== null
       ? step.schedulingMethod
@@ -1056,7 +1146,9 @@ router.put('/department-steps/:id', async (req, res) => {
     // Build response data ensuring all fields are present
     const responseData = {
       ...step,
-      scheduledTime: finalScheduledTime, // Always include, even if null
+      scheduledTime: finalScheduledTime, // Active time based on schedulingMethod (for backward compatibility)
+      scheduledTimeDoj: finalScheduledTimeDoj, // Separate time for DOJ
+      scheduledTimeOfferLetter: finalScheduledTimeOfferLetter, // Separate time for Offer Letter
       schedulingMethod: finalSchedulingMethod // Always include
     };
 

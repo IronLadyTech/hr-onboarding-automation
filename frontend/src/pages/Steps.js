@@ -27,7 +27,9 @@ const Steps = () => {
     type: 'MANUAL',
     icon: '📋',
     emailTemplateId: '',
-    scheduledTime: '',
+    scheduledTime: '', // For backward compatibility - will be mapped to scheduledTimeDoj or scheduledTimeOfferLetter
+    scheduledTimeDoj: '', // Separate time for DOJ-based scheduling
+    scheduledTimeOfferLetter: '', // Separate time for Offer Letter-based scheduling
     dueDateOffset: 0,
     schedulingMethod: 'doj' // 'doj', 'offerLetter', or 'manual'
   });
@@ -137,20 +139,27 @@ const Steps = () => {
       schedulingMethod: step.schedulingMethod
     });
     
-    // Ensure scheduledTime is properly formatted for time input (HH:mm format)
-    let formattedScheduledTime = '';
-    if (step.scheduledTime && step.scheduledTime.trim() !== '') {
-      // If it's already in HH:mm format, use it directly
-      // Otherwise, try to parse it
-      const timeMatch = step.scheduledTime.match(/^(\d{1,2}):(\d{2})/);
+    // Helper function to format time for input
+    const formatTimeForInput = (timeString) => {
+      if (!timeString || timeString.trim() === '') return '';
+      const timeMatch = timeString.match(/^(\d{1,2}):(\d{2})/);
       if (timeMatch) {
         const hours = timeMatch[1].padStart(2, '0');
         const minutes = timeMatch[2];
-        formattedScheduledTime = `${hours}:${minutes}`;
-      } else {
-        formattedScheduledTime = step.scheduledTime;
+        return `${hours}:${minutes}`;
       }
-    }
+      return timeString;
+    };
+    
+    // Get the current scheduling method
+    const currentSchedulingMethod = step.schedulingMethod || schedulingMethod;
+    
+    // Load times from separate fields, with fallback to old scheduledTime for backward compatibility
+    const scheduledTimeDoj = formatTimeForInput(step.scheduledTimeDoj || (currentSchedulingMethod === 'doj' ? step.scheduledTime : ''));
+    const scheduledTimeOfferLetter = formatTimeForInput(step.scheduledTimeOfferLetter || (currentSchedulingMethod === 'offerLetter' ? step.scheduledTime : ''));
+    
+    // Set the active time based on current scheduling method
+    const activeScheduledTime = currentSchedulingMethod === 'offerLetter' ? scheduledTimeOfferLetter : scheduledTimeDoj;
     
     setStepForm({
       stepNumber: step.stepNumber,
@@ -159,10 +168,11 @@ const Steps = () => {
       type: step.type,
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
-      // CRITICAL: Use formatted scheduledTime, ensuring it's in HH:mm format for time input
-      scheduledTime: formattedScheduledTime,
+      scheduledTime: activeScheduledTime, // Active time for current method
+      scheduledTimeDoj: scheduledTimeDoj, // Separate time for DOJ
+      scheduledTimeOfferLetter: scheduledTimeOfferLetter, // Separate time for Offer Letter
       dueDateOffset: step.dueDateOffset !== undefined && step.dueDateOffset !== null ? step.dueDateOffset : 0,
-      schedulingMethod: step.schedulingMethod || schedulingMethod
+      schedulingMethod: currentSchedulingMethod
     });
     setShowStepModal(true);
   };
@@ -182,14 +192,21 @@ const Steps = () => {
       return;
     }
     
-    // Prepare data to send - ensure scheduledTime is included even if empty
+    // Prepare data to send - send separate times for each scheduling method
     const dataToSend = {
       ...stepForm,
       department: selectedDepartment,
-      // CRITICAL: Always send scheduledTime - convert empty string to null, but preserve valid times
-      scheduledTime: (stepForm.scheduledTime && stepForm.scheduledTime.trim() !== '') 
-        ? stepForm.scheduledTime.trim() 
-        : (stepForm.schedulingMethod === 'manual' ? null : null), // null for manual, null for empty
+      // Send separate times for each method
+      scheduledTimeDoj: (stepForm.scheduledTimeDoj && stepForm.scheduledTimeDoj.trim() !== '') 
+        ? stepForm.scheduledTimeDoj.trim() 
+        : null,
+      scheduledTimeOfferLetter: (stepForm.scheduledTimeOfferLetter && stepForm.scheduledTimeOfferLetter.trim() !== '') 
+        ? stepForm.scheduledTimeOfferLetter.trim() 
+        : null,
+      // Keep scheduledTime for backward compatibility (set to active method's time)
+      scheduledTime: stepForm.schedulingMethod === 'manual' 
+        ? null 
+        : (stepForm.scheduledTime && stepForm.scheduledTime.trim() !== '' ? stepForm.scheduledTime.trim() : null),
       // Only send dueDateOffset if scheduling method is not manual
       dueDateOffset: stepForm.schedulingMethod === 'manual' ? null : (stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : 0),
       // Always send schedulingMethod
@@ -566,7 +583,16 @@ const Steps = () => {
                           name="schedulingMethod"
                           value="doj"
                           checked={stepForm.schedulingMethod === 'doj'}
-                          onChange={(e) => setStepForm({ ...stepForm, schedulingMethod: e.target.value })}
+                          onChange={(e) => {
+                            const newMethod = e.target.value;
+                            // When switching methods, update the active time and preserve the other method's time
+                            const newActiveTime = newMethod === 'offerLetter' ? stepForm.scheduledTimeOfferLetter : stepForm.scheduledTimeDoj;
+                            setStepForm({ 
+                              ...stepForm, 
+                              schedulingMethod: newMethod,
+                              scheduledTime: newActiveTime // Switch to the appropriate time for this method
+                            });
+                          }}
                           className="mr-2"
                         />
                         <span className="text-sm">Based on DOJ</span>
@@ -577,7 +603,16 @@ const Steps = () => {
                           name="schedulingMethod"
                           value="offerLetter"
                           checked={stepForm.schedulingMethod === 'offerLetter'}
-                          onChange={(e) => setStepForm({ ...stepForm, schedulingMethod: e.target.value })}
+                          onChange={(e) => {
+                            const newMethod = e.target.value;
+                            // When switching methods, update the active time and preserve the other method's time
+                            const newActiveTime = newMethod === 'offerLetter' ? stepForm.scheduledTimeOfferLetter : stepForm.scheduledTimeDoj;
+                            setStepForm({ 
+                              ...stepForm, 
+                              schedulingMethod: newMethod,
+                              scheduledTime: newActiveTime // Switch to the appropriate time for this method
+                            });
+                          }}
                           className="mr-2"
                         />
                         <span className="text-sm">Based on Offer Letter Date</span>
@@ -629,8 +664,21 @@ const Steps = () => {
                           value={stepForm.scheduledTime || ''}
                           onChange={(e) => {
                             const newTime = e.target.value;
-                            console.log('Time changed to:', newTime);
-                            setStepForm({ ...stepForm, scheduledTime: newTime });
+                            console.log('Time changed to:', newTime, 'for method:', stepForm.schedulingMethod);
+                            // Update the active time and also update the specific field for the current method
+                            if (stepForm.schedulingMethod === 'offerLetter') {
+                              setStepForm({ 
+                                ...stepForm, 
+                                scheduledTime: newTime,
+                                scheduledTimeOfferLetter: newTime // Save to Offer Letter time
+                              });
+                            } else {
+                              setStepForm({ 
+                                ...stepForm, 
+                                scheduledTime: newTime,
+                                scheduledTimeDoj: newTime // Save to DOJ time
+                              });
+                            }
                           }}
                           className="input"
                           placeholder={stepForm.schedulingMethod === 'offerLetter' ? '14:00' : '09:00'}

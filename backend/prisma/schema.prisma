@@ -439,7 +439,9 @@ model DepartmentStepTemplate {
   icon          String? // Icon emoji
   isAuto        Boolean @default(false) // Auto-scheduled or manual
   dueDateOffset Int? // Days offset from joining date (null = immediate)
-  scheduledTime String? // Default scheduled time in HH:mm format (e.g., "14:00" for 2:00 PM)
+  scheduledTime String? // Default scheduled time in HH:mm format (e.g., "14:00" for 2:00 PM) - DEPRECATED: Use scheduledTimeDoj or scheduledTimeOfferLetter
+  scheduledTimeDoj String? // Scheduled time for DOJ-based scheduling (HH:mm format, e.g., "09:00")
+  scheduledTimeOfferLetter String? // Scheduled time for Offer Letter-based scheduling (HH:mm format, e.g., "14:00")
   schedulingMethod String @default("doj") // "doj", "offerLetter", "manual"
   priority      String  @default("MEDIUM") // HIGH, MEDIUM, LOW
   isActive      Boolean @default(true)
