@@ -419,11 +419,12 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
       }
     }
     
-    // Validate SMTP configuration
-    if (!process.env.SMTP_HOST || !smtpUser || !smtpPass) {
-      const errorMsg = 'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file or update HR email with SMTP credentials.';
+    // Validate SMTP configuration (check both database and env)
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      const errorMsg = 'SMTP configuration is missing. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file or update HR email with SMTP credentials in Settings.';
       logger.error(`❌ ${errorMsg}`);
-      logger.error(`Current SMTP config - Host: ${process.env.SMTP_HOST || 'NOT SET'}, User: ${smtpUser ? 'SET' : 'NOT SET'}, Pass: ${smtpPass ? 'SET' : 'NOT SET'}`);
+      logger.error(`Current SMTP config - Host: ${smtpHost || 'NOT SET'}, User: ${smtpUser ? 'SET' : 'NOT SET'}, Pass: ${smtpPass ? 'SET' : 'NOT SET'}`);
+      logger.error(`Source - Host: ${smtpHost ? (smtpHost === process.env.SMTP_HOST ? 'env' : 'database') : 'NOT SET'}, User: ${smtpUser ? (smtpUser === process.env.SMTP_USER ? 'env' : 'database') : 'NOT SET'}`);
       
       // Update email record with error
       await prisma.email.update({
@@ -436,6 +437,9 @@ const sendEmail = async (prisma, emailRecord, candidate, attachments = []) => {
       
       throw new Error(errorMsg);
     }
+    
+    // Log which source we're using (for debugging)
+    logger.info(`📧 Using SMTP - Host: ${smtpHost} (${smtpHost === process.env.SMTP_HOST ? 'env' : 'database'}), User: ${smtpUser} (${smtpUser === process.env.SMTP_USER ? 'env' : 'database'}), Port: ${smtpPort}, Secure: ${smtpSecure}`);
 
     // Create dynamic transporter with current credentials
     const dynamicTransporter = await createTransporter(prisma);
