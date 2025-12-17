@@ -695,6 +695,7 @@ const CandidateDetail = () => {
   };
 
   // Helper to convert date to local datetime-local format (YYYY-MM-DDTHH:mm)
+  // Treats the datetime as IST (India Standard Time - UTC+5:30)
   const formatDateForInput = (dateTime) => {
     if (!dateTime) return '';
     const date = new Date(dateTime);
@@ -1370,7 +1371,7 @@ const CandidateDetail = () => {
                             title="Already scheduled"
                           >
                             ⏰ Scheduled: {new Date(step.scheduledEvent.startTime).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })} at {new Date(step.scheduledEvent.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                          </span>
+                          </button>
                           <button
                             onClick={() => {
                               const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
