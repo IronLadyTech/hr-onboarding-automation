@@ -322,17 +322,37 @@ const Steps = () => {
                     </div>
                     <span className="text-2xl mr-3">{step.icon || '📋'}</span>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2 flex-wrap">
                         <span className="text-sm font-medium text-gray-500">Step {step.stepNumber}:</span>
                         <p className="font-medium text-gray-900">{step.title}</p>
-                        {step.scheduledTime && (
-                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold ml-2">
-                            ⏰ {formatTime(step.scheduledTime)}
+                        {step.isAuto && (
+                          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                            AUTO
                           </span>
                         )}
                       </div>
                       {step.description && (
                         <p className="text-sm text-gray-600 mt-1">{step.description}</p>
+                      )}
+                      {step.scheduledTime && (
+                        <div className="mt-2 flex items-center space-x-2">
+                          <span className="text-xs font-semibold text-gray-700">Scheduled Time:</span>
+                          <span className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-md font-medium border border-blue-200">
+                            ⏰ {formatTime(step.scheduledTime)}
+                          </span>
+                          <button
+                            onClick={() => handleEditStep(step)}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 underline"
+                            title="Click Edit to change scheduled time"
+                          >
+                            (Edit)
+                          </button>
+                        </div>
+                      )}
+                      {!step.scheduledTime && step.isAuto && (
+                        <div className="mt-2">
+                          <span className="text-xs text-gray-500 italic">No scheduled time set</span>
+                        </div>
                       )}
                     </div>
                   </div>
