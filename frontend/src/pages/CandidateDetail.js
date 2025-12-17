@@ -1599,28 +1599,28 @@ const CandidateDetail = () => {
                                 let defaultDateTime = '';
                                 const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
                                 if (stepTemplate) {
-                                const referenceDate = candidate.expectedJoiningDate || candidate.actualJoiningDate || new Date();
-                                const baseDate = new Date(referenceDate);
-                                
-                                // Apply dueDateOffset (days from joining date)
-                                if (stepTemplate.dueDateOffset !== null && stepTemplate.dueDateOffset !== undefined) {
-                                  baseDate.setDate(baseDate.getDate() + stepTemplate.dueDateOffset);
+                                  const referenceDate = candidate.expectedJoiningDate || candidate.actualJoiningDate || new Date();
+                                  const baseDate = new Date(referenceDate);
+                                  
+                                  // Apply dueDateOffset (days from joining date)
+                                  if (stepTemplate.dueDateOffset !== null && stepTemplate.dueDateOffset !== undefined) {
+                                    baseDate.setDate(baseDate.getDate() + stepTemplate.dueDateOffset);
+                                  }
+                                  
+                                  // Apply scheduledTime (default time like "14:00")
+                                  if (stepTemplate.scheduledTime) {
+                                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                    baseDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                  }
+                                  
+                                  // Format as datetime-local (YYYY-MM-DDTHH:mm)
+                                  const year = baseDate.getFullYear();
+                                  const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+                                  const day = String(baseDate.getDate()).padStart(2, '0');
+                                  const hour = String(baseDate.getHours()).padStart(2, '0');
+                                  const minute = String(baseDate.getMinutes()).padStart(2, '0');
+                                  defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
                                 }
-                                
-                                // Apply scheduledTime (default time like "14:00")
-                                if (stepTemplate.scheduledTime) {
-                                  const [hours, minutes] = stepTemplate.scheduledTime.split(':');
-                                  baseDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
-                                }
-                                
-                                // Format as datetime-local (YYYY-MM-DDTHH:mm)
-                                const year = baseDate.getFullYear();
-                                const month = String(baseDate.getMonth() + 1).padStart(2, '0');
-                                const day = String(baseDate.getDate()).padStart(2, '0');
-                                const hour = String(baseDate.getHours()).padStart(2, '0');
-                                const minute = String(baseDate.getMinutes()).padStart(2, '0');
-                                defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
-                              }
                               
                               setEditingEventId(null);
                               setScheduleDateTime(defaultDateTime);
