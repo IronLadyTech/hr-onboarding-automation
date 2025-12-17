@@ -578,7 +578,7 @@ const CandidateDetail = () => {
         toast.success('Offer letter uploaded!');
       } else {
         await candidateApi.uploadSignedOffer(id, formData);
-        toast.success('Signed offer uploaded! (Step 2 auto-reminder active)');
+        toast.success('Signed offer uploaded! Step 2 (Offer Reminder) has been marked as completed.');
       }
       setShowUploadModal(false);
       setSelectedFile(null);
@@ -1372,7 +1372,13 @@ const CandidateDetail = () => {
                       View Document →
                     </a>
                   ) : (
-                    <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">Pending</span>
+                    <button
+                      onClick={() => setShowUploadModal('signedOffer')}
+                      className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                      title="Upload signed offer letter received from candidate"
+                    >
+                      📤 Upload
+                    </button>
                   )}
                 </div>
               </div>

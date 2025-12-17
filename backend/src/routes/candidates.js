@@ -629,7 +629,8 @@ router.post('/:id/signed-offer', upload.single('signedOffer'), async (req, res) 
       data: { 
         signedOfferPath: getRelativeFilePath(req.file.path),
         status: 'OFFER_SIGNED',
-        offerSignedAt: new Date()
+        offerSignedAt: new Date(),
+        offerReminderSent: true // Mark reminder as sent since offer is signed
       }
     });
 
@@ -643,8 +644,18 @@ router.post('/:id/signed-offer', upload.single('signedOffer'), async (req, res) 
       data: { status: 'CANCELLED' }
     });
 
-    await logActivity(req.prisma, candidate.id, req.user.id, 'OFFER_SIGNED', 
-      `Signed offer letter received`);
+    // CRITICAL: Mark Step 2 (Offer Reminder) as completed when signed offer is uploaded
+    try {
+      const stepService = require('../services/stepService');
+      await stepService.completeStep(req.prisma, candidate.id, 2, req.user?.id || null, 'Signed offer uploaded manually');
+      logger.info(`✅ Marked Step 2 (Offer Reminder) as completed for ${candidate.email} after signed offer upload`);
+    } catch (stepError) {
+      logger.warn(`⚠️ Could not mark Step 2 as completed: ${stepError.message}`);
+      // Continue even if step completion fails - the signed offer is still uploaded
+    }
+
+    await logActivity(req.prisma, candidate.id, req.user?.id || null, 'OFFER_SIGNED', 
+      `Signed offer letter received - Step 2 marked as completed`);
 
     res.json({ success: true, data: candidate });
   } catch (error) {
