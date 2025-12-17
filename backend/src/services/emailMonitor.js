@@ -347,23 +347,44 @@ const processMessage = async (messageId) => {
     // Check for attachments
     const attachments = findAttachments(message.data.payload);
     
+    logger.info(`📎 Checking for attachments in email from ${candidate.firstName} ${candidate.email}...`);
+    logger.info(`📎 Email payload structure: parts=${message.data.payload.parts?.length || 0}, hasBody=${!!message.data.payload.body}, filename=${message.data.payload.filename || 'none'}`);
+    
     if (attachments.length === 0) {
-      logger.info(`No attachments found in email from ${candidate.firstName} ${candidate.email}`);
+      logger.warn(`⚠️ No attachments found in email from ${candidate.firstName} ${candidate.email}. Email subject: "${subject}"`);
+      logger.warn(`⚠️ This might be because:`);
+      logger.warn(`   1. The email doesn't have attachments`);
+      logger.warn(`   2. The attachment format is not recognized`);
+      logger.warn(`   3. The email structure is different than expected`);
       return;
     }
     
-    logger.info(`📎 Found ${attachments.length} attachment(s) from ${candidate.firstName} ${candidate.email}`);
+    logger.info(`📎 Found ${attachments.length} attachment(s) from ${candidate.firstName} ${candidate.email}:`);
+    attachments.forEach((att, idx) => {
+      logger.info(`   ${idx + 1}. ${att.filename || 'unnamed'} (${att.mimeType || 'unknown type'}, ID: ${att.attachmentId || 'none'})`);
+    });
     
     // Download and save first valid attachment
+    let attachmentProcessed = false;
     for (const att of attachments) {
       const ext = path.extname(att.filename || '').toLowerCase();
-      logger.info(`Processing attachment: ${att.filename}, extension: ${ext}`);
+      logger.info(`📎 Processing attachment: ${att.filename}, extension: ${ext}, mimeType: ${att.mimeType}`);
       
-      if (['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png'].includes(ext)) {
+      // Accept common document and image formats
+      const validExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.txt', '.rtf'];
+      const validMimeTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 
+                              'image/jpeg', 'image/png', 'text/plain', 'application/rtf'];
+      
+      const isValidExtension = ext && validExtensions.includes(ext);
+      const isValidMimeType = att.mimeType && validMimeTypes.some(mt => att.mimeType.toLowerCase().includes(mt.toLowerCase()));
+      
+      if (isValidExtension || isValidMimeType) {
+        logger.info(`✅ Attachment is valid (extension: ${isValidExtension}, mimeType: ${isValidMimeType}), downloading...`);
         const savedPath = await downloadAndSaveAttachment(messageId, att, candidate.id);
         
         if (savedPath) {
-          logger.info(`✅ Attachment saved: ${savedPath}`);
+          logger.info(`✅ Attachment saved successfully: ${savedPath}`);
+          attachmentProcessed = true;
           
           // If candidate hasn't signed yet and email came after offer was sent, treat it as signed offer
           if (shouldProcessSignedOffer) {
@@ -474,8 +495,16 @@ const processMessage = async (messageId) => {
           }
           
           break; // Only need first valid attachment
+        } else {
+          logger.error(`❌ Failed to save attachment: ${att.filename}`);
         }
+      } else {
+        logger.warn(`⚠️ Skipping attachment ${att.filename}: Invalid extension (${ext}) and mimeType (${att.mimeType})`);
       }
+    }
+    
+    if (!attachmentProcessed && attachments.length > 0) {
+      logger.warn(`⚠️ No valid attachments were processed from ${attachments.length} attachment(s) found`);
     }
   } catch (error) {
     logger.error('Error processing message:', error.message);
@@ -483,15 +512,20 @@ const processMessage = async (messageId) => {
 };
 
 const findAttachments = (payload, attachments = []) => {
+  if (!payload) return attachments;
+  
+  // Check if this part itself is an attachment
   if (payload.filename && payload.body?.attachmentId) {
     attachments.push({
       filename: payload.filename,
-      mimeType: payload.mimeType,
+      mimeType: payload.mimeType || 'application/octet-stream',
       attachmentId: payload.body.attachmentId
     });
+    logger.debug(`Found attachment: ${payload.filename} (ID: ${payload.body.attachmentId})`);
   }
   
-  if (payload.parts) {
+  // Recursively check parts
+  if (payload.parts && Array.isArray(payload.parts)) {
     for (const part of payload.parts) {
       findAttachments(part, attachments);
     }
