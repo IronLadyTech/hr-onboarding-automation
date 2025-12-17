@@ -749,7 +749,8 @@ const processMessage = async (messageId) => {
     const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
     
     // Check if subject contains "offer letter" keywords (case-insensitive)
-    const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('document'));
+    // Accept variations: "offer letter", "offerletter", "offer-letter", etc.
+    const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('document') || subjectLower.includes('offerletter'));
     const hasReplyHeaders = !!(inReplyTo || references);
     const isReply = isReplySubject || hasReplyHeaders;
     
@@ -827,6 +828,14 @@ const processMessage = async (messageId) => {
           break;
         }
       }
+    }
+    
+    // If still no match, check one more time with more lenient matching
+    // If email has "offer letter" keywords and is from a candidate with offerSentAt, accept it
+    if (!isReplyToOfferEmail && hasOfferKeywords && candidate.offerSentAt) {
+      logger.info(`✅ Accepting email with offer keywords from candidate with offerSentAt. Subject: "${subject}"`);
+      isReplyToOfferEmail = true;
+      originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER if we can't determine
     }
     
     // If still no match, this is NOT a reply to Step 1 or Step 2 - skip it
