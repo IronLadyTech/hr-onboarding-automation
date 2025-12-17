@@ -2,6 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { configApi, templateApi } from '../services/api';
 import toast from 'react-hot-toast';
 
+// Helper function to format time from HH:MM to readable format (e.g., "14:00" -> "2:00 PM")
+const formatTime = (timeString) => {
+  if (!timeString) return '';
+  const [hours, minutes] = timeString.split(':');
+  const hour = parseInt(hours);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+};
+
 const Steps = () => {
   const [departments, setDepartments] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState('');

@@ -876,6 +876,7 @@ router.post('/department-steps', async (req, res) => {
           icon,
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
           scheduledTime: scheduledTime || null
@@ -911,6 +912,7 @@ router.post('/department-steps', async (req, res) => {
           icon,
           isAuto: isAuto || false,
           dueDateOffset: dueDateOffset !== undefined ? parseInt(dueDateOffset) : null,
+          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
           scheduledTime: scheduledTime || null
@@ -932,7 +934,7 @@ router.post('/department-steps', async (req, res) => {
 router.put('/department-steps/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, type, icon, isAuto, dueDateOffset, priority, stepNumber, emailTemplateId } = req.body;
+    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, priority, stepNumber, emailTemplateId } = req.body;
 
     // Get existing step to check current emailTemplateId
     const existingStep = await req.prisma.departmentStepTemplate.findUnique({
