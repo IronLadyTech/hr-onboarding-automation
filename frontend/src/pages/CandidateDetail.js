@@ -590,6 +590,36 @@ const CandidateDetail = () => {
     }
   };
 
+  const handleCheckEmail = async () => {
+    if (!candidate?.offerSentAt) {
+      toast.error('Offer letter must be sent first');
+      return;
+    }
+    if (candidate?.offerSignedAt) {
+      toast.info('Offer letter already signed');
+      return;
+    }
+    setActionLoading('checkEmail');
+    try {
+      const response = await candidateApi.checkEmail(id);
+      if (response.data.success) {
+        toast.success(response.data.message || 'Email checked successfully');
+        fetchCandidate(); // Refresh candidate data
+      } else {
+        toast.error(response.data.message || 'Failed to check email');
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Failed to check email';
+      if (errorMsg.includes('Gmail API not initialized')) {
+        toast.error('Email monitoring is not configured. Please configure Gmail API in Settings.');
+      } else {
+        toast.error(errorMsg);
+      }
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   const handleScheduleSubmit = async () => {
     if (!scheduleDateTime) {
       toast.error('Please select date and time');
@@ -1343,43 +1373,55 @@ const CandidateDetail = () => {
                       <p className="text-xs text-gray-500">
                         {candidate.signedOfferPath 
                           ? `Auto-captured on ${candidate.offerSignedAt ? new Date(candidate.offerSignedAt).toLocaleString('en-IN') : 'N/A'}`
-                          : 'Waiting for candidate response'
+                          : 'Waiting for candidate response (auto-detects from email replies)'
                         }
                       </p>
                     </div>
                   </div>
-                  {candidate.signedOfferPath ? (
-                    <a 
-                      href={`${(() => {
-                        // Get API URL same way as api.js does
-                        let apiUrl = process.env.REACT_APP_API_URL || '/api';
-                        if (apiUrl.startsWith('http')) {
-                          apiUrl = apiUrl.replace(/\/$/, '');
-                          if (!apiUrl.endsWith('/api')) {
-                            apiUrl = `${apiUrl}/api`;
+                  <div className="flex items-center space-x-2">
+                    {candidate.signedOfferPath ? (
+                      <a 
+                        href={`${(() => {
+                          // Get API URL same way as api.js does
+                          let apiUrl = process.env.REACT_APP_API_URL || '/api';
+                          if (apiUrl.startsWith('http')) {
+                            apiUrl = apiUrl.replace(/\/$/, '');
+                            if (!apiUrl.endsWith('/api')) {
+                              apiUrl = `${apiUrl}/api`;
+                            }
                           }
-                        }
-                        return apiUrl;
-                      })()}/uploads/${candidate.signedOfferPath.replace(/\\/g, '/')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-600 hover:text-green-800 text-sm font-medium"
-                      onClick={(e) => {
-                        // Prevent React Router from intercepting the link
-                        e.stopPropagation();
-                      }}
-                    >
-                      View Document →
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => setShowUploadModal('signedOffer')}
-                      className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
-                      title="Upload signed offer letter received from candidate"
-                    >
-                      📤 Upload
-                    </button>
-                  )}
+                          return apiUrl;
+                        })()}/uploads/${candidate.signedOfferPath.replace(/\\/g, '/')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:text-green-800 text-sm font-medium"
+                        onClick={(e) => {
+                          // Prevent React Router from intercepting the link
+                          e.stopPropagation();
+                        }}
+                      >
+                        View Document →
+                      </a>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleCheckEmail}
+                          disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
+                          className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
+                          title="Check email inbox for signed offer letter from candidate"
+                        >
+                          {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
+                        </button>
+                        <button
+                          onClick={() => setShowUploadModal('signedOffer')}
+                          className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                          title="Upload signed offer letter received from candidate"
+                        >
+                          📤 Upload
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

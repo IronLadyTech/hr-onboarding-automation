@@ -80,6 +80,7 @@ export const candidateApi = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   sendOfferReminder: (id) => api.post(`/candidates/${id}/send-offer-reminder`),
+  checkEmail: (id) => api.post(`/candidates/check-email/${id}`),
   
   // Step 3: Welcome Email
   sendWelcomeEmail: (id) => api.post(`/candidates/${id}/welcome-email`),

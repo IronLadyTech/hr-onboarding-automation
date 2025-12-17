@@ -70,18 +70,20 @@ const checkForReplies = async (checkReadEmails = false) => {
   
   try {
     // First, get all candidates who have been sent offers but haven't signed yet
+    // Don't restrict by status - just check if offer was sent and not yet signed
     const candidates = await prisma.candidate.findMany({
       where: {
         offerSentAt: { not: null },
-        offerSignedAt: null,
-        status: { in: ['OFFER_SENT', 'OFFER_VIEWED'] }
+        offerSignedAt: null
+        // Removed status restriction - check all candidates with offerSentAt but no offerSignedAt
       },
       select: {
         id: true,
         email: true,
         firstName: true,
         lastName: true,
-        offerSentAt: true
+        offerSentAt: true,
+        status: true
       }
     });
 
@@ -247,15 +249,21 @@ const processMessage = async (messageId) => {
     if (offerEmails.length === 0) {
       logger.warn(`⚠️ No offer emails found in database for candidate ${candidate.email}, but offerSentAt is ${candidate.offerSentAt}. Will try subject-based matching.`);
       
-      // Check if subject contains offer-related keywords - if yes, accept it as a reply
+      // More flexible: If candidate has offerSentAt and email has attachment, check if subject/headers suggest it's a reply
+      // Accept if:
+      // 1. Subject contains offer-related keywords, OR
+      // 2. Has In-Reply-To/References headers (indicates it's a reply), OR
+      // 3. Subject contains "Re:" or "RE:" (indicates it's a reply)
       const subjectLower = subject.toLowerCase();
-      const hasOfferKeywords = subjectLower.includes('offer') && (subjectLower.includes('letter') || subjectLower.includes('reminder') || subjectLower.includes('signed'));
+      const hasOfferKeywords = subjectLower.includes('offer') || subjectLower.includes('letter') || subjectLower.includes('signed');
+      const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
+      const hasReplyHeaders = !!(inReplyTo || references);
       
-      if (hasOfferKeywords && (inReplyTo || references)) {
-        // If subject has offer keywords and has In-Reply-To/References, it's likely a reply to an offer email
+      if (hasOfferKeywords || (isReplySubject && hasReplyHeaders) || (hasReplyHeaders && candidate.offerSentAt)) {
+        // If subject has offer keywords OR it's clearly a reply (has In-Reply-To/References), accept it
         isReplyToOfferEmail = true;
         originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER
-        logger.info(`✅ Detected as offer email reply - subject contains offer keywords and has In-Reply-To/References. Subject: "${subject}"`);
+        logger.info(`✅ Detected as offer email reply - candidate has offerSentAt and email appears to be a reply. Subject: "${subject}", In-Reply-To: ${inReplyTo || 'none'}, References: ${references || 'none'}`);
       }
     } else {
       // Method 1: Check In-Reply-To and References headers to see if this is a reply to an offer email
@@ -298,19 +306,47 @@ const processMessage = async (messageId) => {
           
           logger.info(`Comparing subjects - Original: "${cleanOfferSubject}", Reply: "${cleanReplySubject}"`);
           
-          // Check if reply subject matches or contains the original email subject
-          // Must contain key offer-related words to ensure it's about the offer
+          // More flexible matching:
+          // 1. If subjects match (either contains the other) AND both have offer keywords
+          // 2. OR if reply subject has "Re:" and contains offer keywords (even if subject doesn't match exactly)
+          // 3. OR if reply subject contains key words from original subject
           const hasOfferKeywords = cleanReplySubject.includes('offer') || cleanReplySubject.includes('letter') || cleanReplySubject.includes('signed');
           const originalHasOfferKeywords = cleanOfferSubject.includes('offer') || cleanOfferSubject.includes('letter');
+          const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
           
-          if ((cleanReplySubject.includes(cleanOfferSubject) || 
-              cleanOfferSubject.includes(cleanReplySubject)) &&
-              hasOfferKeywords && originalHasOfferKeywords) {
+          // Check if subjects match
+          const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
+                               cleanOfferSubject.includes(cleanReplySubject) ||
+                               // Also check if reply contains key words from original
+                               (cleanOfferSubject.split(' ').some(word => word.length > 3 && cleanReplySubject.includes(word)));
+          
+          if (subjectsMatch && hasOfferKeywords && originalHasOfferKeywords) {
             isReplyToOfferEmail = true;
             originalEmailType = offerEmail.type;
             logger.info(`✅ Detected as reply to ${offerEmail.type} email - subject matches. Original: "${offerEmail.subject}", Reply: "${subject}"`);
             break;
+          } else if (isReplySubject && hasOfferKeywords && candidate.offerSentAt) {
+            // Fallback: If it's clearly a reply (has "Re:") and has offer keywords, accept it
+            isReplyToOfferEmail = true;
+            originalEmailType = offerEmail.type;
+            logger.info(`✅ Detected as reply to ${offerEmail.type} email - reply subject with offer keywords. Original: "${offerEmail.subject}", Reply: "${subject}"`);
+            break;
           }
+        }
+      }
+      
+      // Method 3: Final fallback - if candidate has offerSentAt and email has attachment and is from candidate,
+      // and we still haven't matched, but the email subject suggests it's about the offer, accept it
+      if (!isReplyToOfferEmail && candidate.offerSentAt) {
+        const subjectLower = subject.toLowerCase();
+        const hasOfferKeywords = subjectLower.includes('offer') || subjectLower.includes('letter') || subjectLower.includes('signed');
+        const isReplySubject = subjectLower.startsWith('re:') || subjectLower.startsWith('re ');
+        
+        // If it's a reply and has offer keywords, or has In-Reply-To/References, accept it
+        if ((isReplySubject && hasOfferKeywords) || (inReplyTo || references)) {
+          isReplyToOfferEmail = true;
+          originalEmailType = 'OFFER_LETTER'; // Default to OFFER_LETTER
+          logger.info(`✅ Detected as offer email reply (fallback) - candidate has offerSentAt, email is from candidate with attachment. Subject: "${subject}"`);
         }
       }
     }
