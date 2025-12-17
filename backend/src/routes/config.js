@@ -2020,11 +2020,13 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         const trimmedToken = googleRefreshToken.trim();
         const tokenLine = `GOOGLE_REFRESH_TOKEN=${trimmedToken}`;
         
-        // Check if GOOGLE_REFRESH_TOKEN exists (handle various formats)
-        const tokenRegex = /^GOOGLE_REFRESH_TOKEN\s*=\s*.*$/gm;
+        // Check if GOOGLE_REFRESH_TOKEN exists (handle various formats: with/without spaces, quotes, comments)
+        // Match: GOOGLE_REFRESH_TOKEN=value or GOOGLE_REFRESH_TOKEN = value or GOOGLE_REFRESH_TOKEN="value" etc.
+        const tokenRegex = /^GOOGLE_REFRESH_TOKEN\s*=\s*[^\r\n]*(?:\r?\n|$)/gm;
+        
         if (tokenRegex.test(envContent)) {
           // Replace existing token (handles spaces, quotes, etc.)
-          envContent = envContent.replace(tokenRegex, tokenLine);
+          envContent = envContent.replace(tokenRegex, tokenLine + '\n');
           logger.info('📝 Replaced existing GOOGLE_REFRESH_TOKEN in .env file');
         } else {
           // Add new token at the end
