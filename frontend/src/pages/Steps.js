@@ -170,8 +170,8 @@ const Steps = () => {
     const dataToSend = {
       ...stepForm,
       department: selectedDepartment,
-      // Ensure scheduledTime is sent (even if empty string, backend will handle it)
-      scheduledTime: stepForm.scheduledTime || null,
+      // Ensure scheduledTime is sent - preserve the actual value (even if empty string)
+      scheduledTime: stepForm.scheduledTime !== undefined && stepForm.scheduledTime !== null ? stepForm.scheduledTime : null,
       // Only send dueDateOffset if scheduling method is not manual
       dueDateOffset: stepForm.schedulingMethod === 'manual' ? null : (stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : 0)
     };
