@@ -1148,17 +1148,37 @@ const CandidateDetail = () => {
       const description = getStepDescription(stepTemplate);
       const title = replacePlaceholders(stepTemplate.title);
       
-      // Calculate scheduled time based on candidate's DOJ + step template configuration
+      // Calculate scheduled time based on step template configuration and scheduling method
       let calculatedScheduledTime = null;
-      if (candidate.expectedJoiningDate && stepTemplate.scheduledTime && stepTemplate.dueDateOffset !== undefined) {
-        const doj = new Date(candidate.expectedJoiningDate);
-        const scheduledDate = new Date(doj);
-        scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
+      const schedulingMethod = stepTemplate.schedulingMethod || 'doj';
+      
+      // Get the appropriate scheduled time based on scheduling method
+      const scheduledTime = schedulingMethod === 'offerLetter' 
+        ? (stepTemplate.scheduledTimeOfferLetter || stepTemplate.scheduledTime)
+        : (stepTemplate.scheduledTimeDoj || stepTemplate.scheduledTime);
+      
+      if (scheduledTime && stepTemplate.dueDateOffset !== undefined) {
+        let baseDate = null;
         
-        const [hours, minutes] = stepTemplate.scheduledTime.split(':');
-        scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+        // Determine base date based on scheduling method
+        if (schedulingMethod === 'offerLetter') {
+          // Use Offer Letter date (from event or offerSentAt)
+          const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+          baseDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+        } else if (schedulingMethod === 'doj') {
+          // Use DOJ
+          baseDate = candidate.expectedJoiningDate;
+        }
         
-        calculatedScheduledTime = scheduledDate;
+        if (baseDate) {
+          const scheduledDate = new Date(baseDate);
+          scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
+          
+          const [hours, minutes] = scheduledTime.split(':');
+          scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+          
+          calculatedScheduledTime = scheduledDate;
+        }
       }
       
       // All steps now follow the same pattern - no special actions
@@ -1366,7 +1386,18 @@ const CandidateDetail = () => {
                               ⏰ {step.calculatedScheduledTime.toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })} at {step.calculatedScheduledTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                             </span>
                             <span className="text-xs text-gray-500">
-                              (Based on DOJ: {candidate.expectedJoiningDate ? new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN') : 'Not set'})
+                              {(() => {
+                                const schedulingMethod = step.stepTemplate?.schedulingMethod || 'doj';
+                                if (schedulingMethod === 'offerLetter') {
+                                  const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                                  const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                                  return offerLetterDate 
+                                    ? `(Based on Offer Letter: ${new Date(offerLetterDate).toLocaleDateString('en-IN')})`
+                                    : '(Based on Offer Letter: Not scheduled yet)';
+                                } else {
+                                  return `(Based on DOJ: ${candidate.expectedJoiningDate ? new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN') : 'Not set'})`;
+                                }
+                              })()}
                             </span>
                           </div>
                         )}
