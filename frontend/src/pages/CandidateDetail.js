@@ -2040,7 +2040,7 @@ const CandidateDetail = () => {
                 </div>
               )}
               
-              {scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && (() => {
+              {scheduleMode === 'offerLetter' && (() => {
                 const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
                 const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
                 return (
