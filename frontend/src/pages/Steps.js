@@ -135,7 +135,7 @@ const Steps = () => {
       type: step.type,
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
-      scheduledTime: step.scheduledTime || '',
+      scheduledTime: step.scheduledTime ? step.scheduledTime : '',
       dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0,
       schedulingMethod: step.schedulingMethod || schedulingMethod
     });
@@ -167,7 +167,9 @@ const Steps = () => {
         toast.success('Step created successfully!');
       }
       setShowStepModal(false);
-      fetchDepartmentSteps();
+      setEditingStep(null);
+      // Refresh the steps list to get updated values
+      await fetchDepartmentSteps();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save step');
     } finally {
