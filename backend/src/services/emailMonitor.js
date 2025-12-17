@@ -121,11 +121,18 @@ const initImapMonitor = async () => {
     const imapSecure = configMap.imap_secure !== 'false'; // Default to true
     
     if (!imapEnabled || !imapHost || !imapUser || !imapPass) {
-      logger.debug('📧 IMAP not configured - will try Gmail API instead');
+      logger.info('📧 IMAP not configured - checking configuration:');
+      logger.info(`   imap_enabled: ${imapEnabled}`);
+      logger.info(`   imap_host: ${imapHost || 'NOT SET'}`);
+      logger.info(`   imap_user: ${imapUser || 'NOT SET'}`);
+      logger.info(`   imap_pass: ${imapPass ? 'SET' : 'NOT SET'}`);
+      logger.info('📧 Will try Gmail API instead');
       return false;
     }
     
     logger.info(`📧 Initializing IMAP monitor for ${imapUser}...`);
+    logger.info(`   Host: ${imapHost}:${imapPort}`);
+    logger.info(`   Secure: ${imapSecure}`);
     
     // Create IMAP connection
     imapClient = new Imap({
@@ -236,21 +243,49 @@ const checkForRepliesImap = async () => {
     let totalProcessed = 0;
     for (const candidate of candidates) {
       try {
-        // Search for unread emails from this candidate
-        const searchCriteria = [
+        logger.info(`🔍 [IMAP] Checking emails for candidate: ${candidate.firstName} ${candidate.lastName} (${candidate.email})`);
+        logger.info(`   Offer sent at: ${candidate.offerSentAt?.toISOString() || 'N/A'}`);
+        logger.info(`   Offer signed at: ${candidate.offerSignedAt?.toISOString() || 'Not signed yet'}`);
+        
+        // First, search for unread emails from this candidate
+        let searchCriteria = [
           ['UNSEEN'],
           ['FROM', candidate.email]
         ];
 
-        const results = await new Promise((resolve, reject) => {
+        let results = await new Promise((resolve, reject) => {
           imapClient.search(searchCriteria, (err, results) => {
             if (err) reject(err);
             else resolve(results || []);
           });
         });
 
+        logger.info(`   Found ${results.length} unread email(s) from ${candidate.email}`);
+        
+        // If no unread emails, also check recent read emails (last 60 days)
         if (results.length === 0) {
-          logger.debug(`📧 No unread emails from ${candidate.email}`);
+          logger.info(`   No unread emails found, checking recent read emails (last 60 days)...`);
+          const sixtyDaysAgo = new Date();
+          sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+          const dateStr = sixtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '-');
+          
+          searchCriteria = [
+            ['SINCE', dateStr],
+            ['FROM', candidate.email]
+          ];
+          
+          results = await new Promise((resolve, reject) => {
+            imapClient.search(searchCriteria, (err, results) => {
+              if (err) reject(err);
+              else resolve(results || []);
+            });
+          });
+          
+          logger.info(`   Found ${results.length} total email(s) from ${candidate.email} (last 60 days)`);
+        }
+        
+        if (results.length === 0) {
+          logger.debug(`📧 No emails found from ${candidate.email}`);
           continue;
         }
 
