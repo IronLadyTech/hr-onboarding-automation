@@ -1849,33 +1849,42 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
           create: { key: 'smtp_pass', value: smtpPassword }
         });
 
-        // Store SMTP host, port, and secure settings if provided
-        if (smtpHost) {
+        // Store SMTP host, port, and secure settings (always save, use defaults if not provided)
+        // Determine default host based on email provider or use provided value
+        let defaultHost = '';
+        if (emailProvider === 'gmail') {
+          defaultHost = 'smtp.gmail.com';
+        } else if (emailProvider === 'godaddy') {
+          defaultHost = 'smtpout.secureserver.net';
+        } else {
+          defaultHost = process.env.SMTP_HOST || '';
+        }
+        const hostToSave = smtpHost || defaultHost;
+        const portToSave = smtpPort || '587';
+        const secureToSave = smtpSecure !== undefined ? smtpSecure : false;
+        
+        if (hostToSave) {
           await req.prisma.workflowConfig.upsert({
             where: { key: 'smtp_host' },
-            update: { value: smtpHost },
-            create: { key: 'smtp_host', value: smtpHost }
+            update: { value: hostToSave },
+            create: { key: 'smtp_host', value: hostToSave }
           });
-          logger.info(`✅ SMTP Host stored: ${smtpHost}`);
+          logger.info(`✅ SMTP Host stored: ${hostToSave}`);
         }
 
-        if (smtpPort) {
-          await req.prisma.workflowConfig.upsert({
-            where: { key: 'smtp_port' },
-            update: { value: smtpPort.toString() },
-            create: { key: 'smtp_port', value: smtpPort.toString() }
-          });
-          logger.info(`✅ SMTP Port stored: ${smtpPort}`);
-        }
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'smtp_port' },
+          update: { value: portToSave.toString() },
+          create: { key: 'smtp_port', value: portToSave.toString() }
+        });
+        logger.info(`✅ SMTP Port stored: ${portToSave}`);
 
-        if (smtpSecure !== undefined) {
-          await req.prisma.workflowConfig.upsert({
-            where: { key: 'smtp_secure' },
-            update: { value: smtpSecure.toString() },
-            create: { key: 'smtp_secure', value: smtpSecure.toString() }
-          });
-          logger.info(`✅ SMTP Secure stored: ${smtpSecure}`);
-        }
+        await req.prisma.workflowConfig.upsert({
+          where: { key: 'smtp_secure' },
+          update: { value: secureToSave.toString() },
+          create: { key: 'smtp_secure', value: secureToSave.toString() }
+        });
+        logger.info(`✅ SMTP Secure stored: ${secureToSave}`);
         
         smtpUpdated = true;
         logger.info(`✅ SMTP credentials and settings stored in database for ${hrEmail} (no restart needed)`);
