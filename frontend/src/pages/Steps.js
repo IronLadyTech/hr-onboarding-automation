@@ -28,7 +28,8 @@ const Steps = () => {
     icon: '📋',
     emailTemplateId: '',
     scheduledTime: '',
-    dueDateOffset: 0
+    dueDateOffset: 0,
+    schedulingMethod: 'doj' // 'doj', 'offerLetter', or 'manual'
   });
 
   useEffect(() => {
@@ -111,13 +112,22 @@ const Steps = () => {
       icon: '📋',
       emailTemplateId: '',
       scheduledTime: '',
-      dueDateOffset: 0
+      dueDateOffset: 0,
+      schedulingMethod: 'doj' // Default to DOJ-based scheduling
     });
     setShowStepModal(true);
   };
 
   const handleEditStep = (step) => {
     setEditingStep(step);
+    // Determine scheduling method based on step type
+    let schedulingMethod = 'doj'; // Default
+    if (step.type === 'OFFER_REMINDER') {
+      schedulingMethod = 'offerLetter'; // Offer Reminder uses offer letter date
+    } else if (!step.scheduledTime && step.dueDateOffset === undefined) {
+      schedulingMethod = 'manual'; // Manual if no scheduling config
+    }
+    
     setStepForm({
       stepNumber: step.stepNumber,
       title: step.title,
@@ -126,7 +136,8 @@ const Steps = () => {
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
       scheduledTime: step.scheduledTime || '',
-      dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0
+      dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0,
+      schedulingMethod: step.schedulingMethod || schedulingMethod
     });
     setShowStepModal(true);
   };
@@ -478,42 +489,106 @@ const Steps = () => {
                 <div className="border-t pt-4 mt-4">
                   <h3 className="text-sm font-semibold text-gray-700 mb-3">⏰ Default Scheduling Configuration</h3>
                   
+                  {/* Scheduling Method Selection */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Days Offset from DOJ *
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Default Scheduling Method *
                     </label>
-                    <input
-                      type="number"
-                      value={stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : ''}
-                      onChange={(e) => setStepForm({ ...stepForm, dueDateOffset: e.target.value ? parseInt(e.target.value) : 0 })}
-                      className="input"
-                      placeholder="0"
-                    />
+                    <div className="flex space-x-4">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="schedulingMethod"
+                          value="doj"
+                          checked={stepForm.schedulingMethod === 'doj'}
+                          onChange={(e) => setStepForm({ ...stepForm, schedulingMethod: e.target.value })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Based on DOJ</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="schedulingMethod"
+                          value="offerLetter"
+                          checked={stepForm.schedulingMethod === 'offerLetter'}
+                          onChange={(e) => setStepForm({ ...stepForm, schedulingMethod: e.target.value })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Based on Offer Letter Date</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="radio"
+                          name="schedulingMethod"
+                          value="manual"
+                          checked={stepForm.schedulingMethod === 'manual'}
+                          onChange={(e) => setStepForm({ ...stepForm, schedulingMethod: e.target.value })}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">Manual (Exact Date & Time)</span>
+                      </label>
+                    </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Days from Date of Joining (DOJ). Use negative numbers for before DOJ (e.g., -1 for day before), 0 for on DOJ, positive for after DOJ.
+                      How this step should be scheduled by default. "Based on DOJ" calculates from candidate's joining date. "Based on Offer Letter Date" calculates from when Step 1 (Offer Letter) is sent/scheduled. "Manual" requires HR to set exact date/time each time.
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Default Scheduled Time (HH:mm) ⏰
-                    </label>
-                    <input
-                      type="time"
-                      value={stepForm.scheduledTime || ''}
-                      onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
-                      className="input"
-                      placeholder="14:00"
-                    />
-                    {stepForm.scheduledTime && (
-                      <p className="text-xs text-blue-600 mt-1 font-medium">
-                        ⏰ Default time: {formatTime(stepForm.scheduledTime)}
+                  {/* Show offset and time inputs for DOJ and Offer Letter methods */}
+                  {(stepForm.schedulingMethod === 'doj' || stepForm.schedulingMethod === 'offerLetter') && (
+                    <>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Days Offset {stepForm.schedulingMethod === 'doj' ? 'from DOJ' : 'from Offer Letter Date'} *
+                        </label>
+                        <input
+                          type="number"
+                          value={stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : ''}
+                          onChange={(e) => setStepForm({ ...stepForm, dueDateOffset: e.target.value ? parseInt(e.target.value) : 0 })}
+                          className="input"
+                          placeholder={stepForm.schedulingMethod === 'offerLetter' ? '1' : '0'}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {stepForm.schedulingMethod === 'doj' 
+                            ? 'Days from Date of Joining (DOJ). Use negative numbers for before DOJ (e.g., -1 for day before), 0 for on DOJ, positive for after DOJ.'
+                            : 'Days from when Offer Letter (Step 1) is sent/scheduled. Use 1 for next day, 0 for same day, etc.'}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Default Scheduled Time (HH:mm) ⏰ *
+                        </label>
+                        <input
+                          type="time"
+                          value={stepForm.scheduledTime || ''}
+                          onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
+                          className="input"
+                          placeholder={stepForm.schedulingMethod === 'offerLetter' ? '14:00' : '09:00'}
+                          required={stepForm.schedulingMethod !== 'manual'}
+                        />
+                        {stepForm.scheduledTime && (
+                          <p className="text-xs text-blue-600 mt-1 font-medium">
+                            ⏰ Default time: {formatTime(stepForm.scheduledTime)}
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-1">
+                          Default time for this step (e.g., 14:00 for 2:00 PM, 08:30 for 8:30 AM). This time will be used when scheduling calendar events automatically. 
+                          {stepForm.schedulingMethod === 'doj' && ' The date will be calculated as: DOJ + Days Offset, at this time.'}
+                          {stepForm.schedulingMethod === 'offerLetter' && ' The date will be calculated as: Offer Letter Date + Days Offset, at this time.'}
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Show message for manual mode */}
+                  {stepForm.schedulingMethod === 'manual' && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                      <p className="text-xs text-yellow-800">
+                        <strong>Manual Scheduling:</strong> This step will require HR to set the exact date and time each time it's scheduled. No default timing will be applied.
                       </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      Default time for this step (e.g., 14:00 for 2:00 PM). This time will be used when scheduling calendar events automatically based on DOJ + offset. Leave empty for manual scheduling.
-                    </p>
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Email Template Selection - REQUIRED */}
