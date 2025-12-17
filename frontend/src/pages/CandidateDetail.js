@@ -453,6 +453,14 @@ const CandidateDetail = () => {
             
             await calendarApi.create(requestData);
             toast.success('Calendar event scheduled!');
+            
+            // If this is an Offer Letter event, auto-schedule Offer Reminder
+            if (eventType === 'OFFER_LETTER') {
+              // Refresh candidate data first to get the new offer letter event
+              await fetchCandidate();
+              // Then auto-schedule the reminder
+              await autoScheduleOfferReminder();
+            }
           }
           break;
         case 'sendWhatsAppGroups':
@@ -1904,8 +1912,8 @@ const CandidateDetail = () => {
                   if (scheduleMode === 'exact') {
                     setScheduleDateTime(e.target.value);
                   }
-                  // In DOJ mode, allow manual override but switch to exact mode
-                  if (scheduleMode === 'doj') {
+                  // In DOJ or offerLetter mode, allow manual override but switch to exact mode
+                  if (scheduleMode === 'doj' || scheduleMode === 'offerLetter') {
                     setScheduleMode('exact');
                     setScheduleDateTime(e.target.value);
                   }
