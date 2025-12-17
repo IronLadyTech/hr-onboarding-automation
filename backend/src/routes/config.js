@@ -833,7 +833,24 @@ router.get('/department-steps/:department', async (req, res) => {
       orderBy: { stepNumber: 'asc' }
     });
 
-    res.json({ success: true, data: steps });
+    // Debug: Log what we're returning
+    logger.info(`Fetching steps for ${department}:`, steps.map(s => ({
+      id: s.id,
+      stepNumber: s.stepNumber,
+      title: s.title,
+      scheduledTime: s.scheduledTime,
+      schedulingMethod: s.schedulingMethod,
+      dueDateOffset: s.dueDateOffset
+    })));
+
+    // Ensure scheduledTime and schedulingMethod are always included (even if null)
+    const stepsWithDefaults = steps.map(step => ({
+      ...step,
+      scheduledTime: step.scheduledTime ?? null, // Explicitly set to null if undefined
+      schedulingMethod: step.schedulingMethod ?? 'doj' // Default to 'doj' if undefined
+    }));
+
+    res.json({ success: true, data: stepsWithDefaults });
   } catch (error) {
     logger.error('Error fetching department steps:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -843,7 +860,7 @@ router.get('/department-steps/:department', async (req, res) => {
 // Create or update step template
 router.post('/department-steps', async (req, res) => {
   try {
-    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId, scheduledTime } = req.body;
+    const { department, stepNumber, title, description, type, icon, isAuto, dueDateOffset, priority, emailTemplateId, scheduledTime, schedulingMethod } = req.body;
 
     if (!department || !stepNumber || !title || !type) {
       return res.status(400).json({ success: false, message: 'Department, stepNumber, title, and type are required' });
