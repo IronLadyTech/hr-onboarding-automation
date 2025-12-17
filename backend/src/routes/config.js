@@ -1010,13 +1010,14 @@ router.put('/department-steps/:id', async (req, res) => {
       updateData.dueDateOffset = (dueDateOffset !== null && dueDateOffset !== '' && !isNaN(dueDateOffset)) ? parseInt(dueDateOffset) : null;
     }
     
-    // Handle scheduledTime - preserve the value if provided, even if it's an empty string (convert to null)
+    // CRITICAL: Handle scheduledTime - preserve the value if provided, even if it's an empty string (convert to null)
+    // This MUST be set in updateData so it's saved to the database
     if (scheduledTime !== undefined) {
       updateData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
     }
     
     // Debug: Log what we're saving
-    logger.info(`Saving step ${id} with updateData:`, updateData);
+    logger.info(`Saving step ${id} with updateData:`, JSON.stringify(updateData, null, 2));
     
     const step = await req.prisma.departmentStepTemplate.update({
       where: { id },
@@ -1030,15 +1031,34 @@ router.put('/department-steps/:id', async (req, res) => {
     logger.info(`Step ${id} saved successfully:`, {
       scheduledTime: step.scheduledTime,
       schedulingMethod: step.schedulingMethod,
-      dueDateOffset: step.dueDateOffset
+      dueDateOffset: step.dueDateOffset,
+      updateDataScheduledTime: updateData.scheduledTime
     });
 
-    // Ensure scheduledTime is explicitly included in response (even if null)
+    // CRITICAL: Ensure scheduledTime is explicitly included in response
+    // Use the value from updateData if step.scheduledTime is undefined/null
+    // This handles cases where Prisma might not return the field properly
+    const finalScheduledTime = step.scheduledTime !== undefined && step.scheduledTime !== null 
+      ? step.scheduledTime 
+      : (updateData.scheduledTime !== undefined ? updateData.scheduledTime : null);
+    
+    const finalSchedulingMethod = step.schedulingMethod !== undefined && step.schedulingMethod !== null
+      ? step.schedulingMethod
+      : (updateData.schedulingMethod !== undefined ? updateData.schedulingMethod : 'doj');
+
+    // Build response data ensuring all fields are present
     const responseData = {
       ...step,
-      scheduledTime: step.scheduledTime ?? null, // Explicitly set to null if undefined
-      schedulingMethod: step.schedulingMethod ?? 'doj' // Default to 'doj' if undefined
+      scheduledTime: finalScheduledTime, // Always include, even if null
+      schedulingMethod: finalSchedulingMethod // Always include
     };
+
+    // Debug: Log what we're sending back
+    logger.info(`Step ${id} response data:`, {
+      scheduledTime: responseData.scheduledTime,
+      schedulingMethod: responseData.schedulingMethod,
+      dueDateOffset: responseData.dueDateOffset
+    });
 
     res.json({ success: true, data: responseData });
   } catch (error) {
