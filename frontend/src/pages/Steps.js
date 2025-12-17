@@ -160,21 +160,46 @@ const Steps = () => {
       return;
     }
     
+    // Validate: If scheduling method is not manual, scheduledTime is required
+    if (stepForm.schedulingMethod !== 'manual' && !stepForm.scheduledTime) {
+      toast.error('Please set a default scheduled time for this step');
+      return;
+    }
+    
+    // Prepare data to send - ensure scheduledTime is included even if empty
+    const dataToSend = {
+      ...stepForm,
+      department: selectedDepartment,
+      // Ensure scheduledTime is sent (even if empty string, backend will handle it)
+      scheduledTime: stepForm.scheduledTime || null,
+      // Only send dueDateOffset if scheduling method is not manual
+      dueDateOffset: stepForm.schedulingMethod === 'manual' ? null : (stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : 0)
+    };
+    
+    // Debug: Log what we're sending
+    console.log('Saving step with data:', {
+      scheduledTime: dataToSend.scheduledTime,
+      dueDateOffset: dataToSend.dueDateOffset,
+      schedulingMethod: dataToSend.schedulingMethod
+    });
+    
     try {
       setLoading(true);
+      let response;
       if (editingStep) {
-        await configApi.updateDepartmentStep(editingStep.id, {
-          ...stepForm,
-          department: selectedDepartment
-        });
+        response = await configApi.updateDepartmentStep(editingStep.id, dataToSend);
         toast.success('Step updated successfully!');
       } else {
-        await configApi.createDepartmentStep({
-          ...stepForm,
-          department: selectedDepartment
-        });
+        response = await configApi.createDepartmentStep(dataToSend);
         toast.success('Step created successfully!');
       }
+      
+      // Debug: Log what we got back
+      console.log('Step saved, response:', {
+        scheduledTime: response.data?.data?.scheduledTime,
+        dueDateOffset: response.data?.data?.dueDateOffset
+      });
+      
       setShowStepModal(false);
       setEditingStep(null);
       // Refresh the steps list to get updated values
@@ -572,8 +597,11 @@ const Steps = () => {
                         </label>
                         <input
                           type="time"
-                          value={stepForm.scheduledTime || ''}
-                          onChange={(e) => setStepForm({ ...stepForm, scheduledTime: e.target.value })}
+                          value={stepForm.scheduledTime ? stepForm.scheduledTime : ''}
+                          onChange={(e) => {
+                            console.log('Time changed to:', e.target.value);
+                            setStepForm({ ...stepForm, scheduledTime: e.target.value });
+                          }}
                           className="input"
                           placeholder={stepForm.schedulingMethod === 'offerLetter' ? '14:00' : '09:00'}
                           required={stepForm.schedulingMethod !== 'manual'}
