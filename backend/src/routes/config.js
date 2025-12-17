@@ -1975,11 +1975,35 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
     }
 
     // Update Google Refresh Token in .env file if provided
+    let tokenUpdateSuccess = false;
+    let tokenUpdateMessage = '';
     if (googleRefreshToken && googleRefreshToken.trim()) {
       try {
         const fs = require('fs');
         const path = require('path');
-        const envPath = path.join(__dirname, '../../.env');
+        
+        // Try multiple possible paths for .env file
+        const possiblePaths = [
+          path.join(process.cwd(), '.env'), // Current working directory
+          path.join(__dirname, '../../.env'), // Relative to this file
+          path.join(__dirname, '../../../.env'), // One level up
+          '.env' // Current directory
+        ];
+        
+        let envPath = null;
+        for (const testPath of possiblePaths) {
+          if (fs.existsSync(testPath)) {
+            envPath = testPath;
+            logger.info(`📝 Found .env file at: ${envPath}`);
+            break;
+          }
+        }
+        
+        if (!envPath) {
+          // Use the most likely path (current working directory)
+          envPath = path.join(process.cwd(), '.env');
+          logger.warn(`⚠️  .env file not found, will create at: ${envPath}`);
+        }
         
         logger.info(`📝 Attempting to update Google Refresh Token in .env file: ${envPath}`);
         
@@ -1989,7 +2013,7 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
           envContent = fs.readFileSync(envPath, 'utf8');
           logger.info(`📝 Read .env file (${envContent.length} characters)`);
         } else {
-          logger.warn(`⚠️  .env file not found at ${envPath}, will create new one`);
+          logger.info(`📝 .env file does not exist, will create new one`);
         }
         
         // Update or add GOOGLE_REFRESH_TOKEN
@@ -2011,14 +2035,17 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
         
         // Write back to .env file
         fs.writeFileSync(envPath, envContent, 'utf8');
-        logger.info('✅ Google Refresh Token successfully updated in .env file');
+        logger.info('✅ Google Refresh Token successfully written to .env file');
         
         // Verify the write
         const verifyContent = fs.readFileSync(envPath, 'utf8');
         if (verifyContent.includes(`GOOGLE_REFRESH_TOKEN=${trimmedToken}`)) {
           logger.info('✅ Verified: Token is present in .env file');
+          tokenUpdateSuccess = true;
+          tokenUpdateMessage = 'Google Refresh Token successfully updated in .env file';
         } else {
           logger.warn('⚠️  Warning: Token verification failed - token may not have been written correctly');
+          tokenUpdateMessage = 'Warning: Token may not have been written correctly';
         }
         
         // Reload environment variables (for current process)
@@ -2027,6 +2054,8 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
       } catch (error) {
         logger.error('❌ Error updating Google Refresh Token in .env:', error.message);
         logger.error('Full error:', error);
+        logger.error('Error stack:', error.stack);
+        tokenUpdateMessage = `Error updating .env file: ${error.message}`;
         // Don't fail the request, just log the error
       }
     } else {
@@ -2099,19 +2128,25 @@ router.post('/update-hr-email', requireAdmin, async (req, res) => {
       logger.warn('⚠️ Gmail API error:', gmailError.message);
     }
 
-    // Check if refresh token was updated
-    const tokenUpdated = googleRefreshToken && googleRefreshToken.trim() ? true : false;
+    // Build success message
+    let successMessage = `HR email updated successfully to ${hrEmail}`;
+    if (tokenUpdateSuccess) {
+      successMessage += '. Google Refresh Token updated in .env file.';
+    } else if (tokenUpdateMessage && tokenUpdateMessage.includes('Error')) {
+      successMessage += `. ${tokenUpdateMessage}`;
+    }
     
     res.json({ 
       success: true, 
-      message: `HR email updated successfully to ${hrEmail}`,
+      message: successMessage,
       data: {
         oldHrEmail,
         newHrEmail: hrEmail,
         smtpUpdated,
         gmailConfigured,
         gmailConfigMessage,
-        refreshTokenUpdated: tokenUpdated,
+        refreshTokenUpdated: tokenUpdateSuccess,
+        refreshTokenMessage: tokenUpdateMessage,
         requiresRestart: smtpUpdated
       }
     });

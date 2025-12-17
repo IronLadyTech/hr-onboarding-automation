@@ -2553,7 +2553,17 @@ const Settings = () => {
                               gmailConfigMessage: response.data.data?.gmailConfigMessage || ''
                             }));
                             setWizardStep(emailFlow === 'gmail' ? 6 : 5); // Go to Test Email step
-                            toast.success('HR email saved successfully!');
+                            
+                            // Show success message with refresh token confirmation
+                            let successMsg = 'HR email saved successfully!';
+                            if (emailFlow === 'gmail' && googleRefreshToken) {
+                              if (response.data.data?.refreshTokenUpdated) {
+                                successMsg += ' ✅ Google Refresh Token updated in .env file.';
+                              } else if (response.data.data?.refreshTokenMessage) {
+                                toast.warning(response.data.data.refreshTokenMessage);
+                              }
+                            }
+                            toast.success(successMsg);
                           }
                         } catch (error) {
                           toast.error(error.response?.data?.message || 'Failed to save HR email');
