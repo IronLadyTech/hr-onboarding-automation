@@ -128,6 +128,14 @@ const Steps = () => {
       schedulingMethod = 'manual'; // Manual if no scheduling config
     }
     
+    // Debug: Log the step data to see what we're getting
+    console.log('Editing step:', {
+      id: step.id,
+      scheduledTime: step.scheduledTime,
+      dueDateOffset: step.dueDateOffset,
+      type: step.type
+    });
+    
     setStepForm({
       stepNumber: step.stepNumber,
       title: step.title,
@@ -135,7 +143,8 @@ const Steps = () => {
       type: step.type,
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
-      scheduledTime: step.scheduledTime ? step.scheduledTime : '',
+      // CRITICAL: Use step.scheduledTime if it exists (even if it's an empty string, check for null/undefined)
+      scheduledTime: (step.scheduledTime !== null && step.scheduledTime !== undefined) ? step.scheduledTime : '',
       dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0,
       schedulingMethod: step.schedulingMethod || schedulingMethod
     });
