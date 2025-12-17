@@ -39,7 +39,7 @@ const CandidateDetail = () => {
   const [scheduleDateTime, setScheduleDateTime] = useState('');
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [editingEventId, setEditingEventId] = useState(null);
-  const [scheduleMode, setScheduleMode] = useState('exact'); // 'exact' or 'doj'
+  const [scheduleMode, setScheduleMode] = useState('exact'); // 'exact', 'doj', or 'offerLetter'
   const [scheduleAttachment, setScheduleAttachment] = useState(null);
   const [scheduleAttachments, setScheduleAttachments] = useState([]); // Multiple attachments (new files)
   const [existingAttachmentPaths, setExistingAttachmentPaths] = useState([]); // Existing attachment paths from event
@@ -1953,6 +1953,40 @@ const CandidateDetail = () => {
                       </p>
                       <p className="text-xs text-blue-600 mt-1">
                         Based on DOJ ({new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN')}) + {stepTemplate.dueDateOffset === 0 ? 'same day' : stepTemplate.dueDateOffset > 0 ? `${stepTemplate.dueDateOffset} days after` : `${Math.abs(stepTemplate.dueDateOffset)} days before`} + {stepTemplate.scheduledTime ? formatTime(stepTemplate.scheduledTime) : '9:00 AM (default)'}
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              
+              {scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && (() => {
+                const currentStep = workflowSteps.find(s => {
+                  const action = getScheduleActionName(s.stepType || 'MANUAL');
+                  return action === showScheduleModal;
+                });
+                const stepTemplate = currentStep ? departmentSteps.find(s => s.stepNumber === currentStep.step) : null;
+                if (stepTemplate) {
+                  const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                  const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                  const offerDate = new Date(offerLetterDate);
+                  const scheduledDate = new Date(offerDate);
+                  scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 1));
+                  
+                  if (stepTemplate.scheduledTime) {
+                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                    scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
+                  } else {
+                    scheduledDate.setHours(14, 0, 0, 0);
+                  }
+                  
+                  return (
+                    <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
+                      <p className="text-sm text-green-800">
+                        <strong>Calculated Time:</strong> {scheduledDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {scheduledDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      </p>
+                      <p className="text-xs text-green-600 mt-1">
+                        Based on Offer Letter Date ({new Date(offerLetterDate).toLocaleDateString('en-IN')}) + {stepTemplate.dueDateOffset === 0 ? 'same day' : stepTemplate.dueDateOffset > 0 ? `${stepTemplate.dueDateOffset} days after` : `${Math.abs(stepTemplate.dueDateOffset)} days before`} + {stepTemplate.scheduledTime ? formatTime(stepTemplate.scheduledTime) : '2:00 PM (default)'}
                       </p>
                     </div>
                   );
