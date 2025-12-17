@@ -936,6 +936,13 @@ router.put('/department-steps/:id', async (req, res) => {
     const { id } = req.params;
     const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
 
+    // Debug: Log what we're receiving
+    logger.info(`Updating step ${id} with data:`, {
+      scheduledTime: scheduledTime,
+      schedulingMethod: schedulingMethod,
+      dueDateOffset: dueDateOffset
+    });
+
     // Get existing step to check current emailTemplateId
     const existingStep = await req.prisma.departmentStepTemplate.findUnique({
       where: { id }
@@ -954,7 +961,7 @@ router.put('/department-steps/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
     }
 
-    // Prepare update data
+    // Prepare update data - ensure scheduledTime is always included if provided
     const updateData = {
       ...(title && { title }),
       ...(description !== undefined && { description }),
@@ -964,10 +971,21 @@ router.put('/department-steps/:id', async (req, res) => {
       ...(priority && { priority }),
       ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
       ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
-      ...(schedulingMethod !== undefined && { schedulingMethod }),
-      ...(dueDateOffset !== undefined && { dueDateOffset: dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null }),
-      ...(scheduledTime !== undefined && { scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null })
+      ...(schedulingMethod !== undefined && { schedulingMethod })
     };
+    
+    // Handle dueDateOffset - convert to null if empty string or undefined
+    if (dueDateOffset !== undefined) {
+      updateData.dueDateOffset = (dueDateOffset !== null && dueDateOffset !== '' && !isNaN(dueDateOffset)) ? parseInt(dueDateOffset) : null;
+    }
+    
+    // Handle scheduledTime - preserve the value if provided, even if it's an empty string (convert to null)
+    if (scheduledTime !== undefined) {
+      updateData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+    }
+    
+    // Debug: Log what we're saving
+    logger.info(`Saving step ${id} with updateData:`, updateData);
     
     const step = await req.prisma.departmentStepTemplate.update({
       where: { id },
@@ -975,6 +993,13 @@ router.put('/department-steps/:id', async (req, res) => {
       include: {
         emailTemplate: true
       }
+    });
+
+    // Debug: Log what we got back from database
+    logger.info(`Step ${id} saved successfully:`, {
+      scheduledTime: step.scheduledTime,
+      schedulingMethod: step.schedulingMethod,
+      dueDateOffset: step.dueDateOffset
     });
 
     res.json({ success: true, data: step });
