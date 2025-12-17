@@ -125,7 +125,8 @@ const Steps = () => {
       type: step.type,
       icon: step.icon || '📋',
       emailTemplateId: step.emailTemplateId || '',
-      scheduledTime: step.scheduledTime || ''
+      scheduledTime: step.scheduledTime || '',
+      dueDateOffset: step.dueDateOffset !== undefined ? step.dueDateOffset : 0
     });
     setShowStepModal(true);
   };
