@@ -2569,10 +2569,10 @@ const Settings = () => {
                 </div>
               )}
 
-              {/* Step 4/5: Test Email */}
-              {wizardStep === (emailFlow === 'gmail' ? 4 : 5) && (
+              {/* Step 5/6: Test Email */}
+              {wizardStep === (emailFlow === 'gmail' ? 6 : 5) && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '4' : '5'}: Test Email Configuration</h3>
+                  <h3 className="text-lg font-semibold">Step {emailFlow === 'gmail' ? '6' : '5'}: Test Email Configuration</h3>
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
                     <p className="text-sm text-gray-700 mb-3">
                       Send a test email to verify everything is working correctly.
