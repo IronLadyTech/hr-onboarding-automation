@@ -40,6 +40,8 @@ const CandidateDetail = () => {
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [editingEventId, setEditingEventId] = useState(null);
   const [scheduleMode, setScheduleMode] = useState('exact'); // 'exact', 'doj', or 'offerLetter'
+  const [scheduleOffsetDays, setScheduleOffsetDays] = useState(0); // Days offset for DOJ or Offer Letter Date
+  const [scheduleOffsetTime, setScheduleOffsetTime] = useState('09:00'); // Time for offset calculation
   const [scheduleAttachment, setScheduleAttachment] = useState(null);
   const [scheduleAttachments, setScheduleAttachments] = useState([]); // Multiple attachments (new files)
   const [existingAttachmentPaths, setExistingAttachmentPaths] = useState([]); // Existing attachment paths from event
@@ -1910,16 +1912,20 @@ const CandidateDetail = () => {
                       if (currentStep && offerLetterDate) {
                         const stepTemplate = departmentSteps.find(s => s.stepNumber === currentStep.step);
                         if (stepTemplate) {
+                          // Initialize offset and time from step template
+                          setScheduleOffsetDays(stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1);
+                          setScheduleOffsetTime(stepTemplate.scheduledTime || '14:00');
+                          
+                          // Calculate and update scheduleDateTime
                           const offerDate = new Date(offerLetterDate);
                           const scheduledDate = new Date(offerDate);
-                          // For Offer Reminder, it's next day (+1)
-                          scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 1));
+                          const offset = stepTemplate.dueDateOffset !== undefined ? stepTemplate.dueDateOffset : 1;
+                          scheduledDate.setDate(scheduledDate.getDate() + offset);
                           
                           if (stepTemplate.scheduledTime) {
                             const [hours, minutes] = stepTemplate.scheduledTime.split(':');
                             scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
                           } else {
-                            // Default to 2:00 PM for Offer Reminder
                             scheduledDate.setHours(14, 0, 0, 0);
                           }
                           
@@ -1941,70 +1947,124 @@ const CandidateDetail = () => {
                 </label>
               </div>
               
-              {scheduleMode === 'doj' && candidate.expectedJoiningDate && (() => {
-                const currentStep = workflowSteps.find(s => {
-                  const action = getScheduleActionName(s.stepType || 'MANUAL');
-                  return action === showScheduleModal;
-                });
-                const stepTemplate = currentStep ? departmentSteps.find(s => s.stepNumber === currentStep.step) : null;
-                if (stepTemplate) {
-                  const doj = new Date(candidate.expectedJoiningDate);
-                  const scheduledDate = new Date(doj);
-                  scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 0));
-                  
-                  if (stepTemplate.scheduledTime) {
-                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
-                    scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
-                  } else {
-                    scheduledDate.setHours(9, 0, 0, 0);
-                  }
-                  
-                  return (
-                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
-                      <p className="text-sm text-blue-800">
-                        <strong>Calculated Time:</strong> {scheduledDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {scheduledDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                      </p>
-                      <p className="text-xs text-blue-600 mt-1">
-                        Based on DOJ ({new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN')}) + {stepTemplate.dueDateOffset === 0 ? 'same day' : stepTemplate.dueDateOffset > 0 ? `${stepTemplate.dueDateOffset} days after` : `${Math.abs(stepTemplate.dueDateOffset)} days before`} + {stepTemplate.scheduledTime ? formatTime(stepTemplate.scheduledTime) : '9:00 AM (default)'}
-                      </p>
+              {scheduleMode === 'doj' && candidate.expectedJoiningDate && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
+                  <p className="text-xs text-blue-600 mb-2">
+                    <strong>Base Date:</strong> {new Date(candidate.expectedJoiningDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                      <input
+                        type="number"
+                        value={scheduleOffsetDays}
+                        onChange={(e) => {
+                          const offset = parseInt(e.target.value) || 0;
+                          setScheduleOffsetDays(offset);
+                          // Recalculate and update scheduleDateTime
+                          const doj = new Date(candidate.expectedJoiningDate);
+                          const scheduledDate = new Date(doj);
+                          scheduledDate.setDate(scheduledDate.getDate() + offset);
+                          const [hours, minutes] = scheduleOffsetTime.split(':');
+                          scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                        }}
+                        className="input text-sm"
+                        placeholder="0"
+                      />
                     </div>
-                  );
-                }
-                return null;
-              })()}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                      <input
+                        type="time"
+                        value={scheduleOffsetTime}
+                        onChange={(e) => {
+                          setScheduleOffsetTime(e.target.value);
+                          // Recalculate and update scheduleDateTime
+                          const doj = new Date(candidate.expectedJoiningDate);
+                          const scheduledDate = new Date(doj);
+                          scheduledDate.setDate(scheduledDate.getDate() + scheduleOffsetDays);
+                          const [hours, minutes] = e.target.value.split(':');
+                          scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                          const year = scheduledDate.getFullYear();
+                          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(scheduledDate.getDate()).padStart(2, '0');
+                          const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                          const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                          setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                        }}
+                        className="input text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {scheduleMode === 'offerLetter' && (candidate.offerSentAt || candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER')) && (() => {
-                const currentStep = workflowSteps.find(s => {
-                  const action = getScheduleActionName(s.stepType || 'MANUAL');
-                  return action === showScheduleModal;
-                });
-                const stepTemplate = currentStep ? departmentSteps.find(s => s.stepNumber === currentStep.step) : null;
-                if (stepTemplate) {
-                  const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
-                  const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
-                  const offerDate = new Date(offerLetterDate);
-                  const scheduledDate = new Date(offerDate);
-                  scheduledDate.setDate(scheduledDate.getDate() + (stepTemplate.dueDateOffset || 1));
-                  
-                  if (stepTemplate.scheduledTime) {
-                    const [hours, minutes] = stepTemplate.scheduledTime.split(':');
-                    scheduledDate.setHours(parseInt(hours) || 14, parseInt(minutes) || 0, 0, 0);
-                  } else {
-                    scheduledDate.setHours(14, 0, 0, 0);
-                  }
-                  
-                  return (
-                    <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
-                      <p className="text-sm text-green-800">
-                        <strong>Calculated Time:</strong> {scheduledDate.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at {scheduledDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        Based on Offer Letter Date ({new Date(offerLetterDate).toLocaleDateString('en-IN')}) + {stepTemplate.dueDateOffset === 0 ? 'same day' : stepTemplate.dueDateOffset > 0 ? `${stepTemplate.dueDateOffset} days after` : `${Math.abs(stepTemplate.dueDateOffset)} days before`} + {stepTemplate.scheduledTime ? formatTime(stepTemplate.scheduledTime) : '2:00 PM (default)'}
-                      </p>
+                const offerLetterEvent = candidate.scheduledEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                const offerLetterDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                return (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mb-3">
+                    <p className="text-xs text-green-600 mb-2">
+                      <strong>Base Date:</strong> {new Date(offerLetterDate).toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} {offerLetterEvent?.startTime ? `at ${new Date(offerLetterEvent.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}` : ''}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Days Offset *</label>
+                        <input
+                          type="number"
+                          value={scheduleOffsetDays}
+                          onChange={(e) => {
+                            const offset = parseInt(e.target.value) || 0;
+                            setScheduleOffsetDays(offset);
+                            // Recalculate and update scheduleDateTime
+                            const offerDate = new Date(offerLetterDate);
+                            const scheduledDate = new Date(offerDate);
+                            scheduledDate.setDate(scheduledDate.getDate() + offset);
+                            const [hours, minutes] = scheduleOffsetTime.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                          }}
+                          className="input text-sm"
+                          placeholder="1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Time (HH:mm) *</label>
+                        <input
+                          type="time"
+                          value={scheduleOffsetTime}
+                          onChange={(e) => {
+                            setScheduleOffsetTime(e.target.value);
+                            // Recalculate and update scheduleDateTime
+                            const offerDate = new Date(offerLetterDate);
+                            const scheduledDate = new Date(offerDate);
+                            scheduledDate.setDate(scheduledDate.getDate() + scheduleOffsetDays);
+                            const [hours, minutes] = e.target.value.split(':');
+                            scheduledDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                            const year = scheduledDate.getFullYear();
+                            const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+                            const day = String(scheduledDate.getDate()).padStart(2, '0');
+                            const hour = String(scheduledDate.getHours()).padStart(2, '0');
+                            const minute = String(scheduledDate.getMinutes()).padStart(2, '0');
+                            setScheduleDateTime(`${year}-${month}-${day}T${hour}:${minute}`);
+                          }}
+                          className="input text-sm"
+                        />
+                      </div>
                     </div>
-                  );
-                }
-                return null;
+                  </div>
+                );
               })()}
               
               <label className="block text-sm font-medium text-gray-700 mb-1">Date & Time *</label>
