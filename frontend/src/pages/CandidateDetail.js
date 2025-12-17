@@ -1643,6 +1643,7 @@ const CandidateDetail = () => {
                           >
                             📅
                           </button>
+                          )}
                           {/* Show "Send" button for all steps (disabled if previous step not completed) */}
                           {!step.actions && (
                             <button
