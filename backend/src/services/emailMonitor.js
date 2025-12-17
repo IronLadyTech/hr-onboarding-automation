@@ -39,11 +39,17 @@ let imapEmail = null;
 const initEmailMonitor = async (prismaClient) => {
   prisma = prismaClient;
   
+  logger.info('📧 ========================================');
+  logger.info('📧 INITIALIZING EMAIL MONITOR');
+  logger.info('📧 ========================================');
+  
   // Try IMAP first (for GoDaddy/professional emails), then fallback to Gmail API
+  logger.info('📧 Step 1: Attempting IMAP initialization...');
   const imapConfigured = await initImapMonitor();
   
   if (!imapConfigured) {
     // Fallback to Gmail API if IMAP not configured
+    logger.info('📧 Step 2: IMAP not configured, attempting Gmail API initialization...');
     try {
       // Initialize Gmail API with OAuth2
       const oauth2Client = new google.auth.OAuth2(
@@ -83,18 +89,39 @@ const initEmailMonitor = async (prismaClient) => {
       logger.info('📧 Monitoring candidates with offerSentAt but no offerSignedAt');
     } catch (error) {
       logger.error('❌ Gmail API initialization failed:', error.message);
+      if (error.message.includes('invalid_grant')) {
+        logger.error('   ⚠️  Your GOOGLE_REFRESH_TOKEN is expired or invalid!');
+        logger.error('   📝 See FIX_EXPIRED_GMAIL_TOKEN.md or GET_GOOGLE_CREDENTIALS.md for instructions');
+      }
       logger.error('Full error:', error);
-      logger.warn('📧 Email monitoring DISABLED. Automatic detection will NOT work.');
+      logger.warn('📧 ========================================');
+      logger.warn('📧 ⚠️  EMAIL MONITORING DISABLED ⚠️');
+      logger.warn('📧 Automatic detection will NOT work!');
+      logger.warn('📧 ========================================');
       logger.info('📧 To enable automatic email detection:');
-      logger.info('   Option 1 - IMAP (for GoDaddy/professional emails):');
-      logger.info('     Configure IMAP settings in Settings → HR Email Configuration');
+      logger.info('');
+      logger.info('   Option 1 - IMAP (Recommended - Works with Gmail & GoDaddy):');
+      logger.info('     1. Install IMAP packages: cd backend && npm install imap mailparser');
+      logger.info('     2. Go to Settings → HR Email Configuration → Quick Setup Wizard');
+      logger.info('     3. Select "GoDaddy / Other Professional Email Flow" (works for Gmail too)');
+      logger.info('     4. Configure SMTP (Step 2)');
+      logger.info('     5. Enable IMAP and configure (Step 3):');
+      logger.info('        - For Gmail: imap.gmail.com:993');
+      logger.info('        - Use same App Password as SMTP');
+      logger.info('     6. Save and restart backend: pm2 restart hr-onboarding-backend');
+      logger.info('');
       logger.info('   Option 2 - Gmail API:');
-      logger.info('     1. Go to Google Cloud Console');
-      logger.info('     2. Enable Gmail API');
-      logger.info('     3. Create OAuth 2.0 credentials');
-      logger.info('     4. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN to .env');
+      logger.info('     1. Generate new refresh token (see FIX_EXPIRED_GMAIL_TOKEN.md)');
+      logger.info('     2. Update GOOGLE_REFRESH_TOKEN in .env file');
+      logger.info('     3. Restart backend: pm2 restart hr-onboarding-backend');
+      logger.info('');
+      logger.warn('📧 ========================================');
       gmail = null; // Ensure gmail is null if initialization failed
     }
+  } else {
+    logger.info('📧 ========================================');
+    logger.info('📧 ✅ EMAIL MONITORING ACTIVE (IMAP)');
+    logger.info('📧 ========================================');
   }
 };
 
