@@ -879,7 +879,7 @@ router.post('/department-steps', async (req, res) => {
           scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
-          scheduledTime: scheduledTime || null
+          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null
         },
         include: {
           emailTemplate: true
@@ -915,7 +915,7 @@ router.post('/department-steps', async (req, res) => {
           scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null,
           priority: priority || 'MEDIUM',
           emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null,
-          scheduledTime: scheduledTime || null
+          scheduledTime: scheduledTime && scheduledTime.trim() !== '' ? scheduledTime.trim() : null
         },
         include: {
           emailTemplate: true
