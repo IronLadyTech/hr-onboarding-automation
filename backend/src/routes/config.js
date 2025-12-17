@@ -984,15 +984,21 @@ router.put('/department-steps/:id', async (req, res) => {
     }
 
     // Validate: Email template is required
-    // If emailTemplateId is provided in the update, it must not be empty
+    // If emailTemplateId is provided in the update, validate it
     // If not provided, we keep the existing one (so we don't require it in every update)
-    const finalEmailTemplateId = emailTemplateId !== undefined ? emailTemplateId : existingStep.emailTemplateId;
-    
-    if (!finalEmailTemplateId) {
-      return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
+    if (emailTemplateId !== undefined) {
+      // If emailTemplateId is being updated, validate it's not empty
+      if (!emailTemplateId || emailTemplateId.trim() === '') {
+        return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
+      }
+    } else {
+      // If not provided, ensure existing step has one
+      if (!existingStep.emailTemplateId) {
+        return res.status(400).json({ success: false, message: 'Email template is required for every step. Please select an email template.' });
+      }
     }
 
-    // Prepare update data - ensure scheduledTime is always included if provided
+    // Prepare update data - only include fields that are being updated
     const updateData = {
       ...(title && { title }),
       ...(description !== undefined && { description }),
@@ -1001,7 +1007,8 @@ router.put('/department-steps/:id', async (req, res) => {
       ...(isAuto !== undefined && { isAuto }),
       ...(priority && { priority }),
       ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
-      ...(emailTemplateId !== undefined && { emailTemplateId: finalEmailTemplateId }),
+      // Only include emailTemplateId if it's being explicitly updated
+      ...(emailTemplateId !== undefined && emailTemplateId && emailTemplateId.trim() !== '' && { emailTemplateId: emailTemplateId.trim() }),
       ...(schedulingMethod !== undefined && { schedulingMethod })
     };
     
