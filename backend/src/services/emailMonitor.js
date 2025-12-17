@@ -2,8 +2,17 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
-const Imap = require('imap');
-const { simpleParser } = require('mailparser');
+
+// Conditionally require IMAP packages (only if available)
+let Imap = null;
+let simpleParser = null;
+try {
+  Imap = require('imap');
+  simpleParser = require('mailparser').simpleParser;
+} catch (error) {
+  logger.warn('IMAP packages not installed. IMAP email monitoring will be disabled.');
+  logger.warn('To enable IMAP support, run: npm install imap mailparser');
+}
 
 // Helper to convert absolute file path to relative path for storage
 const getRelativeFilePath = (filePath) => {
@@ -164,6 +173,11 @@ const checkForRepliesImap = async () => {
     return;
   }
   
+  if (!Imap || !simpleParser) {
+    logger.debug('📧 IMAP packages not available, skipping email check');
+    return;
+  }
+  
   if (!imapClient || !useImap) {
     logger.debug('📧 IMAP not initialized, skipping email check');
     return;
@@ -280,6 +294,11 @@ const checkForRepliesImap = async () => {
 };
 
 const processMessageImap = async (emailData, candidate) => {
+  if (!simpleParser) {
+    logger.warn('📧 mailparser not available, cannot process IMAP email');
+    return;
+  }
+  
   try {
     // Parse email using mailparser
     const parsed = await simpleParser(emailData.raw);
