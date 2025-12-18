@@ -1086,7 +1086,20 @@ router.post('/department-steps', async (req, res) => {
       // After successfully creating a new step, check if it's an auto-scheduled step
       // If so, create calendar events for existing candidates who don't have one yet
       // This ensures newly added steps work the same as existing steps
-      if (step.isAuto && step.schedulingMethod !== 'manual' && (step.scheduledTimeDoj || step.scheduledTimeOfferLetter)) {
+      // CRITICAL: Use finalIsAuto (the value we calculated and saved) instead of step.isAuto
+      // because step.isAuto might not be properly returned from Prisma
+      // Also use the values from createData to ensure we have the correct values
+      const shouldAutoSchedule = finalIsAuto && 
+                                 step.schedulingMethod !== 'manual' && 
+                                 (createData.dueDateOffset !== null && createData.dueDateOffset !== undefined) &&
+                                 (createData.scheduledTimeDoj || createData.scheduledTimeOfferLetter);
+      
+      logger.info(`🔍 Checking if new step ${step.stepNumber} should auto-schedule:`);
+      logger.info(`   finalIsAuto=${finalIsAuto}, schedulingMethod=${step.schedulingMethod}, dueDateOffset=${createData.dueDateOffset}`);
+      logger.info(`   scheduledTimeDoj=${createData.scheduledTimeDoj}, scheduledTimeOfferLetter=${createData.scheduledTimeOfferLetter}`);
+      logger.info(`   shouldAutoSchedule=${shouldAutoSchedule}`);
+      
+      if (shouldAutoSchedule) {
         try {
           logger.info(`🔄 New step ${step.stepNumber} is auto-scheduled. Checking for existing candidates to create calendar events...`);
 
