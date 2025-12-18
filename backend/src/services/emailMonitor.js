@@ -290,12 +290,23 @@ const checkForRepliesImap = async () => {
     logger.info(`📧 [IMAP AUTO-CHECK] Checking emails for ${candidates.length} candidate(s)`);
 
     // Open inbox
-    await new Promise((resolve, reject) => {
-      imapClient.openBox('INBOX', false, (err, box) => {
-        if (err) reject(err);
-        else resolve(box);
+    try {
+      await new Promise((resolve, reject) => {
+        imapClient.openBox('INBOX', false, (err, box) => {
+          if (err) {
+            logger.error(`❌ IMAP openBox error:`, err);
+            reject(err);
+          } else {
+            logger.debug(`✅ IMAP inbox opened successfully`);
+            resolve(box);
+          }
+        });
       });
-    });
+    } catch (openError) {
+      logger.error(`❌ Failed to open IMAP inbox:`, openError.message);
+      logger.error(`❌ Full error:`, openError);
+      throw openError; // Re-throw to be caught by outer catch
+    }
 
     let totalProcessed = 0;
     for (const candidate of candidates) {
@@ -324,7 +335,12 @@ const checkForRepliesImap = async () => {
           logger.info(`   No unread emails found, checking recent read emails (last 60 days)...`);
           const sixtyDaysAgo = new Date();
           sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-          const dateStr = sixtyDaysAgo.toISOString().split('T')[0].replace(/-/g, '-');
+          // IMAP date format: DD-MMM-YYYY (e.g., "18-Dec-2024")
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const day = String(sixtyDaysAgo.getDate()).padStart(2, '0');
+          const month = months[sixtyDaysAgo.getMonth()];
+          const year = sixtyDaysAgo.getFullYear();
+          const dateStr = `${day}-${month}-${year}`;
           
           searchCriteria = [
             ['SINCE', dateStr],
@@ -396,6 +412,8 @@ const checkForRepliesImap = async () => {
     }
   } catch (error) {
     logger.error('❌ Error in checkForRepliesImap:', error.message);
+    logger.error('❌ Full error details:', error);
+    logger.error('❌ Error stack:', error.stack);
   } finally {
     isProcessing = false;
   }

@@ -864,6 +864,7 @@ const autoCompleteCalendarSteps = async () => {
 
     // Map event types to step numbers (for backward compatibility with hardcoded steps)
     const eventTypeToStep = {
+      'OFFER_LETTER': 1,
       'HR_INDUCTION': 4,
       'CEO_INDUCTION': 8,
       'SALES_INDUCTION': 9,
