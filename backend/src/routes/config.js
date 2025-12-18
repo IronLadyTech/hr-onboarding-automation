@@ -1347,7 +1347,6 @@ router.put('/department-steps/:id', async (req, res) => {
       finalScheduledTimeDoj,
       finalScheduledTimeOfferLetter
     );
-        logger.info(`🔄 Auto-creating calendar events for step ${step.stepNumber} (${step.type}) in department ${step.department}...`);
         
         // Get all candidates in this department who don't already have this step scheduled
         const candidates = await req.prisma.candidate.findMany({
