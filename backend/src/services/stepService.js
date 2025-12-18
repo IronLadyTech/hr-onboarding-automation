@@ -1,4 +1,5 @@
 const emailService = require('./emailService');
+const calendarService = require('./calendarService');
 const logger = require('../utils/logger');
 
 /**
@@ -425,11 +426,167 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null, desc
       }
     }
 
+    // If Step 1 (OFFER_LETTER) was just completed, schedule all offerLetter-based steps
+    if (stepNumber === 1 && stepConfig.field === 'offerSentAt' && updated.offerSentAt) {
+      try {
+        logger.info(`🔄 Step 1 completed - scheduling offerLetter-based steps for ${candidate.email}...`);
+        await scheduleOfferLetterBasedSteps(prisma, updated);
+      } catch (scheduleError) {
+        logger.error(`❌ Error scheduling offerLetter-based steps after Step 1 completion:`, scheduleError.message);
+        // Don't fail the step completion - just log the error
+      }
+    }
+
     logger.info(`✅ Step ${stepNumber} completed successfully for ${candidate.email}`);
     return updated;
   } catch (error) {
     logger.error(`❌ Error completing step ${stepNumber} for candidate ${candidateId}:`, error);
     throw error;
+  }
+};
+
+// Helper to schedule all offerLetter-based steps when Step 1 is completed
+const scheduleOfferLetterBasedSteps = async (prisma, candidate) => {
+  try {
+    const department = candidate.department;
+    const offerSentAt = candidate.offerSentAt;
+    
+    if (!offerSentAt) {
+      logger.warn(`⚠️ Cannot schedule offerLetter-based steps: offerSentAt is not set for ${candidate.email}`);
+      return;
+    }
+
+    // Get all auto-scheduled step templates that are based on offer letter
+    const stepTemplates = await prisma.departmentStepTemplate.findMany({
+      where: {
+        department,
+        isActive: true,
+        isAuto: true,
+        schedulingMethod: 'offerLetter',
+        stepNumber: { not: 1 } // Skip Step 1 itself
+      },
+      orderBy: { stepNumber: 'asc' }
+    });
+
+    if (stepTemplates.length === 0) {
+      logger.info(`ℹ️ No offerLetter-based steps found for ${candidate.email} in ${department} department`);
+      return;
+    }
+
+    logger.info(`🔄 Scheduling ${stepTemplates.length} offerLetter-based step(s) for ${candidate.email}...`);
+
+    let eventsCreated = 0;
+    let eventsSkipped = 0;
+
+    for (const step of stepTemplates) {
+      try {
+        // Check if event already exists for this step
+        const existingEvent = await prisma.calendarEvent.findFirst({
+          where: {
+            candidateId: candidate.id,
+            stepNumber: step.stepNumber,
+            status: { not: 'COMPLETED' }
+          }
+        });
+
+        if (existingEvent) {
+          logger.debug(`⏭️ Skipping step ${step.stepNumber} for ${candidate.email}: Event already exists`);
+          eventsSkipped++;
+          continue;
+        }
+
+        const scheduledTimeStr = step.scheduledTimeOfferLetter || '14:00';
+        const base = new Date(offerSentAt);
+        const scheduledDate = new Date(base);
+        scheduledDate.setDate(scheduledDate.getDate() + (step.dueDateOffset || 0));
+
+        // Extract date components
+        const year = scheduledDate.getFullYear();
+        const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+        const day = String(scheduledDate.getDate()).padStart(2, '0');
+        
+        // Get time from scheduledTimeStr (HH:mm format, e.g., "12:03")
+        const [hours, minutes] = scheduledTimeStr.split(':');
+        const hour = parseInt(hours) || 14;
+        const minute = parseInt(minutes) || 0;
+
+        // Create date string treating the time as IST (Asia/Kolkata, UTC+5:30)
+        const istDateString = `${year}-${month}-${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+05:30`;
+        const scheduledDateIST = new Date(istDateString);
+
+        if (isNaN(scheduledDateIST.getTime())) {
+          logger.error(`❌ Invalid date created for candidate ${candidate.email}: ${istDateString}`);
+          eventsSkipped++;
+          continue;
+        }
+
+        // Calculate end time
+        const durationMap = { 
+          'OFFER_LETTER': 30, 
+          'OFFER_REMINDER': 15, 
+          'WELCOME_EMAIL': 30, 
+          'HR_INDUCTION': 60, 
+          'WHATSAPP_ADDITION': 15, 
+          'ONBOARDING_FORM': 30, 
+          'FORM_REMINDER': 15, 
+          'CEO_INDUCTION': 60, 
+          'SALES_INDUCTION': 90, 
+          'DEPARTMENT_INDUCTION': 90,
+          'TRAINING_PLAN': 30, 
+          'CHECKIN_CALL': 30 
+        };
+        const eventDuration = durationMap[step.type] || 15;
+        const endTime = new Date(scheduledDateIST);
+        endTime.setMinutes(endTime.getMinutes() + eventDuration);
+
+        // Create calendar event
+        const eventData = {
+          title: `${step.title} - ${candidate.firstName} ${candidate.lastName}`,
+          description: step.description || '',
+          startTime: scheduledDateIST,
+          endTime: endTime,
+          attendees: [candidate.email],
+          createMeet: false
+        };
+
+        // Try to create Google Calendar event (optional)
+        let googleEvent = null;
+        try {
+          googleEvent = await calendarService.createGoogleEvent(eventData, prisma);
+        } catch (gcalError) {
+          logger.warn(`⚠️ Google Calendar event creation failed for ${candidate.email}, continuing with local event:`, gcalError.message);
+        }
+
+        // Create calendar event in database
+        await prisma.calendarEvent.create({
+          data: {
+            candidateId: candidate.id,
+            type: step.type,
+            title: eventData.title,
+            description: eventData.description,
+            startTime: scheduledDateIST,
+            endTime: endTime,
+            attendees: eventData.attendees,
+            meetingLink: googleEvent?.hangoutLink || googleEvent?.htmlLink || null,
+            googleEventId: googleEvent?.id || null,
+            stepNumber: step.stepNumber,
+            status: 'SCHEDULED'
+          }
+        });
+
+        eventsCreated++;
+        logger.info(`✅ Scheduled offerLetter-based step ${step.stepNumber} for ${candidate.email}: ${scheduledDateIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (IST)`);
+
+      } catch (stepError) {
+        logger.error(`❌ Error scheduling offerLetter-based step ${step.stepNumber} for candidate ${candidate.email}:`, stepError.message);
+        eventsSkipped++;
+      }
+    }
+
+    logger.info(`✅ OfferLetter-based scheduling complete for ${candidate.email}: ${eventsCreated} event(s) created, ${eventsSkipped} skipped`);
+  } catch (error) {
+    logger.error(`❌ Error in scheduleOfferLetterBasedSteps for ${candidate.email}:`, error.message);
+    // Don't throw - allow step completion to succeed even if scheduling fails
   }
 };
 
