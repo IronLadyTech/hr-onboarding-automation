@@ -323,8 +323,13 @@ const checkForRepliesImap = async () => {
 
         let results = await new Promise((resolve, reject) => {
           imapClient.search(searchCriteria, (err, results) => {
-            if (err) reject(err);
-            else resolve(results || []);
+            if (err) {
+              logger.error(`❌ IMAP search error (UNSEEN) for ${candidate.email}:`, err.message);
+              logger.error(`❌ Search criteria:`, JSON.stringify(searchCriteria));
+              reject(err);
+            } else {
+              resolve(results || []);
+            }
           });
         });
 
@@ -349,8 +354,13 @@ const checkForRepliesImap = async () => {
           
           results = await new Promise((resolve, reject) => {
             imapClient.search(searchCriteria, (err, results) => {
-              if (err) reject(err);
-              else resolve(results || []);
+              if (err) {
+                logger.error(`❌ IMAP search error (SINCE) for ${candidate.email}:`, err.message);
+                logger.error(`❌ Search criteria:`, JSON.stringify(searchCriteria));
+                reject(err);
+              } else {
+                resolve(results || []);
+              }
             });
           });
           
