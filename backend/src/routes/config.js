@@ -14,14 +14,24 @@ const logger = require('../utils/logger');
 // ============================================================
 const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalSchedulingMethod, finalDueDateOffset, finalScheduledTimeDoj, finalScheduledTimeOfferLetter) => {
   try {
+    // CRITICAL: Check if step is active - EXACT SAME CONDITION as autoScheduleStepsForNewCandidate
+    if (!step.isActive) {
+      logger.debug(`⏭️ Step ${step.stepNumber} is not active, skipping auto-scheduling`);
+      return;
+    }
+    
     // Check if step should auto-schedule - EXACT SAME CONDITIONS as autoScheduleStepsForNewCandidate
+    // IMPORTANT: finalIsAuto must be true, schedulingMethod must not be 'manual', 
+    // dueDateOffset must be set, and at least one scheduled time must be set
     const shouldAutoSchedule = finalIsAuto && 
                                 finalSchedulingMethod !== 'manual' && 
                                 (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
                                 (finalScheduledTimeDoj || finalScheduledTimeOfferLetter);
     
     if (!shouldAutoSchedule) {
-      logger.debug(`⏭️ Step ${step.stepNumber} should not auto-schedule: isAuto=${finalIsAuto}, method=${finalSchedulingMethod}, offset=${finalDueDateOffset}, times=${finalScheduledTimeDoj || finalScheduledTimeOfferLetter || 'none'}`);
+      logger.info(`⏭️ Step ${step.stepNumber} (${step.title}) should not auto-schedule:`);
+      logger.info(`   isAuto=${finalIsAuto}, method=${finalSchedulingMethod}, offset=${finalDueDateOffset}`);
+      logger.info(`   timeDoj=${finalScheduledTimeDoj || 'none'}, timeOfferLetter=${finalScheduledTimeOfferLetter || 'none'}`);
       return;
     }
     
