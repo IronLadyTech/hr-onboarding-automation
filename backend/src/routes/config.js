@@ -1387,25 +1387,44 @@ router.put('/department-steps/:id', async (req, res) => {
                 continue;
               }
 
-              // Calculate scheduled date
+              // Calculate scheduled date - CRITICAL: Handle timezone correctly (IST = UTC+5:30)
+              // Same logic as calendar route and candidate profile scheduling
               const base = new Date(baseDate);
               const scheduledDate = new Date(base);
               scheduledDate.setDate(scheduledDate.getDate() + (finalDueDateOffset || 0));
 
-              // Set time from scheduledTime
+              // Extract date components
+              const year = scheduledDate.getFullYear();
+              const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+              const day = String(scheduledDate.getDate()).padStart(2, '0');
+              
+              // Get time from scheduledTime (HH:mm format, e.g., "12:03")
               const [hours, minutes] = scheduledTime.split(':');
-              scheduledDate.setHours(parseInt(hours) || 9, parseInt(minutes) || 0, 0, 0);
+              const hour = parseInt(hours) || 9;
+              const minute = parseInt(minutes) || 0;
+
+              // Create date string treating the time as IST (Asia/Kolkata, UTC+5:30)
+              // Format: "YYYY-MM-DDTHH:mm:00+05:30" for IST
+              const istDateString = `${year}-${month}-${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+05:30`;
+              const scheduledDateIST = new Date(istDateString);
+
+              // Verify the date is valid
+              if (isNaN(scheduledDateIST.getTime())) {
+                logger.error(`❌ Invalid date created for candidate ${candidate.email}: ${istDateString}`);
+                eventsSkipped++;
+                continue;
+              }
 
               // Calculate end time (default 15 minutes, longer for inductions)
               const duration = ['HR_INDUCTION', 'CEO_INDUCTION', 'SALES_INDUCTION', 'DEPARTMENT_INDUCTION'].includes(step.type) ? 60 : 15;
-              const endTime = new Date(scheduledDate);
+              const endTime = new Date(scheduledDateIST);
               endTime.setMinutes(endTime.getMinutes() + duration);
 
               // Create calendar event (same as candidate profile scheduling)
               const eventData = {
                 title: `${step.title} - ${candidate.firstName} ${candidate.lastName}`,
                 description: step.description || '',
-                startTime: scheduledDate,
+                startTime: scheduledDateIST, // Use IST-converted date
                 endTime: endTime,
                 attendees: [candidate.email],
                 createMeet: false // Don't create Google Meet for auto-scheduled events
@@ -1426,7 +1445,7 @@ router.put('/department-steps/:id', async (req, res) => {
                   type: step.type,
                   title: eventData.title,
                   description: eventData.description,
-                  startTime: scheduledDate,
+                  startTime: scheduledDateIST, // Use IST-converted date
                   endTime: endTime,
                   attendees: [candidate.email],
                   meetingLink: googleEvent?.hangoutLink || googleEvent?.htmlLink || null,
@@ -1437,7 +1456,7 @@ router.put('/department-steps/:id', async (req, res) => {
               });
 
               eventsCreated++;
-              logger.info(`✅ Created calendar event for ${candidate.email}: Step ${step.stepNumber} scheduled for ${scheduledDate.toLocaleString('en-IN')}`);
+              logger.info(`✅ Created calendar event for ${candidate.email}: Step ${step.stepNumber} scheduled for ${scheduledDateIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (IST)`);
 
             } catch (candidateError) {
               logger.error(`❌ Error creating calendar event for candidate ${candidate.email}:`, candidateError.message);
