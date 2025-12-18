@@ -1084,13 +1084,23 @@ router.put('/department-steps/:id', async (req, res) => {
       (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
       (finalScheduledTimeDoj || finalScheduledTimeOfferLetter || finalScheduledTime);
     
+    // Ensure isAuto is always a boolean
+    let finalIsAuto;
+    if (isAuto !== undefined) {
+      // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
+      finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+    } else {
+      // Auto-detect from scheduling config
+      finalIsAuto = hasSchedulingConfig;
+    }
+    
     // Prepare update data - only include fields that are being updated
     const updateData = {
       ...(title && { title }),
       ...(description !== undefined && { description }),
       ...(type && { type }),
       ...(icon !== undefined && { icon }),
-      ...(isAuto !== undefined ? { isAuto } : { isAuto: hasSchedulingConfig }), // Use provided isAuto, or auto-detect from scheduling config
+      isAuto: finalIsAuto, // Always include isAuto as boolean
       ...(priority && { priority }),
       ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
       // Only include emailTemplateId if it's being explicitly updated
