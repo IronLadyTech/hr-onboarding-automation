@@ -1875,7 +1875,18 @@ const CandidateDetail = () => {
                               ⏰ Schedule
                             </button>
                           ) : (
-                            /* For manual steps, show calendar icon */
+                            /* For manual steps, show calendar icon or Send button for Step 1 */
+                            step.step === 1 ? (
+                              /* Step 1: Show Send button (instant send without scheduling) */
+                              <button
+                                onClick={() => handleSendClick(step.step)}
+                                className="btn btn-primary text-sm"
+                                disabled={actionLoading === `completeStep${step.step}`}
+                                title="Send offer letter immediately"
+                              >
+                                {actionLoading === `completeStep${step.step}` ? 'Sending...' : 'Send'}
+                              </button>
+                            ) : (
                           <button
                             onClick={() => {
                               const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
