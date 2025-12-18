@@ -1072,13 +1072,25 @@ router.put('/department-steps/:id', async (req, res) => {
       }
     }
 
+    // Determine final values for scheduling config (use provided or existing)
+    const finalSchedulingMethod = schedulingMethod !== undefined ? schedulingMethod : existingStep.schedulingMethod;
+    const finalDueDateOffset = dueDateOffset !== undefined ? (dueDateOffset !== null && dueDateOffset !== '' && !isNaN(dueDateOffset) ? parseInt(dueDateOffset) : null) : existingStep.dueDateOffset;
+    const finalScheduledTimeDoj = scheduledTimeDoj !== undefined ? ((scheduledTimeDoj && scheduledTimeDoj.trim() !== '') ? scheduledTimeDoj.trim() : null) : existingStep.scheduledTimeDoj;
+    const finalScheduledTimeOfferLetter = scheduledTimeOfferLetter !== undefined ? ((scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ? scheduledTimeOfferLetter.trim() : null) : existingStep.scheduledTimeOfferLetter;
+    const finalScheduledTime = scheduledTime !== undefined ? ((scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null) : existingStep.scheduledTime;
+    
+    // Automatically determine isAuto: true if step has scheduling configuration (not manual)
+    const hasSchedulingConfig = finalSchedulingMethod !== 'manual' && 
+      (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
+      (finalScheduledTimeDoj || finalScheduledTimeOfferLetter || finalScheduledTime);
+    
     // Prepare update data - only include fields that are being updated
     const updateData = {
       ...(title && { title }),
       ...(description !== undefined && { description }),
       ...(type && { type }),
       ...(icon !== undefined && { icon }),
-      ...(isAuto !== undefined && { isAuto }),
+      ...(isAuto !== undefined ? { isAuto } : { isAuto: hasSchedulingConfig }), // Use provided isAuto, or auto-detect from scheduling config
       ...(priority && { priority }),
       ...(stepNumber !== undefined && { stepNumber: parseInt(stepNumber) }),
       // Only include emailTemplateId if it's being explicitly updated
