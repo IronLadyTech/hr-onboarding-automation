@@ -14,7 +14,14 @@ const logger = require('../utils/logger');
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
-    const folder = file.fieldname === 'signedOffer' ? 'signed-offers' : 'offer-letters';
+    // Determine folder based on fieldname
+    let folder = 'offer-letters'; // default
+    if (file.fieldname === 'signedOffer') {
+      folder = 'signed-offers';
+    } else if (file.fieldname === 'attachment') {
+      // For step attachments, use calendar-attachments folder
+      folder = 'calendar-attachments';
+    }
     const dir = path.join(__dirname, `../../uploads/${folder}`);
     // Create directory if it doesn't exist
     await fs.mkdir(dir, { recursive: true }).catch(() => {});
