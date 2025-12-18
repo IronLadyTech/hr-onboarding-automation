@@ -357,6 +357,22 @@ router.post('/', (req, res, next) => {
       }
     }
 
+    // CRITICAL: Map step type to valid event type (same as auto-scheduling logic)
+    // MANUAL -> CUSTOM, WHATSAPP_ADDITION -> WHATSAPP_TASK
+    // This ensures frontend can find events (frontend maps MANUAL -> CUSTOM when searching)
+    let eventType = type;
+    if (eventType === 'MANUAL') {
+      eventType = 'CUSTOM';
+    } else if (eventType === 'WHATSAPP_ADDITION') {
+      eventType = 'WHATSAPP_TASK';
+    } else if (!['OFFER_LETTER', 'OFFER_REMINDER', 'WELCOME_EMAIL', 'HR_INDUCTION', 
+                 'WHATSAPP_TASK', 'ONBOARDING_FORM', 'FORM_REMINDER', 'CEO_INDUCTION', 
+                 'SALES_INDUCTION', 'DEPARTMENT_INDUCTION', 'TRAINING_PLAN', 
+                 'CHECKIN_CALL', 'TRAINING', 'CUSTOM'].includes(eventType)) {
+      // If type is not in enum, use CUSTOM
+      eventType = 'CUSTOM';
+    }
+
     // If this is Step 1 (OFFER_LETTER) with attachment, also save it to candidate.offerLetterPath
     // This ensures the offer letter shows in the candidate profile section
     if (type === 'OFFER_LETTER' && attachmentPath) {
@@ -388,11 +404,11 @@ router.post('/', (req, res, next) => {
       });
       logger.info(`📅 Calendar event updated: ${event.id} with ${attachmentPaths.length} attachment(s)`);
     } else {
-      // Create new event
+      // Create new event - use mapped eventType (MANUAL -> CUSTOM, etc.)
       event = await req.prisma.calendarEvent.create({
         data: {
           candidateId,
-          type,
+          type: eventType, // Use mapped type (MANUAL -> CUSTOM, etc.) so frontend can find it
           title,
           description,
           startTime: new Date(startTime),
@@ -407,7 +423,7 @@ router.post('/', (req, res, next) => {
           status: 'SCHEDULED'
         }
       });
-      logger.info(`📅 Calendar event created: ${event.id} with ${attachmentPaths.length} attachment(s)`);
+      logger.info(`📅 Calendar event created: ${event.id} with type=${eventType} (mapped from ${type}), stepNumber=${stepNumber}, ${attachmentPaths.length} attachment(s)`);
     }
 
     // Email will be sent automatically when the calendar event auto-completes at the scheduled time
