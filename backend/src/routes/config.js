@@ -1095,7 +1095,23 @@ router.post('/department-steps', async (req, res) => {
 router.put('/department-steps/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, type, icon, isAuto, dueDateOffset, scheduledTime, scheduledTimeDoj, scheduledTimeOfferLetter, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
+    // Extract all fields from req.body, but explicitly handle isAuto separately
+    const { title, description, type, icon, dueDateOffset, scheduledTime, scheduledTimeDoj, scheduledTimeOfferLetter, priority, stepNumber, emailTemplateId, schedulingMethod } = req.body;
+    
+    // CRITICAL: Extract isAuto separately and validate it immediately
+    // If isAuto is present but is not a valid boolean (e.g., it's a time string), ignore it completely
+    let isAuto = req.body.isAuto;
+    if (isAuto !== undefined && isAuto !== null) {
+      const isValidBoolean = typeof isAuto === 'boolean' || 
+                             isAuto === 'true' || isAuto === 'false' || 
+                             isAuto === 1 || isAuto === 0 || 
+                             isAuto === '1' || isAuto === '0';
+      if (!isValidBoolean) {
+        // If isAuto is not a valid boolean, set it to undefined so it will be auto-detected
+        logger.warn(`⚠️ Ignoring invalid isAuto value from request: "${isAuto}" (type: ${typeof isAuto}). Will auto-detect from scheduling config.`);
+        isAuto = undefined;
+      }
+    }
 
     // Debug: Log what we're receiving
     logger.info(`Updating step ${id} with data:`, {
@@ -1146,6 +1162,10 @@ router.put('/department-steps/:id', async (req, res) => {
     // CRITICAL: If isAuto is provided but is not a valid boolean value (e.g., it's a time string like "11:40"),
     // ignore it and auto-detect from scheduling config instead
     let finalIsAuto;
+    
+    // Debug: Log what we received for isAuto
+    logger.info(`🔍 DEBUG isAuto: received="${isAuto}", type=${typeof isAuto}, hasSchedulingConfig=${hasSchedulingConfig}`);
+    
     if (isAuto !== undefined && isAuto !== null) {
       // Check if isAuto is a valid boolean value
       const isValidBoolean = typeof isAuto === 'boolean' || 
@@ -1153,18 +1173,27 @@ router.put('/department-steps/:id', async (req, res) => {
                              isAuto === 1 || isAuto === 0 || 
                              isAuto === '1' || isAuto === '0';
       
+      logger.info(`🔍 DEBUG isAuto validation: isValidBoolean=${isValidBoolean}`);
+      
       if (isValidBoolean) {
         // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
         finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+        logger.info(`🔍 DEBUG isAuto: converted to boolean=${finalIsAuto}`);
       } else {
         // If isAuto is not a valid boolean (e.g., it's "11:40"), ignore it and auto-detect
         logger.warn(`⚠️ Invalid isAuto value received: "${isAuto}" (type: ${typeof isAuto}). Auto-detecting from scheduling config instead.`);
         finalIsAuto = hasSchedulingConfig;
+        logger.info(`🔍 DEBUG isAuto: auto-detected=${finalIsAuto}`);
       }
     } else {
       // Auto-detect from scheduling config
       finalIsAuto = hasSchedulingConfig;
+      logger.info(`🔍 DEBUG isAuto: not provided, auto-detected=${finalIsAuto}`);
     }
+    
+    // CRITICAL: Ensure finalIsAuto is definitely a boolean
+    finalIsAuto = Boolean(finalIsAuto);
+    logger.info(`🔍 DEBUG isAuto: final value=${finalIsAuto}, type=${typeof finalIsAuto}`);
     
     // Prepare update data - only include fields that are being updated
     const updateData = {
@@ -1179,6 +1208,14 @@ router.put('/department-steps/:id', async (req, res) => {
       ...(emailTemplateId !== undefined && emailTemplateId && emailTemplateId.trim() !== '' && { emailTemplateId: emailTemplateId.trim() }),
       ...(schedulingMethod !== undefined && { schedulingMethod })
     };
+    
+    // CRITICAL: Double-check that isAuto in updateData is a boolean
+    if (typeof updateData.isAuto !== 'boolean') {
+      logger.error(`❌ CRITICAL ERROR: updateData.isAuto is not a boolean! Value="${updateData.isAuto}", type=${typeof updateData.isAuto}`);
+      // Force it to be a boolean
+      updateData.isAuto = Boolean(hasSchedulingConfig);
+      logger.info(`🔧 FIXED: updateData.isAuto forced to boolean=${updateData.isAuto}`);
+    }
     
     // Handle dueDateOffset - convert to null if empty string or undefined
     if (dueDateOffset !== undefined) {
@@ -1208,8 +1245,23 @@ router.put('/department-steps/:id', async (req, res) => {
       }
     }
     
+    // CRITICAL FINAL CHECK: Ensure isAuto is definitely a boolean before sending to Prisma
+    if (typeof updateData.isAuto !== 'boolean') {
+      logger.error(`❌ CRITICAL: updateData.isAuto is not a boolean before Prisma update! Value="${updateData.isAuto}", type=${typeof updateData.isAuto}`);
+      updateData.isAuto = Boolean(hasSchedulingConfig);
+      logger.info(`🔧 FIXED: updateData.isAuto forced to boolean=${updateData.isAuto}`);
+    }
+    
     // Debug: Log what we're saving
     logger.info(`Saving step ${id} with updateData:`, JSON.stringify(updateData, null, 2));
+    
+    // FINAL VERIFICATION: Double-check isAuto is boolean
+    if (typeof updateData.isAuto !== 'boolean') {
+      logger.error(`❌ FATAL: updateData.isAuto is still not a boolean! This should never happen.`);
+      // Remove isAuto completely and let Prisma use the existing value
+      delete updateData.isAuto;
+      logger.warn(`⚠️ Removed isAuto from updateData to prevent Prisma error`);
+    }
     
     const step = await req.prisma.departmentStepTemplate.update({
       where: { id },
