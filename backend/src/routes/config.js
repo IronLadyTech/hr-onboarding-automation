@@ -1365,8 +1365,14 @@ router.put('/department-steps/:id', async (req, res) => {
               let scheduledTime = null;
 
               if (finalSchedulingMethod === 'offerLetter') {
-                // Use Offer Letter date
-                const offerLetterEvent = candidate.calendarEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                // Use Offer Letter date - need to fetch it separately since we filtered calendarEvents
+                const offerLetterEvent = await req.prisma.calendarEvent.findFirst({
+                  where: {
+                    candidateId: candidate.id,
+                    type: 'OFFER_LETTER',
+                    status: { not: 'COMPLETED' }
+                  }
+                });
                 baseDate = offerLetterEvent?.startTime || candidate.offerSentAt;
                 scheduledTime = finalScheduledTimeOfferLetter || '14:00';
               } else {
