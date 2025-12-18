@@ -1147,29 +1147,30 @@ router.put('/department-steps/:id', async (req, res) => {
     });
 
     // CRITICAL: Ensure all scheduled time fields are explicitly included in response
-    const finalScheduledTimeDoj = step.scheduledTimeDoj !== undefined && step.scheduledTimeDoj !== null 
+    // Use values from updated step (from database) or fallback to updateData
+    const responseScheduledTimeDoj = step.scheduledTimeDoj !== undefined && step.scheduledTimeDoj !== null 
       ? step.scheduledTimeDoj 
       : (updateData.scheduledTimeDoj !== undefined ? updateData.scheduledTimeDoj : null);
     
-    const finalScheduledTimeOfferLetter = step.scheduledTimeOfferLetter !== undefined && step.scheduledTimeOfferLetter !== null 
+    const responseScheduledTimeOfferLetter = step.scheduledTimeOfferLetter !== undefined && step.scheduledTimeOfferLetter !== null 
       ? step.scheduledTimeOfferLetter 
       : (updateData.scheduledTimeOfferLetter !== undefined ? updateData.scheduledTimeOfferLetter : null);
     
     // For backward compatibility, set scheduledTime based on current schedulingMethod
     const currentMethod = step.schedulingMethod || updateData.schedulingMethod || 'doj';
-    const finalScheduledTime = currentMethod === 'offerLetter' ? finalScheduledTimeOfferLetter : finalScheduledTimeDoj;
+    const responseScheduledTime = currentMethod === 'offerLetter' ? responseScheduledTimeOfferLetter : responseScheduledTimeDoj;
     
-    const finalSchedulingMethod = step.schedulingMethod !== undefined && step.schedulingMethod !== null
+    const responseSchedulingMethod = step.schedulingMethod !== undefined && step.schedulingMethod !== null
       ? step.schedulingMethod
       : (updateData.schedulingMethod !== undefined ? updateData.schedulingMethod : 'doj');
 
     // Build response data ensuring all fields are present
     const responseData = {
       ...step,
-      scheduledTime: finalScheduledTime, // Active time based on schedulingMethod (for backward compatibility)
-      scheduledTimeDoj: finalScheduledTimeDoj, // Separate time for DOJ
-      scheduledTimeOfferLetter: finalScheduledTimeOfferLetter, // Separate time for Offer Letter
-      schedulingMethod: finalSchedulingMethod // Always include
+      scheduledTime: responseScheduledTime, // Active time based on schedulingMethod (for backward compatibility)
+      scheduledTimeDoj: responseScheduledTimeDoj, // Separate time for DOJ
+      scheduledTimeOfferLetter: responseScheduledTimeOfferLetter, // Separate time for Offer Letter
+      schedulingMethod: responseSchedulingMethod // Always include
     };
 
     // Debug: Log what we're sending back
