@@ -1869,17 +1869,89 @@ const CandidateDetail = () => {
                               ⏰ Schedule
                             </button>
                           ) : (
-                            /* For manual steps, show calendar icon or Send button for Step 1 */
+                            /* For manual steps, show calendar icon or both Schedule and Send for Step 1 */
                             step.step === 1 ? (
-                              /* Step 1: Show Send button (instant send without scheduling) */
-                              <button
-                                onClick={() => handleSendClick(step.step)}
-                                className="btn btn-primary text-sm"
-                                disabled={actionLoading === `completeStep${step.step}`}
-                                title="Send offer letter immediately"
-                              >
-                                {actionLoading === `completeStep${step.step}` ? 'Sending...' : 'Send'}
-                              </button>
+                              /* Step 1: Show both Schedule and Send buttons */
+                              <>
+                                <button
+                                  onClick={() => {
+                                    const scheduleAction = getScheduleActionName(step.stepType || 'MANUAL');
+                                    const durationMap = { 
+                                      'OFFER_LETTER': 30, 
+                                      'OFFER_REMINDER': 15, 
+                                      'WELCOME_EMAIL': 30, 
+                                      'HR_INDUCTION': 60, 
+                                      'WHATSAPP_ADDITION': 15, 
+                                      'ONBOARDING_FORM': 30, 
+                                      'FORM_REMINDER': 15, 
+                                      'CEO_INDUCTION': 60, 
+                                      'SALES_INDUCTION': 90, 
+                                      'DEPARTMENT_INDUCTION': 90,
+                                      'TRAINING_PLAN': 30, 
+                                      'CHECKIN_CALL': 30 
+                                    };
+                                    
+                                    // Calculate default dateTime from step template
+                                    let defaultDateTime = '';
+                                    const stepTemplate = departmentSteps.find(s => s.stepNumber === step.step);
+                                    if (stepTemplate) {
+                                      const referenceDate = candidate.expectedJoiningDate || candidate.actualJoiningDate || new Date();
+                                      const baseDate = new Date(referenceDate);
+                                      
+                                      // Apply dueDateOffset (days from joining date)
+                                      if (stepTemplate.dueDateOffset !== null && stepTemplate.dueDateOffset !== undefined) {
+                                        baseDate.setDate(baseDate.getDate() + stepTemplate.dueDateOffset);
+                                      }
+                                      
+                                      // Apply scheduledTime (default time like "14:00")
+                                      if (stepTemplate.scheduledTime) {
+                                        const [hours, minutes] = stepTemplate.scheduledTime.split(':');
+                                        baseDate.setHours(parseInt(hours) || 0, parseInt(minutes) || 0, 0, 0);
+                                      }
+                                      
+                                      // Format as datetime-local (YYYY-MM-DDTHH:mm)
+                                      const year = baseDate.getFullYear();
+                                      const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+                                      const day = String(baseDate.getDate()).padStart(2, '0');
+                                      const hour = String(baseDate.getHours()).padStart(2, '0');
+                                      const minute = String(baseDate.getMinutes()).padStart(2, '0');
+                                      defaultDateTime = `${year}-${month}-${day}T${hour}:${minute}`;
+                                    }
+                                    
+                                    setEditingEventId(null);
+                                    setScheduleDateTime(defaultDateTime);
+                                    setScheduleDuration(durationMap[step.stepType] || 30);
+                                    setScheduleAttachment(null);
+                                    setScheduleAttachmentPreview(null);
+                                    setSchedulingStepType(step.stepType);
+                                    setSchedulingStepNumber(step.step);
+                                    
+                                    // Set schedule mode
+                                    if (candidate.expectedJoiningDate && stepTemplate) {
+                                      setScheduleMode('doj');
+                                      setScheduleOffsetDays(stepTemplate.dueDateOffset || 0);
+                                      setScheduleOffsetTime(stepTemplate.scheduledTime ? stepTemplate.scheduledTime : '09:00');
+                                    } else {
+                                      setScheduleMode('exact');
+                                      setScheduleOffsetDays(0);
+                                      setScheduleOffsetTime(stepTemplate?.scheduledTime ? stepTemplate.scheduledTime : '09:00');
+                                    }
+                                    setShowScheduleModal(scheduleAction);
+                                  }}
+                                  className="btn btn-sm btn-primary"
+                                  title="Schedule offer letter"
+                                >
+                                  ⏰ Schedule
+                                </button>
+                                <button
+                                  onClick={() => handleSendClick(step.step)}
+                                  className="btn btn-primary text-sm"
+                                  disabled={actionLoading === `completeStep${step.step}`}
+                                  title="Send offer letter immediately"
+                                >
+                                  {actionLoading === `completeStep${step.step}` ? 'Sending...' : 'Send'}
+                                </button>
+                              </>
                             ) : (
                           <button
                             onClick={() => {

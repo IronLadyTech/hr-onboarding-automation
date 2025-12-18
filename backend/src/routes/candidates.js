@@ -1859,8 +1859,11 @@ router.post('/:id/undo-scheduled-step', async (req, res) => {
 router.post('/:id/complete-step', upload.single('attachment'), async (req, res) => {
   try {
     const { stepNumber } = req.body;
+    
+    // Parse stepNumber to integer (FormData sends it as string)
+    const parsedStepNumber = parseInt(stepNumber, 10);
 
-    if (!stepNumber || stepNumber < 1) {
+    if (!parsedStepNumber || parsedStepNumber < 1 || isNaN(parsedStepNumber)) {
       return res.status(400).json({ success: false, message: 'Invalid step number' });
     }
 
@@ -1872,7 +1875,7 @@ router.post('/:id/complete-step', upload.single('attachment'), async (req, res) 
       logger.info(`📎 Attachment uploaded for step ${stepNumber}: ${attachmentPath}`);
       
       // For Step 1, also save as offer letter
-      if (stepNumber === 1) {
+      if (parsedStepNumber === 1) {
         await req.prisma.candidate.update({
           where: { id: req.params.id },
           data: { offerLetterPath: attachmentPath }
@@ -1886,7 +1889,7 @@ router.post('/:id/complete-step', upload.single('attachment'), async (req, res) 
     const updated = await stepService.completeStep(
       req.prisma, 
       req.params.id, 
-      stepNumber, 
+      parsedStepNumber, // Use parsed integer
       req.user.id,
       null, // description
       attachmentPath // attachment path
