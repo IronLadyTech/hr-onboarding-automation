@@ -1336,14 +1336,17 @@ router.put('/department-steps/:id', async (req, res) => {
 
     // ============================================================
     // AUTO-CREATE CALENDAR EVENTS FOR EXISTING CANDIDATES
-    // When a step is saved with default scheduling (isAuto=true),
-    // automatically create calendar events for all candidates in
-    // that department who don't already have this step scheduled.
-    // This uses the same logic as candidate profile scheduling.
+    // Use the shared function to ensure same logic as POST endpoint
     // ============================================================
-    if (finalIsAuto && finalSchedulingMethod !== 'manual' && 
-        (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
-        (finalScheduledTimeDoj || finalScheduledTimeOfferLetter)) {
+    await autoCreateCalendarEventsForStep(
+      req.prisma,
+      step,
+      finalIsAuto,
+      finalSchedulingMethod,
+      finalDueDateOffset,
+      finalScheduledTimeDoj,
+      finalScheduledTimeOfferLetter
+    );
       
       try {
         logger.info(`🔄 Auto-creating calendar events for step ${step.stepNumber} (${step.type}) in department ${step.department}...`);
