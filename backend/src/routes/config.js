@@ -1512,10 +1512,40 @@ router.put('/department-steps/:id', async (req, res) => {
     if (scheduledTime !== undefined && scheduledTimeDoj === undefined && scheduledTimeOfferLetter === undefined) {
       updateData.scheduledTime = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
       // Also set the appropriate separate field based on schedulingMethod
-      if (schedulingMethod === 'doj' || (!schedulingMethod && existingStep.schedulingMethod === 'doj')) {
+      const method = schedulingMethod !== undefined ? schedulingMethod : existingStep.schedulingMethod;
+      if (method === 'doj' || (!method && existingStep.schedulingMethod === 'doj')) {
         updateData.scheduledTimeDoj = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
-      } else if (schedulingMethod === 'offerLetter' || (!schedulingMethod && existingStep.schedulingMethod === 'offerLetter')) {
+      } else if (method === 'offerLetter' || (!method && existingStep.schedulingMethod === 'offerLetter')) {
         updateData.scheduledTimeOfferLetter = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+      }
+    }
+    
+    // CRITICAL FIX: If step should auto-schedule but no time is set, use default times
+    // This ensures updated steps with schedulingMethod and dueDateOffset will auto-schedule
+    // Check final values after all updates
+    const finalUpdateMethod = updateData.schedulingMethod !== undefined ? updateData.schedulingMethod : existingStep.schedulingMethod;
+    const finalUpdateDueDateOffset = updateData.dueDateOffset !== undefined ? updateData.dueDateOffset : existingStep.dueDateOffset;
+    const finalUpdateScheduledTimeDoj = updateData.scheduledTimeDoj !== undefined ? updateData.scheduledTimeDoj : existingStep.scheduledTimeDoj;
+    const finalUpdateScheduledTimeOfferLetter = updateData.scheduledTimeOfferLetter !== undefined ? updateData.scheduledTimeOfferLetter : existingStep.scheduledTimeOfferLetter;
+    
+    if (finalIsAuto && finalUpdateMethod !== 'manual' && finalUpdateDueDateOffset !== null && finalUpdateDueDateOffset !== undefined) {
+      if (!finalUpdateScheduledTimeDoj && !finalUpdateScheduledTimeOfferLetter) {
+        // No time set at all - use defaults based on scheduling method
+        if (finalUpdateMethod === 'offerLetter') {
+          updateData.scheduledTimeOfferLetter = '14:00'; // Default for offer letter
+          logger.info(`🔧 Setting default scheduledTimeOfferLetter=14:00 for step ${id} (no time provided)`);
+        } else {
+          updateData.scheduledTimeDoj = '12:30'; // Default for DOJ
+          logger.info(`🔧 Setting default scheduledTimeDoj=12:30 for step ${id} (no time provided)`);
+        }
+      } else if (finalUpdateMethod === 'doj' && !finalUpdateScheduledTimeDoj && finalUpdateScheduledTimeOfferLetter) {
+        // DOJ method but only offerLetter time is set - copy it to DOJ
+        updateData.scheduledTimeDoj = finalUpdateScheduledTimeOfferLetter;
+        logger.info(`🔧 Copying scheduledTimeOfferLetter to scheduledTimeDoj for step ${id}`);
+      } else if (finalUpdateMethod === 'offerLetter' && !finalUpdateScheduledTimeOfferLetter && finalUpdateScheduledTimeDoj) {
+        // OfferLetter method but only DOJ time is set - copy it to offerLetter
+        updateData.scheduledTimeOfferLetter = finalUpdateScheduledTimeDoj;
+        logger.info(`🔧 Copying scheduledTimeDoj to scheduledTimeOfferLetter for step ${id}`);
       }
     }
     
