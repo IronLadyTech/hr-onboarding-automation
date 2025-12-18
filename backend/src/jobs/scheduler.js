@@ -962,8 +962,12 @@ const autoCompleteCalendarSteps = async () => {
         
         if (!actualStepNumber) {
           logger.warn(`⚠️ Could not determine step number for event type: ${event.type}, candidate: ${candidate.email} - skipping`);
+          logger.warn(`   Event details: id=${event.id}, stepNumber=${event.stepNumber}, type=${event.type}, startTime=${event.startTime.toISOString()}`);
+          logger.warn(`   Step template found: ${stepTemplate ? 'Yes' : 'No'}`);
           continue; // Skip if we can't determine step number
         }
+        
+        logger.info(`📋 Processing event: type=${event.type}, stepNumber=${actualStepNumber}, candidate=${candidate.email}, startTime=${event.startTime.toISOString()}, now=${now.toISOString()}`);
 
         // ✅ USE THE SAME LOGIC AS MANUAL "SEND" BUTTON
         // This ensures scheduled emails work exactly like manual sends
