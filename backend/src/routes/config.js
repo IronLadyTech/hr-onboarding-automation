@@ -1314,6 +1314,141 @@ router.put('/department-steps/:id', async (req, res) => {
       dueDateOffset: responseData.dueDateOffset
     });
 
+    // ============================================================
+    // AUTO-CREATE CALENDAR EVENTS FOR EXISTING CANDIDATES
+    // When a step is saved with default scheduling (isAuto=true),
+    // automatically create calendar events for all candidates in
+    // that department who don't already have this step scheduled.
+    // This uses the same logic as candidate profile scheduling.
+    // ============================================================
+    if (finalIsAuto && finalSchedulingMethod !== 'manual' && 
+        (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
+        (finalScheduledTimeDoj || finalScheduledTimeOfferLetter)) {
+      
+      try {
+        logger.info(`🔄 Auto-creating calendar events for step ${step.stepNumber} (${step.type}) in department ${step.department}...`);
+        
+        // Get all candidates in this department who don't already have this step scheduled
+        const candidates = await req.prisma.candidate.findMany({
+          where: {
+            department: step.department,
+            // Only include candidates who have the required date (DOJ or Offer Letter)
+            OR: [
+              { expectedJoiningDate: { not: null } },
+              { offerSentAt: { not: null } }
+            ]
+          },
+          include: {
+            calendarEvents: {
+              where: {
+                stepNumber: step.stepNumber,
+                status: { not: 'COMPLETED' }
+              }
+            }
+          }
+        });
+
+        // Filter out candidates who already have this step scheduled
+        const candidatesToSchedule = candidates.filter(c => c.calendarEvents.length === 0);
+        
+        logger.info(`📋 Found ${candidatesToSchedule.length} candidate(s) in ${step.department} who need calendar events for step ${step.stepNumber}`);
+
+        if (candidatesToSchedule.length > 0) {
+          const calendarService = require('../services/calendarService');
+          let eventsCreated = 0;
+          let eventsSkipped = 0;
+
+          for (const candidate of candidatesToSchedule) {
+            try {
+              // Calculate scheduled date/time using same logic as candidate profile
+              let baseDate = null;
+              let scheduledTime = null;
+
+              if (finalSchedulingMethod === 'offerLetter') {
+                // Use Offer Letter date
+                const offerLetterEvent = candidate.calendarEvents?.find(e => e.type === 'OFFER_LETTER' && e.status !== 'COMPLETED');
+                baseDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+                scheduledTime = finalScheduledTimeOfferLetter || '14:00';
+              } else {
+                // Use DOJ
+                baseDate = candidate.expectedJoiningDate;
+                scheduledTime = finalScheduledTimeDoj || '09:00';
+              }
+
+              if (!baseDate) {
+                logger.debug(`⏭️ Skipping candidate ${candidate.email}: No ${finalSchedulingMethod === 'offerLetter' ? 'offer letter date' : 'DOJ'}`);
+                eventsSkipped++;
+                continue;
+              }
+
+              // Calculate scheduled date
+              const base = new Date(baseDate);
+              const scheduledDate = new Date(base);
+              scheduledDate.setDate(scheduledDate.getDate() + (finalDueDateOffset || 0));
+
+              // Set time from scheduledTime
+              const [hours, minutes] = scheduledTime.split(':');
+              scheduledDate.setHours(parseInt(hours) || 9, parseInt(minutes) || 0, 0, 0);
+
+              // Calculate end time (default 15 minutes, longer for inductions)
+              const duration = ['HR_INDUCTION', 'CEO_INDUCTION', 'SALES_INDUCTION', 'DEPARTMENT_INDUCTION'].includes(step.type) ? 60 : 15;
+              const endTime = new Date(scheduledDate);
+              endTime.setMinutes(endTime.getMinutes() + duration);
+
+              // Create calendar event (same as candidate profile scheduling)
+              const eventData = {
+                title: `${step.title} - ${candidate.firstName} ${candidate.lastName}`,
+                description: step.description || '',
+                startTime: scheduledDate,
+                endTime: endTime,
+                attendees: [candidate.email],
+                createMeet: false // Don't create Google Meet for auto-scheduled events
+              };
+
+              // Try to create Google Calendar event (optional - continue if it fails)
+              let googleEvent = null;
+              try {
+                googleEvent = await calendarService.createGoogleEvent(eventData, req.prisma);
+              } catch (gcalError) {
+                logger.warn(`⚠️ Google Calendar event creation failed for ${candidate.email}, continuing with local event:`, gcalError.message);
+              }
+
+              // Create calendar event in database
+              const event = await req.prisma.calendarEvent.create({
+                data: {
+                  candidateId: candidate.id,
+                  type: step.type,
+                  title: eventData.title,
+                  description: eventData.description,
+                  startTime: scheduledDate,
+                  endTime: endTime,
+                  attendees: [candidate.email],
+                  meetingLink: googleEvent?.hangoutLink || googleEvent?.htmlLink || null,
+                  googleEventId: googleEvent?.id || null,
+                  stepNumber: step.stepNumber,
+                  status: 'SCHEDULED'
+                }
+              });
+
+              eventsCreated++;
+              logger.info(`✅ Created calendar event for ${candidate.email}: Step ${step.stepNumber} scheduled for ${scheduledDate.toLocaleString('en-IN')}`);
+
+            } catch (candidateError) {
+              logger.error(`❌ Error creating calendar event for candidate ${candidate.email}:`, candidateError.message);
+              eventsSkipped++;
+            }
+          }
+
+          logger.info(`✅ Auto-created ${eventsCreated} calendar event(s) for step ${step.stepNumber}, skipped ${eventsSkipped} candidate(s)`);
+        } else {
+          logger.info(`ℹ️ No candidates need calendar events for step ${step.stepNumber} (all already scheduled or missing required dates)`);
+        }
+      } catch (autoScheduleError) {
+        logger.error('❌ Error auto-creating calendar events:', autoScheduleError);
+        // Don't fail the step update - just log the error
+      }
+    }
+
     res.json({ success: true, data: responseData });
   } catch (error) {
     logger.error('Error updating department step:', error);
