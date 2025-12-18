@@ -973,6 +973,16 @@ router.post('/department-steps', async (req, res) => {
          (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ||
          (scheduledTime && scheduledTime.trim() !== ''));
       
+      // Ensure isAuto is always a boolean
+      let finalIsAuto;
+      if (isAuto !== undefined) {
+        // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
+        finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+      } else {
+        // Auto-detect from scheduling config
+        finalIsAuto = hasSchedulingConfig;
+      }
+      
       const createData = {
         department,
         stepNumber: parseInt(stepNumber),
@@ -980,7 +990,7 @@ router.post('/department-steps', async (req, res) => {
         description,
         type,
         icon,
-        isAuto: isAuto !== undefined ? isAuto : hasSchedulingConfig, // Use provided isAuto, or auto-detect from scheduling config
+        isAuto: finalIsAuto, // Always boolean
         dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
         schedulingMethod: createMethod,
         priority: priority || 'MEDIUM',
