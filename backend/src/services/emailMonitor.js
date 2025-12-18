@@ -201,9 +201,31 @@ const initImapMonitor = async () => {
       tlsOptions: { rejectUnauthorized: false } // Allow self-signed certificates
     });
     
+    // Handle connection events
+    imapClient.on('error', (err) => {
+      logger.error('❌ IMAP connection error:', err.message);
+      useImap = false;
+      imapClient = null;
+    });
+    
+    imapClient.on('end', () => {
+      logger.warn('⚠️ IMAP connection ended - will attempt to reconnect on next check');
+      useImap = false;
+    });
+    
+    imapClient.on('close', () => {
+      logger.warn('⚠️ IMAP connection closed - will attempt to reconnect on next check');
+      useImap = false;
+    });
+    
     // Connect to IMAP server
     await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('IMAP connection timeout'));
+      }, 30000); // 30 second timeout
+      
       imapClient.once('ready', () => {
+        clearTimeout(timeout);
         logger.info(`✅ IMAP connected: ${imapUser} (${imapHost}:${imapPort})`);
         useImap = true;
         imapEmail = imapUser;
@@ -211,15 +233,21 @@ const initImapMonitor = async () => {
       });
       
       imapClient.once('error', (err) => {
-        logger.error('❌ IMAP connection error:', err.message);
+        clearTimeout(timeout);
+        logger.error('❌ IMAP connection error during initialization:', err.message);
         reject(err);
       });
       
       imapClient.connect();
     });
     
+    // Store interval ID so we can clear it if needed
+    if (imapCheckInterval) {
+      clearInterval(imapCheckInterval);
+    }
+    
     // Start monitoring - check every 30 seconds
-    const checkInterval = setInterval(async () => {
+    imapCheckInterval = setInterval(async () => {
       try {
         logger.info('📧 [SCHEDULED CHECK] Starting automatic email check for signed offer letters (IMAP)...');
         await checkForRepliesImap();
@@ -246,6 +274,113 @@ const initImapMonitor = async () => {
   }
 };
 
+// Helper function to ensure IMAP connection is active (reconnect if needed)
+const ensureImapConnection = async () => {
+  // Check if connection is still valid
+  if (imapClient && imapClient.state === 'authenticated') {
+    return true; // Connection is good
+  }
+  
+  // Connection is lost or not authenticated - try to reconnect
+  logger.warn('⚠️ IMAP connection lost or not authenticated, attempting to reconnect...');
+  
+  if (imapClient) {
+    try {
+      // Close existing connection if it exists
+      if (imapClient.state !== 'disconnected' && imapClient.state !== 'logout') {
+        imapClient.end();
+      }
+    } catch (e) {
+      // Ignore errors when closing
+      logger.debug('Error closing old IMAP connection:', e.message);
+    }
+    imapClient = null;
+  }
+  
+  // Reconnect IMAP (without reinitializing the interval)
+  try {
+    // Get IMAP credentials from database
+    const imapConfigs = await prisma.workflowConfig.findMany({
+      where: {
+        key: {
+          in: ['imap_enabled', 'imap_host', 'imap_user', 'imap_pass', 'imap_port', 'imap_secure']
+        }
+      }
+    });
+    
+    const configMap = {};
+    imapConfigs.forEach(c => { configMap[c.key] = c.value; });
+    
+    const imapEnabled = configMap.imap_enabled === 'true';
+    const imapHost = configMap.imap_host;
+    const imapUser = configMap.imap_user;
+    const imapPass = configMap.imap_pass;
+    const imapPort = parseInt(configMap.imap_port) || 993;
+    const imapSecure = configMap.imap_secure !== 'false';
+    
+    if (!imapEnabled || !imapHost || !imapUser || !imapPass) {
+      logger.error('❌ IMAP credentials not available for reconnection');
+      return false;
+    }
+    
+    // Create new IMAP connection
+    imapClient = new Imap({
+      user: imapUser,
+      password: imapPass,
+      host: imapHost,
+      port: imapPort,
+      tls: imapSecure,
+      tlsOptions: { rejectUnauthorized: false }
+    });
+    
+    // Handle connection events
+    imapClient.on('error', (err) => {
+      logger.error('❌ IMAP connection error:', err.message);
+      useImap = false;
+    });
+    
+    imapClient.on('end', () => {
+      logger.warn('⚠️ IMAP connection ended');
+      useImap = false;
+    });
+    
+    imapClient.on('close', () => {
+      logger.warn('⚠️ IMAP connection closed');
+      useImap = false;
+    });
+    
+    // Connect to IMAP server
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('IMAP reconnection timeout'));
+      }, 30000);
+      
+      imapClient.once('ready', () => {
+        clearTimeout(timeout);
+        logger.info(`✅ IMAP reconnected: ${imapUser} (${imapHost}:${imapPort})`);
+        useImap = true;
+        imapEmail = imapUser;
+        resolve();
+      });
+      
+      imapClient.once('error', (err) => {
+        clearTimeout(timeout);
+        logger.error('❌ IMAP reconnection error:', err.message);
+        reject(err);
+      });
+      
+      imapClient.connect();
+    });
+    
+    return true;
+  } catch (error) {
+    logger.error('❌ Failed to reconnect IMAP:', error.message);
+    imapClient = null;
+    useImap = false;
+    return false;
+  }
+};
+
 // IMAP-based email checking
 const checkForRepliesImap = async () => {
   if (isProcessing) {
@@ -258,8 +393,10 @@ const checkForRepliesImap = async () => {
     return;
   }
   
-  if (!imapClient || !useImap) {
-    logger.debug('📧 IMAP not initialized, skipping email check');
+  // Ensure IMAP connection is active before proceeding
+  const isConnected = await ensureImapConnection();
+  if (!isConnected || !imapClient || !useImap) {
+    logger.debug('📧 IMAP not available, skipping email check');
     return;
   }
   
@@ -289,12 +426,26 @@ const checkForRepliesImap = async () => {
 
     logger.info(`📧 [IMAP AUTO-CHECK] Checking emails for ${candidates.length} candidate(s)`);
 
+    // Check connection state before opening inbox
+    if (imapClient.state !== 'authenticated') {
+      logger.warn(`⚠️ IMAP connection state is "${imapClient.state}", attempting to reconnect...`);
+      const reconnected = await ensureImapConnection();
+      if (!reconnected) {
+        throw new Error('IMAP connection not available');
+      }
+    }
+
     // Open inbox
     try {
       await new Promise((resolve, reject) => {
         imapClient.openBox('INBOX', false, (err, box) => {
           if (err) {
             logger.error(`❌ IMAP openBox error:`, err);
+            // If "Not authenticated" error, try to reconnect
+            if (err.message && err.message.includes('Not authenticated')) {
+              logger.warn('⚠️ IMAP authentication lost, will reconnect on next check');
+              useImap = false;
+            }
             reject(err);
           } else {
             logger.debug(`✅ IMAP inbox opened successfully`);
@@ -305,6 +456,11 @@ const checkForRepliesImap = async () => {
     } catch (openError) {
       logger.error(`❌ Failed to open IMAP inbox:`, openError.message);
       logger.error(`❌ Full error:`, openError);
+      // If authentication error, mark connection as lost
+      if (openError.message && openError.message.includes('Not authenticated')) {
+        useImap = false;
+        imapClient = null;
+      }
       throw openError; // Re-throw to be caught by outer catch
     }
 
