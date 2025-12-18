@@ -91,31 +91,31 @@ const initEmailMonitor = async (prismaClient) => {
 // Initialize Gmail API monitor (separated for clarity)
 const initGmailApiMonitor = async () => {
   try {
-      // Initialize Gmail API with OAuth2
-      const oauth2Client = new google.auth.OAuth2(
-        process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
-      );
+    // Initialize Gmail API with OAuth2
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET,
+      process.env.GOOGLE_REDIRECT_URI
+    );
 
-      // Set credentials from refresh token
-      oauth2Client.setCredentials({
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN
-      });
+    // Set credentials from refresh token
+    oauth2Client.setCredentials({
+      refresh_token: process.env.GOOGLE_REFRESH_TOKEN
+    });
 
-      gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-      
-      // Test connection
-      const profile = await gmail.users.getProfile({ userId: 'me' });
-      logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
+    gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+    
+    // Test connection
+    const profile = await gmail.users.getProfile({ userId: 'me' });
+    logger.info(`📧 Gmail API connected: ${profile.data.emailAddress}`);
       
       // Clear any existing interval
       if (gmailCheckInterval) {
         clearInterval(gmailCheckInterval);
         logger.info('📧 Cleared existing Gmail check interval');
       }
-      
-      // Start monitoring - check every 30 seconds for faster capture
+    
+    // Start monitoring - check every 30 seconds for faster capture
       gmailCheckInterval = setInterval(async () => {
         try {
           logger.info('📧 [SCHEDULED CHECK] Starting automatic email check for signed offer letters...');
@@ -640,12 +640,18 @@ const checkForReplies = async (checkReadEmails = false) => {
         
         if (messages.length > 0) {
           logger.info(`📧 Found ${messages.length} email(s) with attachments from ${candidate.email}`);
+          logger.info(`📧 Processing each email to check for attachments...`);
           for (const msg of messages) {
+            logger.info(`📧 Processing message ID: ${msg.id}`);
             await processMessage(msg.id);
             totalProcessed++;
           }
         } else {
-          logger.debug(`📧 No emails with attachments found for ${candidate.email}`);
+          logger.warn(`⚠️ No emails with attachments found for ${candidate.email}`);
+          logger.warn(`   This could mean:`);
+          logger.warn(`   1. Candidate hasn't sent any emails with attachments yet`);
+          logger.warn(`   2. Gmail search query didn't find the emails (might be in spam/trash)`);
+          logger.warn(`   3. Emails are older than 60 days`);
         }
       } catch (error) {
         logger.error(`❌ Error checking emails for ${candidate.email}:`, error.message);
@@ -738,7 +744,7 @@ const processMessage = async (messageId) => {
       logger.info(`No matching candidate for: ${fromEmail}`);
       return;
     }
-    
+
     // SIMPLIFIED LOGIC: Process ANY email with attachment from candidate who has offerSentAt but no offerSignedAt
     // No restrictions - accept first attachment from candidate after offer is sent
     // Once detected, candidate.offerSignedAt will be set, so won't process again
@@ -756,9 +762,13 @@ const processMessage = async (messageId) => {
       return;
     }
     
-    // Check if email was sent AFTER the offer was sent
-    if (emailDate < candidate.offerSentAt) {
-      logger.info(`⏭️ Skipping email from ${fromEmail}: Email date (${emailDate.toISOString()}) is before offer was sent (${candidate.offerSentAt.toISOString()})`);
+    // Check if email was sent AFTER the offer was sent (allow same day with 1 minute buffer)
+    const offerSentTime = new Date(candidate.offerSentAt).getTime();
+    const emailTime = emailDate.getTime();
+    const oneMinute = 60 * 1000; // 1 minute in milliseconds
+    
+    if (emailTime < (offerSentTime - oneMinute)) {
+      logger.info(`⏭️ Skipping email from ${fromEmail}: Email date (${emailDate.toISOString()}) is more than 1 minute before offer was sent (${candidate.offerSentAt.toISOString()})`);
       return;
     }
     
@@ -769,6 +779,7 @@ const processMessage = async (messageId) => {
     
     logger.info(`📎 Checking for attachments in email from ${candidate.firstName} ${candidate.email}...`);
     logger.info(`📎 Email payload structure: parts=${message.data.payload.parts?.length || 0}, hasBody=${!!message.data.payload.body}, filename=${message.data.payload.filename || 'none'}`);
+    logger.info(`📎 Full payload keys: ${Object.keys(message.data.payload).join(', ')}`);
     
     if (attachments.length === 0) {
       logger.warn(`⚠️ No attachments found in email from ${candidate.firstName} ${candidate.email}. Email subject: "${subject}"`);
@@ -776,6 +787,21 @@ const processMessage = async (messageId) => {
       logger.warn(`   1. The email doesn't have attachments`);
       logger.warn(`   2. The attachment format is not recognized`);
       logger.warn(`   3. The email structure is different than expected`);
+      logger.warn(`   4. Gmail API search found email but attachment detection failed`);
+      logger.warn(`   📧 Email message ID: ${messageId}`);
+      logger.warn(`   📧 Email internal date: ${message.data.internalDate || 'N/A'}`);
+      
+      // Try to get full message again with different format to debug
+      try {
+        const fullMessage = await gmail.users.messages.get({
+          userId: 'me',
+          id: messageId,
+          format: 'full'
+        });
+        logger.warn(`   📧 Full message payload structure: ${JSON.stringify(fullMessage.data.payload, null, 2).substring(0, 500)}`);
+      } catch (debugError) {
+        logger.warn(`   📧 Could not fetch full message for debugging: ${debugError.message}`);
+      }
       return;
     }
     
