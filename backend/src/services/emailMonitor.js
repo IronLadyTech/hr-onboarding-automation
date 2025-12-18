@@ -446,15 +446,20 @@ const processMessageImap = async (emailData, candidate) => {
     
     logger.info(`✅ Processing IMAP email from ${candidate.firstName} ${candidate.lastName}: OfferSentAt=${candidate.offerSentAt.toISOString()}, EmailDate=${emailDate.toISOString()}, HasSigned=${!!candidate.offerSignedAt}`);
     
-    // Process attachments
+    // Process attachments - accept ANY attachment
     if (parsed.attachments && parsed.attachments.length > 0) {
-      logger.info(`📎 Found ${parsed.attachments.length} attachment(s) in IMAP email`);
+      logger.info(`📎 Found ${parsed.attachments.length} attachment(s) in IMAP email from ${candidate.firstName} ${candidate.email}`);
+      parsed.attachments.forEach((att, idx) => {
+        logger.info(`   ${idx + 1}. ${att.filename || 'unnamed'} (${att.contentType || 'unknown type'})`);
+      });
       
+      let attachmentProcessed = false;
       for (const att of parsed.attachments) {
         const ext = path.extname(att.filename || '').toLowerCase();
         const validExtensions = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.txt', '.rtf'];
         
         if (validExtensions.includes(ext)) {
+          logger.info(`📎 Processing IMAP attachment: ${att.filename} (${ext})`);
           const savedPath = await saveImapAttachment(att, candidate.id);
           
           if (savedPath) {
@@ -486,7 +491,7 @@ const processMessageImap = async (emailData, candidate) => {
                 candidateId: candidate.id,
                 userId: null,
                 action: 'SIGNED_OFFER_AUTO_DETECTED',
-                description: `✅ Signed offer auto-captured from email reply (IMAP) - Step 2 marked as completed`,
+                description: `✅ Signed offer auto-captured from email (IMAP) - Step 2 marked as completed`,
                 metadata: { 
                   filename: att.filename,
                   emailSubject: subject,
@@ -496,7 +501,7 @@ const processMessageImap = async (emailData, candidate) => {
               }
             });
 
-            logger.info(`✅ AUTO-CAPTURED (IMAP): Signed offer from ${candidate.firstName} ${candidate.lastName}`);
+            logger.info(`✅ AUTO-CAPTURED (IMAP): Signed offer from ${candidate.firstName} ${candidate.lastName} - Step 2 marked as completed`);
             
             // Mark email as read
             if (emailData.uid) {
@@ -505,10 +510,21 @@ const processMessageImap = async (emailData, candidate) => {
               });
             }
             
+            attachmentProcessed = true;
             break; // Only process first valid attachment
+          } else {
+            logger.error(`❌ Failed to save IMAP attachment: ${att.filename}`);
           }
+        } else {
+          logger.warn(`⚠️ Skipping IMAP attachment ${att.filename}: Invalid extension (${ext})`);
         }
       }
+      
+      if (!attachmentProcessed && parsed.attachments.length > 0) {
+        logger.warn(`⚠️ No valid attachments were processed from ${parsed.attachments.length} attachment(s) found in IMAP email`);
+      }
+    } else {
+      logger.warn(`⚠️ No attachments found in IMAP email from ${candidate.firstName} ${candidate.email}. Email subject: "${subject}"`);
     }
   } catch (error) {
     logger.error('Error processing IMAP message:', error.message);
