@@ -893,15 +893,49 @@ router.post('/department-steps', async (req, res) => {
 
     let step;
     if (existing) {
+      // Determine scheduling method
+      const createMethod = schedulingMethod || existing.schedulingMethod || 'doj';
+      
+      // Automatically determine isAuto: true if step has scheduling configuration (not manual)
+      const hasSchedulingConfig = createMethod !== 'manual' && 
+        (dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '') &&
+        ((scheduledTimeDoj && scheduledTimeDoj.trim() !== '') || 
+         (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ||
+         (scheduledTime && scheduledTime.trim() !== ''));
+      
+      // Ensure isAuto is always a boolean
+      // CRITICAL: If isAuto is provided but is not a valid boolean value (e.g., it's a time string like "11:40"),
+      // ignore it and auto-detect from scheduling config instead
+      let finalIsAuto;
+      if (isAuto !== undefined && isAuto !== null) {
+        // Check if isAuto is a valid boolean value
+        const isValidBoolean = typeof isAuto === 'boolean' || 
+                               isAuto === 'true' || isAuto === 'false' || 
+                               isAuto === 1 || isAuto === 0 || 
+                               isAuto === '1' || isAuto === '0';
+        
+        if (isValidBoolean) {
+          // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
+          finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+        } else {
+          // If isAuto is not a valid boolean (e.g., it's "11:40"), ignore it and auto-detect
+          logger.warn(`⚠️ Invalid isAuto value received: "${isAuto}" (type: ${typeof isAuto}). Auto-detecting from scheduling config instead.`);
+          finalIsAuto = hasSchedulingConfig;
+        }
+      } else {
+        // Auto-detect from scheduling config
+        finalIsAuto = hasSchedulingConfig;
+      }
+      
       // Prepare update data with separate times
       const updateData = {
         title,
         description,
         type,
         icon,
-        isAuto: isAuto || false,
+        isAuto: finalIsAuto, // Always a boolean
         dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
-        schedulingMethod: schedulingMethod || 'doj',
+        schedulingMethod: createMethod,
         priority: priority || 'MEDIUM',
         emailTemplateId: emailTemplateId && emailTemplateId.trim() !== '' ? emailTemplateId : null
       };
@@ -974,10 +1008,24 @@ router.post('/department-steps', async (req, res) => {
          (scheduledTime && scheduledTime.trim() !== ''));
       
       // Ensure isAuto is always a boolean
+      // CRITICAL: If isAuto is provided but is not a valid boolean value (e.g., it's a time string like "11:40"),
+      // ignore it and auto-detect from scheduling config instead
       let finalIsAuto;
-      if (isAuto !== undefined) {
-        // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
-        finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+      if (isAuto !== undefined && isAuto !== null) {
+        // Check if isAuto is a valid boolean value
+        const isValidBoolean = typeof isAuto === 'boolean' || 
+                               isAuto === 'true' || isAuto === 'false' || 
+                               isAuto === 1 || isAuto === 0 || 
+                               isAuto === '1' || isAuto === '0';
+        
+        if (isValidBoolean) {
+          // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
+          finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+        } else {
+          // If isAuto is not a valid boolean (e.g., it's "11:40"), ignore it and auto-detect
+          logger.warn(`⚠️ Invalid isAuto value received: "${isAuto}" (type: ${typeof isAuto}). Auto-detecting from scheduling config instead.`);
+          finalIsAuto = hasSchedulingConfig;
+        }
       } else {
         // Auto-detect from scheduling config
         finalIsAuto = hasSchedulingConfig;
@@ -1095,10 +1143,24 @@ router.put('/department-steps/:id', async (req, res) => {
       (finalScheduledTimeDoj || finalScheduledTimeOfferLetter || finalScheduledTime);
     
     // Ensure isAuto is always a boolean
+    // CRITICAL: If isAuto is provided but is not a valid boolean value (e.g., it's a time string like "11:40"),
+    // ignore it and auto-detect from scheduling config instead
     let finalIsAuto;
-    if (isAuto !== undefined) {
-      // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
-      finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+    if (isAuto !== undefined && isAuto !== null) {
+      // Check if isAuto is a valid boolean value
+      const isValidBoolean = typeof isAuto === 'boolean' || 
+                             isAuto === 'true' || isAuto === 'false' || 
+                             isAuto === 1 || isAuto === 0 || 
+                             isAuto === '1' || isAuto === '0';
+      
+      if (isValidBoolean) {
+        // Convert to boolean: handle string "true"/"false", boolean true/false, or any truthy/falsy value
+        finalIsAuto = isAuto === true || isAuto === 'true' || isAuto === 1 || isAuto === '1';
+      } else {
+        // If isAuto is not a valid boolean (e.g., it's "11:40"), ignore it and auto-detect
+        logger.warn(`⚠️ Invalid isAuto value received: "${isAuto}" (type: ${typeof isAuto}). Auto-detecting from scheduling config instead.`);
+        finalIsAuto = hasSchedulingConfig;
+      }
     } else {
       // Auto-detect from scheduling config
       finalIsAuto = hasSchedulingConfig;
