@@ -20,6 +20,47 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null, desc
       throw new Error('Candidate not found');
     }
 
+    // CRITICAL: Check if step is already completed to prevent re-triggering
+    // Check if there's a completed calendar event for this step
+    const completedEvent = await prisma.calendarEvent.findFirst({
+      where: {
+        candidateId: candidate.id,
+        stepNumber: stepNumber,
+        status: 'COMPLETED'
+      }
+    });
+
+    if (completedEvent) {
+      // Check if email was already sent for this completed step
+      const stepTemplate = await prisma.departmentStepTemplate.findFirst({
+        where: {
+          department: candidate.department,
+          stepNumber: stepNumber
+        },
+        include: {
+          emailTemplate: true
+        }
+      });
+
+      if (stepTemplate?.emailTemplate) {
+        const emailType = stepTemplate.emailTemplate.type;
+        const existingSentEmail = await prisma.email.findFirst({
+          where: {
+            candidateId: candidate.id,
+            type: emailType,
+            status: 'SENT'
+          },
+          orderBy: { sentAt: 'desc' }
+        });
+
+        if (existingSentEmail) {
+          logger.info(`⏭️ Step ${stepNumber} for ${candidate.email} is already completed and email was already sent. Skipping to prevent duplicate.`);
+          logger.info(`   Completed event: ${completedEvent.id}, Sent email: ${existingSentEmail.id} at ${existingSentEmail.sentAt?.toISOString() || 'N/A'}`);
+          return { success: true, skipped: true, reason: 'Step already completed and email already sent' };
+        }
+      }
+    }
+
     // Fetch department step template to get the step type and email template
     let stepTemplate = null;
     try {
@@ -323,18 +364,36 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null, desc
           customData['{{formLink}}'] = formLink;
         }
 
-        // UNIVERSAL: Use sendUniversalEmail for ALL steps
-        // stepAttachmentPath can be a string (single) or array (multiple)
-        logger.info(`📧 Completing step ${stepNumber} for ${candidate.email} - sending email type: ${emailTemplateType}`);
-        await emailService.sendUniversalEmail(
-          prisma, 
-          candidate, 
-          emailTemplateType, 
-          stepTemplate,
-          stepAttachmentPath, // Can be string or array
-          customData
-        );
-        logger.info(`✅ Email sent successfully for step ${stepNumber}`);
+            // CRITICAL: Check if email was already sent for this step to prevent duplicates
+        // Check for emails sent in the last 5 minutes for this step to prevent duplicate sends
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const existingEmail = await prisma.email.findFirst({
+          where: {
+            candidateId: candidate.id,
+            type: emailTemplateType,
+            status: { in: ['SENT', 'PENDING'] },
+            createdAt: { gte: fiveMinutesAgo }
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        if (existingEmail) {
+          logger.warn(`⏭️ Skipping email send for step ${stepNumber} (${emailTemplateType}): Email already sent or pending in last 5 minutes (email ID: ${existingEmail.id})`);
+          logger.info(`   Existing email status: ${existingEmail.status}, created: ${existingEmail.createdAt.toISOString()}`);
+        } else {
+          // UNIVERSAL: Use sendUniversalEmail for ALL steps
+          // stepAttachmentPath can be a string (single) or array (multiple)
+          logger.info(`📧 Completing step ${stepNumber} for ${candidate.email} - sending email type: ${emailTemplateType}`);
+          await emailService.sendUniversalEmail(
+            prisma, 
+            candidate, 
+            emailTemplateType, 
+            stepTemplate,
+            stepAttachmentPath, // Can be string or array
+            customData
+          );
+          logger.info(`✅ Email sent successfully for step ${stepNumber}`);
+        }
       } catch (emailError) {
         logger.error(`❌ Failed to send email for step ${stepNumber} (${stepConfig.emailType || 'unknown'}):`, emailError.message);
         logger.error('Full email error:', emailError);
