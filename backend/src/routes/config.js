@@ -189,11 +189,26 @@ const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalS
             logger.warn(`⚠️ Google Calendar event creation failed for ${candidate.email}, continuing with local event:`, gcalError.message);
           }
 
+          // CRITICAL: Map step type to valid event type (same as other places in codebase)
+          // MANUAL -> CUSTOM, WHATSAPP_ADDITION -> WHATSAPP_TASK
+          let eventType = step.type;
+          if (eventType === 'MANUAL') {
+            eventType = 'CUSTOM';
+          } else if (eventType === 'WHATSAPP_ADDITION') {
+            eventType = 'WHATSAPP_TASK';
+          } else if (!['OFFER_LETTER', 'OFFER_REMINDER', 'WELCOME_EMAIL', 'HR_INDUCTION', 
+                       'WHATSAPP_TASK', 'ONBOARDING_FORM', 'FORM_REMINDER', 'CEO_INDUCTION', 
+                       'SALES_INDUCTION', 'DEPARTMENT_INDUCTION', 'TRAINING_PLAN', 
+                       'CHECKIN_CALL', 'TRAINING', 'CUSTOM'].includes(eventType)) {
+            // If type is not in enum, use CUSTOM
+            eventType = 'CUSTOM';
+          }
+
           // Create calendar event in database
           await prisma.calendarEvent.create({
             data: {
               candidateId: candidate.id,
-              type: step.type,
+              type: eventType, // Use mapped type (MANUAL -> CUSTOM, etc.)
               title: eventData.title,
               description: eventData.description,
               startTime: scheduledDateIST, // Use IST-converted date
