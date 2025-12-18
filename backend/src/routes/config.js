@@ -965,6 +965,14 @@ router.post('/department-steps', async (req, res) => {
 
       // Prepare create data with separate times
       const createMethod = schedulingMethod || 'doj';
+      
+      // Automatically determine isAuto: true if step has scheduling configuration (not manual)
+      const hasSchedulingConfig = createMethod !== 'manual' && 
+        (dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '') &&
+        ((scheduledTimeDoj && scheduledTimeDoj.trim() !== '') || 
+         (scheduledTimeOfferLetter && scheduledTimeOfferLetter.trim() !== '') ||
+         (scheduledTime && scheduledTime.trim() !== ''));
+      
       const createData = {
         department,
         stepNumber: parseInt(stepNumber),
@@ -972,7 +980,7 @@ router.post('/department-steps', async (req, res) => {
         description,
         type,
         icon,
-        isAuto: isAuto || false,
+        isAuto: isAuto !== undefined ? isAuto : hasSchedulingConfig, // Use provided isAuto, or auto-detect from scheduling config
         dueDateOffset: dueDateOffset !== undefined && dueDateOffset !== null && dueDateOffset !== '' ? parseInt(dueDateOffset) : null,
         schedulingMethod: createMethod,
         priority: priority || 'MEDIUM',
