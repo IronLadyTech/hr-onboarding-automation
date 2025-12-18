@@ -2004,34 +2004,21 @@ const CandidateDetail = () => {
                           >
                             📅
                           </button>
+                            )
                           )}
                           {/* Show "Send" button for all steps (disabled if previous step not completed) */}
-                          {!step.actions && (
+                          {!step.actions && step.step !== 1 && (
                             <button
                               onClick={() => {
-                                // Special check for Step 1 (Offer Letter) - must have offer letter uploaded or scheduled with attachment
-                                const hasOfferLetter = candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath);
-                                if (step.stepType === 'OFFER_LETTER' && !hasOfferLetter) {
-                                  toast.error('Please upload an offer letter first. You can attach it when scheduling or upload it separately.');
-                                  setShowUploadModal('offer');
-                                  return;
-                                }
-                                
                                 if (!isPreviousStepCompleted(step.step)) {
                                   toast.error('Please complete the previous step first');
                                   return;
                                 }
                                 handleSendClick(step.step);
                               }}
-                              className={`btn text-sm ${isPreviousStepCompleted(step.step) && (step.stepType !== 'OFFER_LETTER' || candidate.offerLetterPath || (step.scheduledEvent && step.scheduledEvent.attachmentPath)) ? 'btn-primary' : 'btn-secondary opacity-50 cursor-not-allowed'}`}
-                              disabled={actionLoading === `completeStep${step.step}` || !isPreviousStepCompleted(step.step) || (step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath))}
-                              title={
-                                step.stepType === 'OFFER_LETTER' && !candidate.offerLetterPath && !(step.scheduledEvent && step.scheduledEvent.attachmentPath)
-                                  ? 'Upload offer letter first or schedule with attachment' 
-                                  : !isPreviousStepCompleted(step.step) 
-                                    ? 'Complete previous step first' 
-                                    : 'Mark as completed'
-                              }
+                              className={`btn text-sm ${isPreviousStepCompleted(step.step) ? 'btn-primary' : 'btn-secondary opacity-50 cursor-not-allowed'}`}
+                              disabled={actionLoading === `completeStep${step.step}` || !isPreviousStepCompleted(step.step)}
+                              title={!isPreviousStepCompleted(step.step) ? 'Complete previous step first' : 'Mark as completed'}
                             >
                               {actionLoading === `completeStep${step.step}` ? 'Completing...' : 'Send'}
                             </button>
