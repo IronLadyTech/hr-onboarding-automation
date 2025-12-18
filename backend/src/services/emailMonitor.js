@@ -415,49 +415,36 @@ const processMessageImap = async (emailData, candidate) => {
     const subject = parsed.subject || '';
     const inReplyTo = parsed.inReplyTo || '';
     
-    logger.info(`Processing IMAP email: From=${fromEmail}, Subject=${subject}, InReplyTo=${inReplyTo || 'none'}`);
-
-    // Verify it's a reply to offer email (same logic as Gmail API)
-    const offerEmails = await prisma.email.findMany({
-      where: {
-        candidateId: candidate.id,
-        type: { in: ['OFFER_LETTER', 'OFFER_REMINDER'] },
-        status: { in: ['SENT', 'PENDING'] }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20
-    });
+    const emailDate = parsed.date || new Date();
     
-    if (offerEmails.length === 0) {
-      logger.info(`⏭️ Skipping IMAP email: No offer emails found for candidate`);
+    logger.info(`Processing IMAP email: From=${fromEmail}, Subject="${subject}", Date=${emailDate.toISOString()}`);
+    
+    // SIMPLIFIED LOGIC: Process ANY email with attachment from candidate who has offerSentAt but no offerSignedAt
+    // No restrictions - accept first attachment from candidate after offer is sent
+    // Once detected, candidate.offerSignedAt will be set, so won't process again
+    
+    // Only process if candidate has offerSentAt but no offerSignedAt (first time detection)
+    if (!candidate.offerSentAt) {
+      logger.info(`⏭️ Skipping IMAP email from ${fromEmail}: Candidate has not been sent an offer letter yet`);
       return;
     }
     
-    let isReplyToOfferEmail = false;
-    const subjectLower = subject.toLowerCase();
-    
-    // Check subject matching
-    for (const offerEmail of offerEmails) {
-      const offerSubjectLower = offerEmail.subject.toLowerCase();
-      const cleanOfferSubject = offerSubjectLower.replace(/^re:\s*/i, '').trim();
-      const cleanReplySubject = subjectLower.replace(/^re:\s*/i, '').trim();
-      
-      const subjectsMatch = cleanReplySubject.includes(cleanOfferSubject) || 
-                           cleanOfferSubject.includes(cleanReplySubject) ||
-                           (cleanReplySubject.includes('offer') && cleanOfferSubject.includes('offer')) ||
-                           (cleanReplySubject.includes('letter') && cleanOfferSubject.includes('letter'));
-      
-      if (subjectsMatch) {
-        isReplyToOfferEmail = true;
-        logger.info(`✅ Detected as reply to ${offerEmail.type} email`);
-        break;
-      }
-    }
-    
-    if (!isReplyToOfferEmail) {
-      logger.info(`⏭️ Skipping IMAP email: Not a reply to offer email`);
+    if (candidate.offerSignedAt) {
+      logger.info(`⏭️ Skipping IMAP email from ${fromEmail}: Candidate has already signed offer letter (signed at: ${candidate.offerSignedAt.toISOString()})`);
       return;
     }
+    
+    // Check if email was sent AFTER the offer was sent (allow 1 minute buffer)
+    const offerSentTime = new Date(candidate.offerSentAt).getTime();
+    const emailTime = emailDate.getTime();
+    const oneMinute = 60 * 1000;
+    
+    if (emailTime < (offerSentTime - oneMinute)) {
+      logger.info(`⏭️ Skipping IMAP email from ${fromEmail}: Email date (${emailDate.toISOString()}) is more than 1 minute before offer was sent (${candidate.offerSentAt.toISOString()})`);
+      return;
+    }
+    
+    logger.info(`✅ Processing IMAP email from ${candidate.firstName} ${candidate.lastName}: OfferSentAt=${candidate.offerSentAt.toISOString()}, EmailDate=${emailDate.toISOString()}, HasSigned=${!!candidate.offerSignedAt}`);
     
     // Process attachments
     if (parsed.attachments && parsed.attachments.length > 0) {
