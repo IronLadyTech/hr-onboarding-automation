@@ -6,6 +6,199 @@ const fs = require('fs').promises;
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
+// ============================================================
+// SHARED FUNCTION: Auto-create calendar events for candidates
+// This function is used by both POST (create) and PUT (update) endpoints
+// to ensure newly created and updated steps use the exact same logic
+// IMPORTANT: This must match the logic in autoScheduleStepsForNewCandidate
+// ============================================================
+const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalSchedulingMethod, finalDueDateOffset, finalScheduledTimeDoj, finalScheduledTimeOfferLetter) => {
+  try {
+    // Check if step should auto-schedule - EXACT SAME CONDITIONS as autoScheduleStepsForNewCandidate
+    const shouldAutoSchedule = finalIsAuto && 
+                                finalSchedulingMethod !== 'manual' && 
+                                (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
+                                (finalScheduledTimeDoj || finalScheduledTimeOfferLetter);
+    
+    if (!shouldAutoSchedule) {
+      logger.debug(`⏭️ Step ${step.stepNumber} should not auto-schedule: isAuto=${finalIsAuto}, method=${finalSchedulingMethod}, offset=${finalDueDateOffset}, times=${finalScheduledTimeDoj || finalScheduledTimeOfferLetter || 'none'}`);
+      return;
+    }
+    
+    logger.info(`🔄 Auto-creating calendar events for step ${step.stepNumber} (${step.type}) in department ${step.department}...`);
+    logger.info(`   Config: isAuto=${finalIsAuto}, method=${finalSchedulingMethod}, offset=${finalDueDateOffset}, timeDoj=${finalScheduledTimeDoj}, timeOfferLetter=${finalScheduledTimeOfferLetter}`);
+    
+    // Get all candidates in this department who don't already have this step scheduled
+    // CRITICAL: Use same conditions as autoScheduleStepsForNewCandidate
+    const candidates = await prisma.candidate.findMany({
+      where: {
+        department: step.department,
+        // Only include candidates who have the required date (DOJ or Offer Letter)
+        OR: [
+          { expectedJoiningDate: { not: null } },
+          { offerSentAt: { not: null } }
+        ]
+      },
+      include: {
+        calendarEvents: {
+          where: {
+            stepNumber: step.stepNumber,
+            status: { not: 'COMPLETED' }
+          }
+        }
+      }
+    });
+
+    // Filter out candidates who already have this step scheduled
+    const candidatesToSchedule = candidates.filter(c => c.calendarEvents.length === 0);
+    
+    logger.info(`📋 Found ${candidatesToSchedule.length} candidate(s) in ${step.department} who need calendar events for step ${step.stepNumber}`);
+
+    if (candidatesToSchedule.length > 0) {
+      const calendarService = require('../services/calendarService');
+      let eventsCreated = 0;
+      let eventsSkipped = 0;
+
+      for (const candidate of candidatesToSchedule) {
+        try {
+          // Calculate scheduled date/time using same logic as candidate profile
+          // EXACT SAME LOGIC as autoScheduleStepsForNewCandidate
+          let baseDate = null;
+          let scheduledTime = null;
+
+          if (finalSchedulingMethod === 'offerLetter') {
+            // Use Offer Letter date - need to fetch it separately since we filtered calendarEvents
+            const offerLetterEvent = await prisma.calendarEvent.findFirst({
+              where: {
+                candidateId: candidate.id,
+                type: 'OFFER_LETTER',
+                status: { not: 'COMPLETED' }
+              }
+            });
+            baseDate = offerLetterEvent?.startTime || candidate.offerSentAt;
+            scheduledTime = finalScheduledTimeOfferLetter || '14:00';
+            
+            // If candidate doesn't have offerSentAt yet, skip (same as autoScheduleStepsForNewCandidate)
+            if (!baseDate) {
+              logger.debug(`⏭️ Skipping candidate ${candidate.email}: No offer letter date available for offerLetter-based step ${step.stepNumber}`);
+              eventsSkipped++;
+              continue;
+            }
+          } else {
+            // Use DOJ
+            baseDate = candidate.expectedJoiningDate;
+            scheduledTime = finalScheduledTimeDoj || '09:00';
+            
+            // If candidate doesn't have DOJ, skip (same as autoScheduleStepsForNewCandidate)
+            if (!baseDate) {
+              logger.debug(`⏭️ Skipping candidate ${candidate.email}: No DOJ available for DOJ-based step ${step.stepNumber}`);
+              eventsSkipped++;
+              continue;
+            }
+          }
+
+          // Calculate scheduled date - CRITICAL: Handle timezone correctly (IST = UTC+5:30)
+          // EXACT SAME LOGIC as autoScheduleStepsForNewCandidate
+          const base = new Date(baseDate);
+          const scheduledDate = new Date(base);
+          scheduledDate.setDate(scheduledDate.getDate() + (finalDueDateOffset || 0));
+
+          // Extract date components
+          const year = scheduledDate.getFullYear();
+          const month = String(scheduledDate.getMonth() + 1).padStart(2, '0');
+          const day = String(scheduledDate.getDate()).padStart(2, '0');
+          
+          // Get time from scheduledTime (HH:mm format, e.g., "12:03")
+          const [hours, minutes] = scheduledTime.split(':');
+          const hour = parseInt(hours) || 9;
+          const minute = parseInt(minutes) || 0;
+
+          // Create date string treating the time as IST (Asia/Kolkata, UTC+5:30)
+          // Format: "YYYY-MM-DDTHH:mm:00+05:30" for IST
+          const istDateString = `${year}-${month}-${day}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00+05:30`;
+          const scheduledDateIST = new Date(istDateString);
+
+          // Verify the date is valid
+          if (isNaN(scheduledDateIST.getTime())) {
+            logger.error(`❌ Invalid date created for candidate ${candidate.email}: ${istDateString}`);
+            eventsSkipped++;
+            continue;
+          }
+
+          // Calculate end time (default 15 minutes, longer for inductions)
+          // EXACT SAME DURATION MAP as autoScheduleStepsForNewCandidate
+          const durationMap = { 
+            'OFFER_LETTER': 30, 
+            'OFFER_REMINDER': 15, 
+            'WELCOME_EMAIL': 30, 
+            'HR_INDUCTION': 60, 
+            'WHATSAPP_ADDITION': 15, 
+            'ONBOARDING_FORM': 30, 
+            'FORM_REMINDER': 15, 
+            'CEO_INDUCTION': 60, 
+            'SALES_INDUCTION': 90, 
+            'DEPARTMENT_INDUCTION': 90,
+            'TRAINING_PLAN': 30, 
+            'CHECKIN_CALL': 30 
+          };
+          const eventDuration = durationMap[step.type] || 15;
+          const endTime = new Date(scheduledDateIST);
+          endTime.setMinutes(endTime.getMinutes() + eventDuration);
+
+          // Create calendar event (same as candidate profile scheduling)
+          const eventData = {
+            title: `${step.title} - ${candidate.firstName} ${candidate.lastName}`,
+            description: step.description || '',
+            startTime: scheduledDateIST, // Use IST-converted date
+            endTime: endTime,
+            attendees: [candidate.email],
+            createMeet: false // Don't create Google Meet for auto-scheduled events
+          };
+
+          // Try to create Google Calendar event (optional - continue if it fails)
+          let googleEvent = null;
+          try {
+            googleEvent = await calendarService.createGoogleEvent(eventData, prisma);
+          } catch (gcalError) {
+            logger.warn(`⚠️ Google Calendar event creation failed for ${candidate.email}, continuing with local event:`, gcalError.message);
+          }
+
+          // Create calendar event in database
+          await prisma.calendarEvent.create({
+            data: {
+              candidateId: candidate.id,
+              type: step.type,
+              title: eventData.title,
+              description: eventData.description,
+              startTime: scheduledDateIST, // Use IST-converted date
+              endTime: endTime,
+              attendees: eventData.attendees,
+              meetingLink: googleEvent?.hangoutLink || googleEvent?.htmlLink || null,
+              googleEventId: googleEvent?.id || null,
+              stepNumber: step.stepNumber,
+              status: 'SCHEDULED'
+            }
+          });
+
+          eventsCreated++;
+          logger.info(`✅ Created calendar event for ${candidate.email}: Step ${step.stepNumber} scheduled for ${scheduledDateIST.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} (IST)`);
+
+        } catch (candidateError) {
+          logger.error(`❌ Error creating calendar event for candidate ${candidate.email}:`, candidateError.message);
+          eventsSkipped++;
+        }
+      }
+
+      logger.info(`✅ Auto-created ${eventsCreated} calendar event(s) for step ${step.stepNumber}, skipped ${eventsSkipped} candidate(s)`);
+    } else {
+      logger.info(`ℹ️ No candidates need calendar events for step ${step.stepNumber} (all already scheduled or missing required dates)`);
+    }
+  } catch (autoScheduleError) {
+    logger.error('❌ Error auto-creating calendar events:', autoScheduleError);
+    // Don't throw - allow step creation/update to succeed even if auto-scheduling fails
+  }
+};
+
 // Configure multer for logo uploads
 const logoStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
