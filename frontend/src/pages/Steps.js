@@ -194,10 +194,16 @@ const Steps = () => {
     
     // Prepare data to send - send separate times for each scheduling method
     // IMPORTANT: Explicitly exclude isAuto from stepForm - backend will auto-detect it
-    const { isAuto, ...stepFormWithoutIsAuto } = stepForm;
+    const { isAuto: _isAuto, ...stepFormWithoutIsAuto } = stepForm;
     
+    // Build dataToSend explicitly to ensure isAuto is never included
     const dataToSend = {
-      ...stepFormWithoutIsAuto,
+      stepNumber: stepForm.stepNumber,
+      title: stepForm.title,
+      description: stepForm.description,
+      type: stepForm.type,
+      icon: stepForm.icon,
+      emailTemplateId: stepForm.emailTemplateId,
       department: selectedDepartment,
       // Send separate times for each method
       scheduledTimeDoj: (stepForm.scheduledTimeDoj && stepForm.scheduledTimeDoj.trim() !== '') 
@@ -214,8 +220,14 @@ const Steps = () => {
       dueDateOffset: stepForm.schedulingMethod === 'manual' ? null : (stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : 0),
       // Always send schedulingMethod
       schedulingMethod: stepForm.schedulingMethod || 'doj'
-      // NOTE: isAuto is NOT sent - backend will auto-detect it from scheduling config
+      // NOTE: isAuto is explicitly NOT included - backend will auto-detect it from scheduling config
     };
+    
+    // CRITICAL: Verify isAuto is not in dataToSend
+    if ('isAuto' in dataToSend) {
+      console.error('❌ ERROR: isAuto found in dataToSend! Removing it...', dataToSend.isAuto);
+      delete dataToSend.isAuto;
+    }
     
     // Debug: Log what we're sending
     console.log('Saving step with data:', {
