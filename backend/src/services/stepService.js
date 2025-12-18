@@ -269,7 +269,12 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null, desc
         
         // Extract attachment path(s) if found
         // Support both single attachment (backward compatibility) and multiple attachments
-        if (calendarEvent) {
+        // Priority: Use provided attachmentPath (from upload), then calendar event attachment
+        if (attachmentPath) {
+          // Use attachment provided in function call (from file upload)
+          stepAttachmentPath = attachmentPath;
+          logger.info(`✅ Using provided attachment for step ${stepNumber}: ${attachmentPath}`);
+        } else if (calendarEvent) {
           // Priority: Use attachmentPaths (array) if available, otherwise use attachmentPath (single)
           if (calendarEvent.attachmentPaths && Array.isArray(calendarEvent.attachmentPaths) && calendarEvent.attachmentPaths.length > 0) {
             // Multiple attachments - pass as array
@@ -280,6 +285,12 @@ const completeStep = async (prisma, candidateId, stepNumber, userId = null, desc
             stepAttachmentPath = calendarEvent.attachmentPath;
             logger.info(`✅ Found attachment for step ${stepNumber} (${calendarEvent.type}): ${calendarEvent.attachmentPath}`);
           }
+        }
+        
+        // For Step 1, also check candidate.offerLetterPath if no attachment found yet
+        if (!stepAttachmentPath && stepNumber === 1 && candidate.offerLetterPath) {
+          stepAttachmentPath = candidate.offerLetterPath;
+          logger.info(`✅ Using candidate offer letter path for step 1: ${candidate.offerLetterPath}`);
         }
         
         if (!stepAttachmentPath) {
