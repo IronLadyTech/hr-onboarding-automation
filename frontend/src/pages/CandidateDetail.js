@@ -36,6 +36,9 @@ const CandidateDetail = () => {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [showScheduleModal, setShowScheduleModal] = useState(null);
+  const [showSendAttachmentModal, setShowSendAttachmentModal] = useState(null); // stepNumber or null
+  const [sendAttachmentFile, setSendAttachmentFile] = useState(null); // New file to attach
+  const [sendAttachmentExisting, setSendAttachmentExisting] = useState(null); // Existing attachment path
   const [scheduleDateTime, setScheduleDateTime] = useState('');
   const [scheduleDuration, setScheduleDuration] = useState(60);
   const [editingEventId, setEditingEventId] = useState(null);
@@ -140,9 +143,18 @@ const CandidateDetail = () => {
   };
 
   const handleSendClick = (stepNumber) => {
-    setPendingStep(stepNumber);
-    setPendingAction('send');
-    setShowConfirmDialog(true);
+    // For Step 1, show attachment modal; for others, show confirmation dialog
+    if (stepNumber === 1) {
+      const step = workflowSteps.find(s => s.step === stepNumber);
+      const existingAttachment = candidate.offerLetterPath || (step?.scheduledEvent?.attachmentPath);
+      setSendAttachmentExisting(existingAttachment);
+      setSendAttachmentFile(null);
+      setShowSendAttachmentModal(stepNumber);
+    } else {
+      setPendingStep(stepNumber);
+      setPendingAction('send');
+      setShowConfirmDialog(true);
+    }
   };
 
   const handleConfirmAction = async () => {
@@ -178,6 +190,37 @@ const CandidateDetail = () => {
       setActionLoading('');
       setPendingStep(null);
       setPendingAction(null);
+    }
+  };
+
+  const handleSendWithAttachment = async () => {
+    if (!showSendAttachmentModal) return;
+    
+    const stepNumber = showSendAttachmentModal;
+    setActionLoading(`completeStep${stepNumber}`);
+    
+    try {
+      // If Step 1 and new file selected, upload it first
+      if (stepNumber === 1 && sendAttachmentFile) {
+        const formData = new FormData();
+        formData.append('offerLetter', sendAttachmentFile);
+        await candidateApi.uploadOfferLetter(id, formData);
+        toast.success('Offer letter uploaded');
+      }
+      
+      // Complete step (will send email with attachment)
+      await candidateApi.completeStep(id, stepNumber);
+      toast.success(`Step ${stepNumber} completed! Email sent to candidate.`);
+      
+      setShowSendAttachmentModal(null);
+      setSendAttachmentFile(null);
+      setSendAttachmentExisting(null);
+      fetchCandidate();
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || 'Failed to complete step';
+      toast.error(errorMessage, { duration: 5000 });
+    } finally {
+      setActionLoading('');
     }
   };
 
@@ -623,35 +666,6 @@ const CandidateDetail = () => {
     }
   };
 
-  const handleCheckEmail = async () => {
-    if (!candidate?.offerSentAt) {
-      toast.error('Offer letter must be sent first');
-      return;
-    }
-    if (candidate?.offerSignedAt) {
-      toast.info('Offer letter already signed');
-      return;
-    }
-    setActionLoading('checkEmail');
-    try {
-      const response = await candidateApi.checkEmail(id);
-      if (response.data.success) {
-        toast.success(response.data.message || 'Email checked successfully');
-        fetchCandidate(); // Refresh candidate data
-      } else {
-        toast.error(response.data.message || 'Failed to check email');
-      }
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to check email';
-      if (errorMsg.includes('Gmail API not initialized')) {
-        toast.error('Email monitoring is not configured. Please configure Gmail API in Settings.');
-      } else {
-        toast.error(errorMsg);
-      }
-    } finally {
-      setActionLoading('');
-    }
-  };
 
   const handleScheduleSubmit = async () => {
     if (!scheduleDateTime) {
@@ -1443,58 +1457,13 @@ const CandidateDetail = () => {
                         View Document →
                       </a>
                     ) : (
-                      <>
-                        {/* Only show manual buttons if auto-detection is not active */}
-                        {emailMonitorActive === false && (
-                          <>
-                            <button
-                              onClick={handleCheckEmail}
-                              disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
-                              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
-                              title="Check email inbox for signed offer letter from candidate"
-                            >
-                              {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
-                            </button>
-                            <button
-                              onClick={() => setShowUploadModal('signedOffer')}
-                              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
-                              title="Upload signed offer letter received from candidate"
-                            >
-                              📤 Upload
-                            </button>
-                          </>
-                        )}
-                        {/* If auto-detection is active, only show upload as backup */}
-                        {emailMonitorActive === true && (
-                          <button
-                            onClick={() => setShowUploadModal('signedOffer')}
-                            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
-                            title="Manual upload (auto-detection is active)"
-                          >
-                            📤 Upload (Manual)
-                          </button>
-                        )}
-                        {/* If status unknown, show both */}
-                        {emailMonitorActive === null && (
-                          <>
-                            <button
-                              onClick={handleCheckEmail}
-                              disabled={actionLoading === 'checkEmail' || !candidate?.offerSentAt}
-                              className="text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-3 py-1 rounded font-medium"
-                              title="Check email inbox for signed offer letter from candidate"
-                            >
-                              {actionLoading === 'checkEmail' ? '⏳ Checking...' : '📧 Check Email'}
-                            </button>
-                            <button
-                              onClick={() => setShowUploadModal('signedOffer')}
-                              className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
-                              title="Upload signed offer letter received from candidate"
-                            >
-                              📤 Upload
-                            </button>
-                          </>
-                        )}
-                      </>
+                      <button
+                        onClick={() => setShowUploadModal('signedOffer')}
+                        className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded font-medium"
+                        title="Upload signed offer letter received from candidate"
+                      >
+                        📤 Upload
+                      </button>
                     )}
                   </div>
                 </div>
@@ -2700,6 +2669,96 @@ const CandidateDetail = () => {
                 ) : (
                   'Delete Permanently'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send with Attachment Modal - for Step 1 and other steps */}
+      {showSendAttachmentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">
+              Send Step {showSendAttachmentModal} Email
+            </h3>
+            
+            {/* Show existing attachment if any */}
+            {sendAttachmentExisting && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-sm font-medium text-gray-700 mb-2">Current Attachment:</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    📎 {sendAttachmentExisting.split('/').pop() || sendAttachmentExisting.split('\\').pop()}
+                  </span>
+                  <a
+                    href={`${(() => {
+                      let apiUrl = process.env.REACT_APP_API_URL || '/api';
+                      if (apiUrl.startsWith('http')) {
+                        apiUrl = apiUrl.replace(/\/$/, '');
+                        if (!apiUrl.endsWith('/api')) {
+                          apiUrl = `${apiUrl}/api`;
+                        }
+                      }
+                      return apiUrl;
+                    })()}/uploads/${sendAttachmentExisting.replace(/\\/g, '/')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    View →
+                  </a>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">This file will be sent with the email</p>
+              </div>
+            )}
+            
+            {/* File upload for new attachment */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {sendAttachmentExisting ? 'Attach Additional File (Optional):' : 'Attach File:'}
+              </label>
+              <input
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setSendAttachmentFile(file || null);
+                }}
+                className="input w-full"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+              />
+              {sendAttachmentFile && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-sm text-gray-600">
+                  📎 {sendAttachmentFile.name}
+                </div>
+              )}
+              {showSendAttachmentModal === 1 && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {sendAttachmentExisting 
+                    ? 'Upload a new file to replace the current offer letter'
+                    : 'Upload offer letter to send with email'}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowSendAttachmentModal(null);
+                  setSendAttachmentFile(null);
+                  setSendAttachmentExisting(null);
+                }}
+                className="btn btn-secondary"
+                disabled={actionLoading === `completeStep${showSendAttachmentModal}`}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendWithAttachment}
+                className="btn btn-primary"
+                disabled={actionLoading === `completeStep${showSendAttachmentModal}` || (showSendAttachmentModal === 1 && !sendAttachmentExisting && !sendAttachmentFile)}
+              >
+                {actionLoading === `completeStep${showSendAttachmentModal}` ? 'Sending...' : 'Send Email'}
               </button>
             </div>
           </div>
