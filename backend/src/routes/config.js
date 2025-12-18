@@ -1347,10 +1347,8 @@ router.put('/department-steps/:id', async (req, res) => {
       finalScheduledTimeDoj,
       finalScheduledTimeOfferLetter
     );
-        
-        // Get all candidates in this department who don't already have this step scheduled
-        const candidates = await req.prisma.candidate.findMany({
-          where: {
+
+    res.json({ success: true, data: responseData });
             department: step.department,
             // Only include candidates who have the required date (DOJ or Offer Letter)
             OR: [
