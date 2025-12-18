@@ -810,6 +810,14 @@ const processMessage = async (messageId) => {
       logger.info(`   ${idx + 1}. ${att.filename || 'unnamed'} (${att.mimeType || 'unknown type'}, ID: ${att.attachmentId || 'none'})`);
     });
     
+    if (attachments.length === 0) {
+      logger.error(`❌ CRITICAL: Gmail search found email with 'has:attachment' but findAttachments() found 0 attachments!`);
+      logger.error(`   This suggests the attachment detection logic needs fixing.`);
+      logger.error(`   Message ID: ${messageId}`);
+      logger.error(`   Subject: ${subject}`);
+      return;
+    }
+    
     // Download and save first valid attachment
     let attachmentProcessed = false;
     for (const att of attachments) {
