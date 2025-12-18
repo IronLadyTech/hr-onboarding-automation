@@ -193,8 +193,11 @@ const Steps = () => {
     }
     
     // Prepare data to send - send separate times for each scheduling method
+    // IMPORTANT: Explicitly exclude isAuto from stepForm - backend will auto-detect it
+    const { isAuto, ...stepFormWithoutIsAuto } = stepForm;
+    
     const dataToSend = {
-      ...stepForm,
+      ...stepFormWithoutIsAuto,
       department: selectedDepartment,
       // Send separate times for each method
       scheduledTimeDoj: (stepForm.scheduledTimeDoj && stepForm.scheduledTimeDoj.trim() !== '') 
@@ -211,6 +214,7 @@ const Steps = () => {
       dueDateOffset: stepForm.schedulingMethod === 'manual' ? null : (stepForm.dueDateOffset !== undefined ? stepForm.dueDateOffset : 0),
       // Always send schedulingMethod
       schedulingMethod: stepForm.schedulingMethod || 'doj'
+      // NOTE: isAuto is NOT sent - backend will auto-detect it from scheduling config
     };
     
     // Debug: Log what we're sending
