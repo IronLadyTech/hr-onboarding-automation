@@ -5,7 +5,7 @@ const logger = require('../utils/logger');
  * Complete a step for a candidate - UNIVERSAL function used by both manual "Send" button and scheduler
  * This ensures both use the EXACT same logic
  */
-const completeStep = async (prisma, candidateId, stepNumber, userId = null) => {
+const completeStep = async (prisma, candidateId, stepNumber, userId = null, description = null, attachmentPath = null) => {
   try {
     if (!stepNumber || stepNumber < 1) {
       throw new Error('Invalid step number');

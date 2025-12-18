@@ -1848,8 +1848,8 @@ router.post('/:id/undo-scheduled-step', async (req, res) => {
 
 // ============ STEP COMPLETION ============
 
-// Mark step as completed (and send email if needed)
-router.post('/:id/complete-step', async (req, res) => {
+// Mark step as completed (and send email if needed) - supports file attachments
+router.post('/:id/complete-step', upload.single('attachment'), async (req, res) => {
   try {
     const { stepNumber } = req.body;
 
@@ -1857,12 +1857,32 @@ router.post('/:id/complete-step', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid step number' });
     }
 
+    // Get attachment file if uploaded
+    let attachmentPath = null;
+    if (req.file) {
+      const relativePath = path.relative(path.join(__dirname, '../../uploads'), req.file.path);
+      attachmentPath = relativePath.replace(/\\/g, '/');
+      logger.info(`📎 Attachment uploaded for step ${stepNumber}: ${attachmentPath}`);
+      
+      // For Step 1, also save as offer letter
+      if (stepNumber === 1) {
+        await req.prisma.candidate.update({
+          where: { id: req.params.id },
+          data: { offerLetterPath: attachmentPath }
+        });
+        logger.info(`✅ Offer letter saved: ${attachmentPath}`);
+      }
+    }
+
     // Use the universal stepService - same logic as scheduler
+    // Pass attachment path if provided
     const updated = await stepService.completeStep(
       req.prisma, 
       req.params.id, 
       stepNumber, 
-      req.user.id
+      req.user.id,
+      null, // description
+      attachmentPath // attachment path
     );
 
     res.json({ success: true, data: updated });

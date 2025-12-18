@@ -200,16 +200,10 @@ const CandidateDetail = () => {
     setActionLoading(`completeStep${stepNumber}`);
     
     try {
-      // If Step 1 and new file selected, upload it first
-      if (stepNumber === 1 && sendAttachmentFile) {
-        const formData = new FormData();
-        formData.append('offerLetter', sendAttachmentFile);
-        await candidateApi.uploadOfferLetter(id, formData);
-        toast.success('Offer letter uploaded');
-      }
-      
-      // Complete step (will send email with attachment)
-      await candidateApi.completeStep(id, stepNumber);
+      // Complete step with attachment (will upload file and send email)
+      // For Step 1, if new file is selected, it will be uploaded and used
+      // For other steps, new file will be attached to email
+      await candidateApi.completeStep(id, stepNumber, sendAttachmentFile || null);
       toast.success(`Step ${stepNumber} completed! Email sent to candidate.`);
       
       setShowSendAttachmentModal(null);

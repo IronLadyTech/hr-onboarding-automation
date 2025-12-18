@@ -138,7 +138,18 @@ export const candidateApi = {
   },
   
   // Complete step
-  completeStep: (id, stepNumber) => api.post(`/candidates/${id}/complete-step`, { stepNumber }),
+  completeStep: (id, stepNumber, attachmentFile = null) => {
+    const formData = new FormData();
+    formData.append('stepNumber', stepNumber);
+    if (attachmentFile) {
+      formData.append('attachment', attachmentFile);
+    }
+    return api.post(`/candidates/${id}/complete-step`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+  },
   // Undo scheduled step
   undoScheduledStep: (id, stepNumber) => api.post(`/candidates/${id}/undo-scheduled-step`, { stepNumber }),
   
