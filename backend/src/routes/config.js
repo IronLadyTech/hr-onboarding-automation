@@ -20,18 +20,34 @@ const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalS
       return;
     }
     
+    // CRITICAL: Use step's scheduledTime field as fallback if separate times are not provided
+    // This handles cases where steps were created with old scheduledTime field
+    let effectiveScheduledTimeDoj = finalScheduledTimeDoj || (finalSchedulingMethod === 'doj' ? step.scheduledTime : null);
+    let effectiveScheduledTimeOfferLetter = finalScheduledTimeOfferLetter || (finalSchedulingMethod === 'offerLetter' ? step.scheduledTime : null);
+    
+    // If still no time, use defaults based on scheduling method
+    if (!effectiveScheduledTimeDoj && !effectiveScheduledTimeOfferLetter && finalSchedulingMethod !== 'manual' && finalDueDateOffset !== null && finalDueDateOffset !== undefined) {
+      if (finalSchedulingMethod === 'offerLetter') {
+        effectiveScheduledTimeOfferLetter = '14:00';
+        logger.info(`🔧 Using default scheduledTimeOfferLetter=14:00 for step ${step.stepNumber} (no time in step or parameters)`);
+      } else {
+        effectiveScheduledTimeDoj = '12:30';
+        logger.info(`🔧 Using default scheduledTimeDoj=12:30 for step ${step.stepNumber} (no time in step or parameters)`);
+      }
+    }
+    
     // Check if step should auto-schedule - EXACT SAME CONDITIONS as autoScheduleStepsForNewCandidate
     // IMPORTANT: finalIsAuto must be true, schedulingMethod must not be 'manual', 
     // dueDateOffset must be set, and at least one scheduled time must be set
     const shouldAutoSchedule = finalIsAuto && 
                                 finalSchedulingMethod !== 'manual' && 
                                 (finalDueDateOffset !== null && finalDueDateOffset !== undefined) &&
-                                (finalScheduledTimeDoj || finalScheduledTimeOfferLetter);
+                                (effectiveScheduledTimeDoj || effectiveScheduledTimeOfferLetter);
     
     if (!shouldAutoSchedule) {
       logger.info(`⏭️ Step ${step.stepNumber} (${step.title}) should not auto-schedule:`);
       logger.info(`   isAuto=${finalIsAuto}, method=${finalSchedulingMethod}, offset=${finalDueDateOffset}`);
-      logger.info(`   timeDoj=${finalScheduledTimeDoj || 'none'}, timeOfferLetter=${finalScheduledTimeOfferLetter || 'none'}`);
+      logger.info(`   timeDoj=${effectiveScheduledTimeDoj || 'none'}, timeOfferLetter=${effectiveScheduledTimeOfferLetter || 'none'}`);
       return;
     }
     
@@ -86,7 +102,7 @@ const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalS
               }
             });
             baseDate = offerLetterEvent?.startTime || candidate.offerSentAt;
-            scheduledTime = finalScheduledTimeOfferLetter || '14:00';
+            scheduledTime = effectiveScheduledTimeOfferLetter || '14:00';
             
             // If candidate doesn't have offerSentAt yet, skip (same as autoScheduleStepsForNewCandidate)
             if (!baseDate) {
@@ -97,7 +113,7 @@ const autoCreateCalendarEventsForStep = async (prisma, step, finalIsAuto, finalS
           } else {
             // Use DOJ
             baseDate = candidate.expectedJoiningDate;
-            scheduledTime = finalScheduledTimeDoj || '09:00';
+            scheduledTime = effectiveScheduledTimeDoj || '12:30';
             
             // If candidate doesn't have DOJ, skip (same as autoScheduleStepsForNewCandidate)
             if (!baseDate) {
