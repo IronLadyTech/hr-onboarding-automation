@@ -1161,6 +1161,34 @@ router.post('/department-steps', async (req, res) => {
         }
       }
       
+      // CRITICAL FIX: If step should auto-schedule but no time is set, use default times
+      // This ensures updated steps with schedulingMethod and dueDateOffset will auto-schedule
+      const updateMethod = schedulingMethod !== undefined ? schedulingMethod : existingStep.schedulingMethod;
+      const updateDueDateOffset = dueDateOffset !== undefined ? (dueDateOffset !== null && dueDateOffset !== '' && !isNaN(dueDateOffset) ? parseInt(dueDateOffset) : null) : existingStep.dueDateOffset;
+      const updateScheduledTimeDoj = updateData.scheduledTimeDoj !== undefined ? updateData.scheduledTimeDoj : existingStep.scheduledTimeDoj;
+      const updateScheduledTimeOfferLetter = updateData.scheduledTimeOfferLetter !== undefined ? updateData.scheduledTimeOfferLetter : existingStep.scheduledTimeOfferLetter;
+      
+      if (finalIsAuto && updateMethod !== 'manual' && updateDueDateOffset !== null && updateDueDateOffset !== undefined) {
+        if (!updateScheduledTimeDoj && !updateScheduledTimeOfferLetter) {
+          // No time set at all - use defaults based on scheduling method
+          if (updateMethod === 'offerLetter') {
+            updateData.scheduledTimeOfferLetter = '14:00'; // Default for offer letter
+            logger.info(`🔧 Setting default scheduledTimeOfferLetter=14:00 for step ${id} (no time provided)`);
+          } else {
+            updateData.scheduledTimeDoj = '12:30'; // Default for DOJ
+            logger.info(`🔧 Setting default scheduledTimeDoj=12:30 for step ${id} (no time provided)`);
+          }
+        } else if (updateMethod === 'doj' && !updateScheduledTimeDoj && updateScheduledTimeOfferLetter) {
+          // DOJ method but only offerLetter time is set - copy it to DOJ
+          updateData.scheduledTimeDoj = updateScheduledTimeOfferLetter;
+          logger.info(`🔧 Copying scheduledTimeOfferLetter to scheduledTimeDoj for step ${id}`);
+        } else if (updateMethod === 'offerLetter' && !updateScheduledTimeOfferLetter && updateScheduledTimeDoj) {
+          // OfferLetter method but only DOJ time is set - copy it to offerLetter
+          updateData.scheduledTimeOfferLetter = updateScheduledTimeDoj;
+          logger.info(`🔧 Copying scheduledTimeDoj to scheduledTimeOfferLetter for step ${id}`);
+        }
+      }
+      
       // Update existing step
       step = await req.prisma.departmentStepTemplate.update({
         where: { id: existing.id },
@@ -1262,6 +1290,29 @@ router.post('/department-steps', async (req, res) => {
           createData.scheduledTimeDoj = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
         } else if (createMethod === 'offerLetter') {
           createData.scheduledTimeOfferLetter = (scheduledTime && scheduledTime.trim() !== '') ? scheduledTime.trim() : null;
+        }
+      }
+      
+      // CRITICAL FIX: If step should auto-schedule but no time is set, use default times
+      // This ensures newly created steps with schedulingMethod and dueDateOffset will auto-schedule
+      if (finalIsAuto && createMethod !== 'manual' && createData.dueDateOffset !== null && createData.dueDateOffset !== undefined) {
+        if (!createData.scheduledTimeDoj && !createData.scheduledTimeOfferLetter) {
+          // No time set at all - use defaults based on scheduling method
+          if (createMethod === 'offerLetter') {
+            createData.scheduledTimeOfferLetter = '14:00'; // Default for offer letter
+            logger.info(`🔧 Setting default scheduledTimeOfferLetter=14:00 for step ${stepNumber} (no time provided)`);
+          } else {
+            createData.scheduledTimeDoj = '12:30'; // Default for DOJ
+            logger.info(`🔧 Setting default scheduledTimeDoj=12:30 for step ${stepNumber} (no time provided)`);
+          }
+        } else if (createMethod === 'doj' && !createData.scheduledTimeDoj && createData.scheduledTimeOfferLetter) {
+          // DOJ method but only offerLetter time is set - copy it to DOJ
+          createData.scheduledTimeDoj = createData.scheduledTimeOfferLetter;
+          logger.info(`🔧 Copying scheduledTimeOfferLetter to scheduledTimeDoj for step ${stepNumber}`);
+        } else if (createMethod === 'offerLetter' && !createData.scheduledTimeOfferLetter && createData.scheduledTimeDoj) {
+          // OfferLetter method but only DOJ time is set - copy it to offerLetter
+          createData.scheduledTimeOfferLetter = createData.scheduledTimeDoj;
+          logger.info(`🔧 Copying scheduledTimeDoj to scheduledTimeOfferLetter for step ${stepNumber}`);
         }
       }
       
