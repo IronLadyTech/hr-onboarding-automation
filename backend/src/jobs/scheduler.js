@@ -839,6 +839,8 @@ const autoCompleteCalendarSteps = async () => {
   try {
     const now = new Date();
     
+    logger.info(`🕐 [AUTO-COMPLETE] Checking for past calendar events at ${now.toISOString()}...`);
+    
     // Find calendar events that have passed their start time and are still SCHEDULED or RESCHEDULED
     // IMPORTANT: Check for already sent emails to prevent duplicates
     // Include RESCHEDULED status so rescheduled events can also trigger emails
@@ -857,10 +859,14 @@ const autoCompleteCalendarSteps = async () => {
     });
 
     if (pastEvents.length === 0) {
+      logger.debug(`🕐 [AUTO-COMPLETE] No past events found (checked ${now.toISOString()})`);
       return;
     }
 
-    logger.info(`Found ${pastEvents.length} calendar event(s) that have passed - auto-completing steps...`);
+    logger.info(`✅ [AUTO-COMPLETE] Found ${pastEvents.length} calendar event(s) that have passed - auto-completing steps...`);
+    pastEvents.forEach(event => {
+      logger.info(`   📅 Event: ${event.type} (Step ${event.stepNumber || 'unknown'}) for ${event.candidate?.email || 'unknown'} - Scheduled: ${event.startTime.toISOString()}`);
+    });
 
     // Map event types to step numbers (for backward compatibility with hardcoded steps)
     const eventTypeToStep = {
@@ -874,7 +880,11 @@ const autoCompleteCalendarSteps = async () => {
       'OFFER_REMINDER': 2,
       'WELCOME_EMAIL': 3,
       'ONBOARDING_FORM': 6,
-      'TRAINING_PLAN': 10
+      'TRAINING_PLAN': 10,
+      'WHATSAPP_TASK': 5, // WhatsApp Group Addition
+      'WHATSAPP_ADDITION': 5, // Alternative name
+      'FORM_REMINDER': 7,
+      'CUSTOM': null // Will be determined from stepNumber
     };
 
     for (const event of pastEvents) {
